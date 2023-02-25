@@ -56,7 +56,16 @@ async function start() {
       value: context.message.text,
     })
     
-    await context.reply()
+    await context.reply('The sticker has been tagged.')
+
+    const queuedSticker = await stickerQueueRepository.take(userId)
+    if (!queuedSticker) {
+      await userSessionRepository.amendContext(userId, { inQueue: false })
+      await context.reply('The queue is empty.')
+      return
+    }
+
+    await context.replyWithSticker(queuedSticker.stickerFileId)
   })
 
   async function refreshStickerSet(stickerSetName) {
@@ -156,8 +165,6 @@ async function start() {
   bot.command('start_queue', async (context) => {
     const { userId } = context.state
 
-    await userSessionRepository.amendContext(userId, { inQueue: true })
-
     const queuedSticker = await stickerQueueRepository.take(userId)
     if (!queuedSticker) {
       await context.reply('The queue is empty. Send a sticker.')
@@ -165,6 +172,8 @@ async function start() {
     }
 
     await context.reply('Starting the queue.')
+
+    await userSessionRepository.amendContext(userId, { inQueue: true })
     await context.replyWithSticker(queuedSticker.stickerFileId)
   })
 
@@ -174,7 +183,6 @@ async function start() {
     await userSessionRepository.amendContext(userId, { inQueue: false })
 
     await context.reply('The queue has been stopped.')
-
   })
 
   bot.command('clear_queue', async (context) => {
