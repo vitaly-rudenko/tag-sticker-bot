@@ -33,4 +33,8 @@ export class InMemoryStickerQueueRepository {
   async clear(userId) {
     this._queuedStickers = this._queuedStickers.filter(sticker => sticker.userId !== userId)
   }
+
+  async count(userId) {
+    return this._queuedStickers.filter(queuedSticker => queuedSticker.userId === userId).length
+  }
 }

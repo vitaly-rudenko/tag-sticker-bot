@@ -16,6 +16,13 @@ async function start() {
   const stickerRepository = new InMemoryStickerRepository()
   const stickerQueueRepository = new InMemoryStickerQueueRepository()
 
+  await bot.telegram.setMyCommands([
+    { command: 'queue', description: 'Get queue size' },
+    { command: 'start_queue', description: 'Start queue' },
+    { command: 'stop_queue', description: 'Stop queue' },
+    { command: 'clear_queue', description: 'Clear queue' },
+  ])
+
   bot.use((context, next) => {
     if (!context.from || context.from.is_bot) return
     context.state.userId = context.from.id
@@ -51,15 +58,17 @@ async function start() {
         Markup.button.callback('Tag untagged stickers in the set', 'sticker:tag-untagged'),
         Markup.button.callback('Tag untagged (by you) stickers in the set', 'sticker:tag-untagged-by-me'),
         Markup.button.callback('Tag all stickers in the set', 'sticker:tag-all'),
-      ]).reply_markup,
+      ], { columns: 1 }).reply_markup,
     })
   })
 
-  bot.on(message('text'), async (context) => {
+  bot.on(message('text'), async (context, next) => {
+    if (context.message.text.startsWith('/')) return next()
+
     const { userId } = context.state
     const { inQueue, stickerSetName, stickerFileId } = await userSessionRepository.getContext(userId)
 
-    if (!inQueue) return
+    if (!inQueue || !stickerSetName || !stickerFileId) return
 
     await stickerRepository.setTag({
       authorUserId: userId,
@@ -78,6 +87,11 @@ async function start() {
     }
 
     await context.replyWithSticker(queuedSticker.stickerFileId)
+    await userSessionRepository.amendContext(userId, {
+      inQueue: true,
+      stickerSetName: queuedSticker.stickerSetName,
+      stickerFileId: queuedSticker.stickerFileId,
+    })
   })
 
   async function refreshStickerSet(stickerSetName) {
@@ -103,6 +117,8 @@ async function start() {
     const { userId } = context.state
     const { stickerSetName, stickerFileId } = await userSessionRepository.getContext(userId)
 
+    if (!stickerSetName || !stickerFileId) return
+
     await stickerQueueRepository.enqueue({
       userId,
       stickers: [{
@@ -117,6 +133,8 @@ async function start() {
   bot.action('sticker:tag-untagged', withRefreshedStickerSet(), async (context) => {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
+
+    if (!stickerSetName) return
 
     const stickers = await stickerRepository.getStickers(stickerSetName)
     const untaggedStickers = []
@@ -139,6 +157,8 @@ async function start() {
   bot.action('sticker:tag-untagged-by-me', withRefreshedStickerSet(), async (context) => {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
+
+    if (!stickerSetName) return
 
     const stickers = await stickerRepository.getStickers(stickerSetName)
     const untaggedStickers = []
@@ -164,6 +184,8 @@ async function start() {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
 
+    if (!stickerSetName) return
+
     const stickers = await stickerRepository.getStickers(stickerSetName)
 
     await stickerQueueRepository.enqueue({
@@ -172,6 +194,14 @@ async function start() {
     })
 
     await context.reply(`Added ${stickers.length} stickers to the queue.`)
+  })
+
+  bot.command('queue', async (context) => {
+    const { userId } = context.state
+
+    const count = await stickerQueueRepository.count(userId)
+
+    await context.reply(`There are ${count} stickers in the queue.`)
   })
 
   bot.command('start_queue', async (context) => {
@@ -184,9 +214,12 @@ async function start() {
     }
 
     await context.reply('Starting the queue.')
-
-    await userSessionRepository.amendContext(userId, { inQueue: true })
     await context.replyWithSticker(queuedSticker.stickerFileId)
+    await userSessionRepository.amendContext(userId, {
+      inQueue: true,
+      stickerSetName: queuedSticker.stickerSetName,
+      stickerFileId: queuedSticker.stickerFileId,
+    })
   })
 
   bot.command('stop_queue', async (context) => {
