@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 import { Markup, Telegraf } from 'telegraf'
-import { message, callbackQuery } from 'telegraf/filters'
+import { message } from 'telegraf/filters'
 import { InMemoryStickerQueueRepository } from './InMemoryStickerQueueRepository.js'
 import { InMemoryStickerRepository } from './InMemoryStickerRepository.js'
 import { InMemoryUserSessionRepository } from './InMemoryUserSessionRepository.js'
@@ -20,6 +20,18 @@ async function start() {
     if (!context.from || context.from.is_bot) return
     context.state.userId = context.from.id
     return next()
+  })
+
+  bot.on('inline_query', async (context) => {
+    const stickers = await stickerRepository.search(context.inlineQuery.query)
+
+    await context.answerInlineQuery(
+      stickers.map((sticker, i) => ({
+        id: String(i),
+        type: 'sticker',
+        sticker_file_id: sticker.fileId
+      }))
+    )
   })
 
   bot.on(message('sticker'), async (context) => {
