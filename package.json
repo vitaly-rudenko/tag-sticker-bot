@@ -1,0 +1,19 @@
+{
+  "name": "tag-sticker-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Vitaly Rudenko",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-cloudsearch": "^3.279.0",
+    "@aws-sdk/client-dynamodb": "^3.279.0",
+    "@aws-sdk/client-ssm": "^3.279.0",
+    "dotenv": "^16.0.3",
+    "telegraf": "^4.11.2"
+  }
+}
