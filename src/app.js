@@ -205,5 +205,16 @@ async function start() {
 
     await context.reply('The queue has been cleared.')
   })
+
+  bot.launch().catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
 }
 
+start()
+  .then(() => console.log('Started!'))
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })
