@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon --exec 'npm start'"
+    "dev": "nodemon --exec 'npm start'",
+    "setup-local": "node scripts/setup-local.js"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
