@@ -7,20 +7,20 @@ export class InMemoryStickerQueueRepository {
   /**
    * @param {{
    *   userId: string
-   *   stickers: import('./Sticker').Sticker[]
+   *   stickers: import('../stickers/Sticker').Sticker[]
    * }} input
    */
   async enqueue({ userId, stickers }) {
     this._queuedStickers = this._queuedStickers.filter(queuedSticker => (
       queuedSticker.userId !== userId &&
-      !stickers.find(sticker => sticker.stickerSetName === queuedSticker.stickerSetName && sticker.fileId === queuedSticker.stickerFileId
+      !stickers.find(sticker => sticker.stickerSetName === queuedSticker.stickerSetName && sticker.stickerFileId === queuedSticker.stickerFileId
     )))
 
     this._queuedStickers.push(
       ...stickers.map(sticker => ({
         userId,
         stickerSetName: sticker.stickerSetName,
-        stickerFileId: sticker.fileId,
+        stickerFileId: sticker.stickerFileId,
       }))
     )
   }
