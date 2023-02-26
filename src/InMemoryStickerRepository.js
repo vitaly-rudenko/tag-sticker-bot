@@ -51,9 +51,9 @@ export class InMemoryStickerRepository {
   }
 
   /** @returns {Promise<import('./Sticker').Sticker[]>} */
-  async search(query) {
+  async search({ query, authorUserId = undefined }) {
     return this._tags
-      .filter(tag => tag.value.includes(query))
+      .filter(tag => tag.value.includes(query) && (!authorUserId || tag.authorUserId === authorUserId))
       .map(tag => this._stickers.find(sticker => sticker.stickerSetName === tag.stickerSetName && sticker.fileId === tag.stickerFileId))
       .filter(Boolean)
   }

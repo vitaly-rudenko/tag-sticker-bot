@@ -30,7 +30,13 @@ async function start() {
   })
 
   bot.on('inline_query', async (context) => {
-    const stickers = await stickerRepository.search(context.inlineQuery.query)
+    if (!context.inlineQuery.query) return
+
+    const { userId } = context.state
+    const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
+    const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
+
+    const stickers = await stickerRepository.search({ query, authorUserId })
 
     await context.answerInlineQuery(
       stickers.map((sticker, i) => ({
@@ -62,6 +68,60 @@ async function start() {
     })
   })
 
+  async function sendNextStickerInQueue(context) {
+    const { userId } = context.state
+
+    const queuedSticker = await stickerQueueRepository.take(userId)
+    if (!queuedSticker) {
+      await userSessionRepository.amendContext(userId, { inQueue: false })
+      await context.reply('The queue is empty. Send a sticker to tag it.')
+      return
+    }
+
+    await context.replyWithSticker(queuedSticker.stickerFileId, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Skip this sticker', 'queue:skip'),
+        Markup.button.callback('Stop the queue', 'queue:stop'),
+        Markup.button.callback('Clear the queue', 'queue:clear'),
+      ], { columns: 1 }).reply_markup
+    })
+
+    await userSessionRepository.amendContext(userId, {
+      inQueue: true,
+      stickerSetName: queuedSticker.stickerSetName,
+      stickerFileId: queuedSticker.stickerFileId,
+    })
+  }
+
+  async function stopQueue(context) {
+    const { userId } = context.state
+    await userSessionRepository.amendContext(userId, { inQueue: false })
+    await context.reply('The queue has been stopped.')
+  }
+
+  async function clearQueue(context) {
+    const { userId } = context.state
+    await userSessionRepository.amendContext(userId, { inQueue: false })
+    await stickerQueueRepository.clear(userId)
+    await context.reply('The queue has been cleared.')
+  }
+
+  bot.action('queue:start', async (context) => {
+    await sendNextStickerInQueue(context)
+  })
+
+  bot.action('queue:skip', async (context) => {
+    await sendNextStickerInQueue(context)
+  })
+
+  bot.action('queue:stop', async (context) => {
+    await stopQueue(context)
+  })
+
+  bot.action('queue:clear', async (context) => {
+    await clearQueue(context)
+  })
+
   bot.on(message('text'), async (context, next) => {
     if (context.message.text.startsWith('/')) return next()
 
@@ -77,21 +137,7 @@ async function start() {
       value: context.message.text,
     })
     
-    await context.reply('The sticker has been tagged.')
-
-    const queuedSticker = await stickerQueueRepository.take(userId)
-    if (!queuedSticker) {
-      await userSessionRepository.amendContext(userId, { inQueue: false })
-      await context.reply('The queue is empty.')
-      return
-    }
-
-    await context.replyWithSticker(queuedSticker.stickerFileId)
-    await userSessionRepository.amendContext(userId, {
-      inQueue: true,
-      stickerSetName: queuedSticker.stickerSetName,
-      stickerFileId: queuedSticker.stickerFileId,
-    })
+    await sendNextStickerInQueue(context)
   })
 
   async function refreshStickerSet(stickerSetName) {
@@ -127,7 +173,11 @@ async function start() {
       }]
     })
 
-    await context.reply(`Added 1 sticker to the queue.`)
+    await context.reply(`Added 1 sticker to the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
+    })
   })
 
   bot.action('sticker:tag-untagged', withRefreshedStickerSet(), async (context) => {
@@ -151,7 +201,11 @@ async function start() {
       stickers: untaggedStickers,
     })
 
-    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`)
+    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
+    })
   })
 
   bot.action('sticker:tag-untagged-by-me', withRefreshedStickerSet(), async (context) => {
@@ -177,7 +231,11 @@ async function start() {
       stickers: untaggedStickers,
     })
 
-    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`)
+    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
+    })
   })
 
   bot.action('sticker:tag-all', withRefreshedStickerSet(), async (context) => {
@@ -193,7 +251,11 @@ async function start() {
       stickers,
     })
 
-    await context.reply(`Added ${stickers.length} stickers to the queue.`)
+    await context.reply(`Added ${stickers.length} stickers to the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
+    })
   })
 
   bot.command('queue', async (context) => {
@@ -201,42 +263,23 @@ async function start() {
 
     const count = await stickerQueueRepository.count(userId)
 
-    await context.reply(`There are ${count} stickers in the queue.`)
-  })
-
-  bot.command('start_queue', async (context) => {
-    const { userId } = context.state
-
-    const queuedSticker = await stickerQueueRepository.take(userId)
-    if (!queuedSticker) {
-      await context.reply('The queue is empty. Send a sticker.')
-      return
-    }
-
-    await context.reply('Starting the queue.')
-    await context.replyWithSticker(queuedSticker.stickerFileId)
-    await userSessionRepository.amendContext(userId, {
-      inQueue: true,
-      stickerSetName: queuedSticker.stickerSetName,
-      stickerFileId: queuedSticker.stickerFileId,
+    await context.reply(`There are ${count} stickers in the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
     })
   })
 
+  bot.command('start_queue', async (context) => {
+    await sendNextStickerInQueue(context)
+  })
+
   bot.command('stop_queue', async (context) => {
-    const { userId } = context.state
-
-    await userSessionRepository.amendContext(userId, { inQueue: false })
-
-    await context.reply('The queue has been stopped.')
+    await stopQueue(context)
   })
 
   bot.command('clear_queue', async (context) => {
-    const { userId } = context.state
-
-    await userSessionRepository.amendContext(userId, { inQueue: false })
-    await stickerQueueRepository.clear(userId)
-
-    await context.reply('The queue has been cleared.')
+    await clearQueue(context)
   })
 
   bot.launch().catch((error) => {
