@@ -4,46 +4,8 @@ import { DynamoDBClient, CreateTableCommand, DeleteTableCommand } from '@aws-sdk
 config()
 
 const dynamodbClient = new DynamoDBClient({
-  endpoint: process.env.LOCALSTACK_ENDPOINT
+  endpoint: process.env.LOCALSTACK_ENDPOINT,
 })
-
-await dynamodbClient.send(new DeleteTableCommand({ TableName: 'sticker-sets' }))
-await dynamodbClient.send(
-  new CreateTableCommand({
-    TableName: 'sticker-sets',
-    KeySchema: [{
-      AttributeName: 'name',
-      KeyType: 'HASH'
-    }],
-    AttributeDefinitions: [{
-      AttributeName: 'name',
-      AttributeType: 'S'
-    }],
-    ProvisionedThroughput: {
-      ReadCapacityUnits: 1,
-      WriteCapacityUnits: 1,
-    }
-  })
-)
-
-await dynamodbClient.send(new DeleteTableCommand({ TableName: 'stickers' }))
-await dynamodbClient.send(
-  new CreateTableCommand({
-    TableName: 'stickers',
-    KeySchema: [{
-      AttributeName: 'stickerFileId',
-      KeyType: 'HASH'
-    }],
-    AttributeDefinitions: [{
-      AttributeName: 'stickerFileId',
-      AttributeType: 'S'
-    }],
-    ProvisionedThroughput: {
-      ReadCapacityUnits: 1,
-      WriteCapacityUnits: 1,
-    }
-  })
-)
 
 await dynamodbClient.send(new DeleteTableCommand({ TableName: 'queued-stickers' }))
 await dynamodbClient.send(

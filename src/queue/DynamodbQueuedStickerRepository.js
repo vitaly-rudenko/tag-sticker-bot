@@ -1,7 +1,7 @@
 import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
 import { QueuedSticker } from './QueuedSticker.js'
 
-export class DynamodbStickerQueueRepository {
+export class DynamodbQueuedStickerRepository {
   /**
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
@@ -16,7 +16,10 @@ export class DynamodbStickerQueueRepository {
   /**
    * @param {{
    *   userId: string
-   *   stickers: import('../stickers/Sticker').Sticker[]
+   *   stickers: {
+   *     stickerSetName: string
+   *     stickerFileId: string
+   *   }[]
    * }} input
    */
   async enqueue({ userId, stickers }) {

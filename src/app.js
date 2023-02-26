@@ -1,11 +1,9 @@
 import { config } from 'dotenv'
 import { createBot } from './bot/createBot.js'
-import { InMemoryStickerRepository } from './stickers/InMemoryStickerRepository.js'
 import { InMemoryUserSessionRepository } from './users/InMemoryUserSessionRepository.js'
-import { SearchStickersInteractor } from './SearchStickersInteractor.js'
-import { InMemoryTagRepository } from './tags/InMemoryTagRepository.js'
-import { DynamodbStickerQueueRepository } from './queue/DynamodbStickerQueueRepository.js'
+import { DynamodbQueuedStickerRepository } from './queue/DynamodbQueuedStickerRepository.js'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
+import { DynamodbTagRepository } from './tags/DynamodbTagRepository.js'
 
 config()
 
@@ -17,24 +15,18 @@ async function start() {
   })
 
   const userSessionRepository = new InMemoryUserSessionRepository()
-  const stickerRepository = new InMemoryStickerRepository()
-  // const stickerQueueRepository = new InMemoryStickerQueueRepository()
-  const stickerQueueRepository = new DynamodbStickerQueueRepository({
+  const queuedStickerRepository = new DynamodbQueuedStickerRepository({
     dynamodbClient,
     tableName: 'queued-stickers',
   })
-  const tagRepository = new InMemoryTagRepository()
-
-  const searchStickersInteractor = new SearchStickersInteractor({
-    stickerRepository,
-    tagRepository,
+  const tagRepository = new DynamodbTagRepository({
+    dynamodbClient,
+    tableName: 'tags',
   })
 
   const bot = await createBot({
     telegramBotToken,
-    searchStickersInteractor,
-    stickerQueueRepository,
-    stickerRepository,
+    queuedStickerRepository,
     userSessionRepository,
     tagRepository,
   })

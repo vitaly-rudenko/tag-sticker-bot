@@ -1,13 +1,10 @@
 import { Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
 
-
 export async function createBot({
   telegramBotToken,
-  searchStickersInteractor,
   userSessionRepository,
-  stickerQueueRepository,
-  stickerRepository,
+  queuedStickerRepository,
   tagRepository,
 }) {
   const bot = new Telegraf(telegramBotToken)
@@ -32,13 +29,13 @@ export async function createBot({
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
     const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
 
-    const stickers = await searchStickersInteractor.execute({ query, authorUserId })
+    const tags = await tagRepository.searchTags({ query, authorUserId })
 
     await context.answerInlineQuery(
-      stickers.map((sticker, i) => ({
+      tags.map((tag, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id: sticker.stickerFileId
+        sticker_file_id: tag.stickerFileId
       }))
     )
   })
@@ -67,7 +64,7 @@ export async function createBot({
   async function sendNextStickerInQueue(context) {
     const { userId } = context.state
 
-    const queuedSticker = await stickerQueueRepository.take(userId)
+    const queuedSticker = await queuedStickerRepository.take(userId)
     if (!queuedSticker) {
       await userSessionRepository.amendContext(userId, { inQueue: false })
       await context.reply('The queue is empty. Send a sticker to tag it.')
@@ -98,7 +95,7 @@ export async function createBot({
   async function clearQueue(context) {
     const { userId } = context.state
     await userSessionRepository.amendContext(userId, { inQueue: false })
-    await stickerQueueRepository.clear(userId)
+    await queuedStickerRepository.clear(userId)
     await context.reply('The queue has been cleared.')
   }
 
@@ -136,128 +133,103 @@ export async function createBot({
     await sendNextStickerInQueue(context)
   })
 
-  async function refreshStickerSet(stickerSetName) {
-    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
-    await stickerRepository.storeStickerSet({
-      name: stickerSet.name,
-      title: stickerSet.title,
-      stickers: stickerSet.stickers.map(sticker => ({
-        stickerFileId: sticker.file_id,
-      }))
+  async function enqueueStickers({ context, userId, stickerSetName, stickerFileIds }) {
+    await queuedStickerRepository.enqueue({
+      userId,
+      stickers: stickerFileIds.map(stickerFileId => ({
+        stickerSetName,
+        stickerFileId,
+      })),
+    })
+
+    await context.reply(`Added ${stickerFileIds.length} sticker${stickerFileIds.length !== 1 ? 's' : ''} to the queue.`, {
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Start the queue', 'queue:start')
+      ]).reply_markup,
     })
   }
 
-  function withRefreshedStickerSet() {
-    return async (context, next) => {
-      const { stickerSetName } = await userSessionRepository.getContext(context.state.userId)
-      await refreshStickerSet(stickerSetName)
-      return next()
-    }
-  }
-
-  bot.action('sticker:tag-single', withRefreshedStickerSet(), async (context) => {
+  bot.action('sticker:tag-single', async (context) => {
     const { userId } = context.state
     const { stickerSetName, stickerFileId } = await userSessionRepository.getContext(userId)
 
     if (!stickerSetName || !stickerFileId) return
 
-    await stickerQueueRepository.enqueue({
+    await enqueueStickers({
+      context,
       userId,
-      stickers: [{
-        stickerSetName,
-        stickerFileId,
-      }]
-    })
-
-    await context.reply(`Added 1 sticker to the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
+      stickerSetName,
+      stickerFileIds: [stickerFileId],
     })
   })
 
-  bot.action('sticker:tag-untagged', withRefreshedStickerSet(), async (context) => {
+  bot.action('sticker:tag-untagged', async (context) => {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
 
     if (!stickerSetName) return
 
-    const stickers = await stickerRepository.queryStickers([{ stickerSetName }])
-    const untaggedStickers = []
-
-    for (const sticker of stickers) {
-      const tags = await tagRepository.getTags(sticker.stickerSetName, sticker.stickerFileId)
-      if (tags.length === 0) {
-        untaggedStickers.push(sticker)
-      }
-    }
-
-    await stickerQueueRepository.enqueue({
-      userId,
-      stickers: untaggedStickers,
+    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
+    const tags = await tagRepository.queryTags({
+      stickerFileIds: stickerSet.stickers.map(sticker => sticker.file_id),
     })
 
-    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
+    const untaggedStickers = stickerSet.stickers.filter(sticker => (
+      !tags.find(tag => sticker.file_id === tag.stickerFileId))
+    )
+
+    await enqueueStickers({
+      context,
+      userId,
+      stickerSetName,
+      stickerFileIds: untaggedStickers.map(sticker => sticker.file_id),
     })
   })
 
-  bot.action('sticker:tag-untagged-by-me', withRefreshedStickerSet(), async (context) => {
+  bot.action('sticker:tag-untagged-by-me', async (context) => {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
 
     if (!stickerSetName) return
 
-    const stickers = await stickerRepository.queryStickers([{ stickerSetName }])
-    const untaggedStickers = []
-
-    for (const sticker of stickers) {
-      const tags = await tagRepository.getTags(sticker.stickerSetName, sticker.stickerFileId)
-      const myTags = tags.filter(tag => tag.authorUserId === userId)
-
-      if (myTags.length === 0) {
-        untaggedStickers.push(sticker)
-      }
-    }
-
-    await stickerQueueRepository.enqueue({
-      userId,
-      stickers: untaggedStickers,
+    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
+    const tags = await tagRepository.queryTags({
+      stickerFileIds: stickerSet.stickers.map(sticker => sticker.file_id),
+      authorUserId: userId,
     })
 
-    await context.reply(`Added ${untaggedStickers.length} stickers to the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
+    const untaggedStickers = stickerSet.stickers.filter(sticker => (
+      !tags.find(tag => sticker.file_id === tag.stickerFileId))
+    )
+
+    await enqueueStickers({
+      context,
+      userId,
+      stickerSetName,
+      stickerFileIds: untaggedStickers.map(sticker => sticker.file_id),
     })
   })
 
-  bot.action('sticker:tag-all', withRefreshedStickerSet(), async (context) => {
+  bot.action('sticker:tag-all', async (context) => {
     const { userId } = context.state
     const { stickerSetName } = await userSessionRepository.getContext(userId)
 
     if (!stickerSetName) return
 
-    const stickers = await stickerRepository.queryStickers([{ stickerSetName }])
+    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
 
-    await stickerQueueRepository.enqueue({
+    await enqueueStickers({
+      context,
       userId,
-      stickers,
-    })
-
-    await context.reply(`Added ${stickers.length} stickers to the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
+      stickerSetName,
+      stickerFileIds: stickerSet.stickers.map(sticker => sticker.file_id),
     })
   })
 
   bot.command('queue', async (context) => {
     const { userId } = context.state
 
-    const count = await stickerQueueRepository.count(userId)
+    const count = await queuedStickerRepository.count(userId)
 
     await context.reply(`There are ${count} stickers in the queue.`, {
       reply_markup: Markup.inlineKeyboard([
