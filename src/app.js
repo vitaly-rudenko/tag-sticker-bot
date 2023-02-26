@@ -1,27 +1,26 @@
-import { config } from 'dotenv'
 import { createBot } from './bot/createBot.js'
-import { InMemoryUserSessionRepository } from './users/InMemoryUserSessionRepository.js'
 import { DynamodbQueuedStickerRepository } from './queue/DynamodbQueuedStickerRepository.js'
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamodbTagRepository } from './tags/DynamodbTagRepository.js'
-
-config()
-
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN ?? ''
+import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable, telegramBotToken } from './env.js'
+import { createDynamodbClient } from './utils/createDynamodbClient.js'
+import { DynamodbUserSessionRepository } from './users/DynamodbUserSessionRepository.js'
 
 async function start() {
-  const dynamodbClient = new DynamoDBClient({
-    endpoint: process.env.LOCALSTACK_ENDPOINT
+  const dynamodbClient = createDynamodbClient()
+
+  const userSessionRepository = new DynamodbUserSessionRepository({
+    dynamodbClient,
+    tableName: dynamodbUserSessionsTable,
   })
 
-  const userSessionRepository = new InMemoryUserSessionRepository()
   const queuedStickerRepository = new DynamodbQueuedStickerRepository({
     dynamodbClient,
-    tableName: 'queued-stickers',
+    tableName: dynamodbQueuedStickersTable,
   })
+
   const tagRepository = new DynamodbTagRepository({
     dynamodbClient,
-    tableName: 'tags',
+    tableName: dynamodbTagsTable,
   })
 
   const bot = await createBot({

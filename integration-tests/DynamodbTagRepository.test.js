@@ -1,8 +1,9 @@
 import './setup.js'
 import { randomBytes } from 'crypto'
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamodbTagRepository } from '../src/tags/DynamodbTagRepository.js'
 import { Tag } from '../src/tags/Tag.js'
+import { createDynamodbClient } from '../src/utils/createDynamodbClient.js'
+import { dynamodbTagsTable } from '../src/env.js'
 
 function generateId(name) {
   return `${name}-${randomBytes(8).toString('hex')}`
@@ -14,10 +15,8 @@ describe('DynamodbTagRepository', () => {
 
   beforeEach(() => {
     tagRepository = new DynamodbTagRepository({
-      dynamodbClient: new DynamoDBClient({
-        endpoint: process.env.LOCALSTACK_ENDPOINT,
-      }),
-      tableName: 'tags',
+      dynamodbClient: createDynamodbClient(),
+      tableName: dynamodbTagsTable,
     })
   })
 
@@ -120,6 +119,11 @@ describe('DynamodbTagRepository', () => {
     })).resolves.toEqual([])
 
     await expect(tagRepository.searchTags({
+      query: 'it is',
+      authorUserId: user1,
+    })).resolves.toEqual([])
+
+    await expect(tagRepository.searchTags({
       query: 'hello'
     })).resolves.toIncludeSameMembers([tag1, tag2])
 
@@ -142,12 +146,7 @@ describe('DynamodbTagRepository', () => {
     })).resolves.toIncludeSameMembers([tag2])
 
     await expect(tagRepository.searchTags({
-      query: 'it is',
-      authorUserId: user1,
-    })).resolves.toEqual([])
-
-    await expect(tagRepository.searchTags({
       query: 'reuse',
-    })).resolves.toEqual([tag4, tag5])
+    })).resolves.toIncludeSameMembers([tag4, tag5])
   })
 })

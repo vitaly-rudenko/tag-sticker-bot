@@ -11,10 +11,10 @@ export async function createBot({
   const bot = new Telegraf(telegramBotToken)
 
   await bot.telegram.setMyCommands([
-    { command: 'queue', description: 'Check sticker queue size' },
+    { command: 'queue',  description: 'Check sticker queue size' },
     { command: 'resume', description: 'Resume sticker tagging' },
-    { command: 'pause', description: 'Pause sticker tagging' },
-    { command: 'clear', description: 'Clear the queue of stickers' },
+    { command: 'pause',  description: 'Pause sticker tagging' },
+    { command: 'clear',  description: 'Clear the queue of stickers' },
   ])
 
   bot.use((context, next) => {
@@ -52,7 +52,7 @@ export async function createBot({
       stickerSetName,
     })
 
-    await context.reply('What do you want to do?', {
+    await context.reply('👇 What do you want to do?', {
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('Tag this sticker', 'sticker:tag-single'),
         Markup.button.callback('Tag untagged stickers in the set', 'sticker:tag-untagged'),
@@ -68,19 +68,19 @@ export async function createBot({
     const queuedSticker = await queuedStickerRepository.take(userId)
     if (!queuedSticker) {
       await userSessionRepository.amendContext(userId, { inQueue: false })
-      await context.reply('The queue is empty. Send a sticker to tag it.')
+      await context.reply('✅ The queue is empty. You\'re all done!')
       return
     }
 
     const { message_id } = await context.replyWithSticker(queuedSticker.stickerFileId, {
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Skip', 'queue:skip'),
-        Markup.button.callback('Pause', 'queue:pause'),
-        Markup.button.callback('Clear the queue', 'queue:clear'),
+        Markup.button.callback('⏯ Skip', 'queue:skip'),
+        Markup.button.callback('⏸ Pause', 'queue:pause'),
+        Markup.button.callback('⏹ Clear the queue', 'queue:clear'),
       ], { columns: 2 }).reply_markup
     })
 
-    await context.reply('Please send your tag for this sticker:')
+    await context.reply('👇 Please send your tag for this sticker:')
 
     await userSessionRepository.amendContext(userId, {
       inQueue: true,
@@ -93,14 +93,14 @@ export async function createBot({
   async function stopQueue(context) {
     const { userId } = context.state
     await userSessionRepository.amendContext(userId, { inQueue: false })
-    await context.reply('The queue has been paused.')
+    await context.reply('⏸ The queue has been paused.')
   }
 
   async function clearQueue(context) {
     const { userId } = context.state
     await userSessionRepository.amendContext(userId, { inQueue: false })
     await queuedStickerRepository.clear(userId)
-    await context.reply('The queue has been cleared.')
+    await context.reply('⏹ The queue has been cleared.')
   }
 
   bot.action('queue:resume', async (context) => {
@@ -152,7 +152,7 @@ export async function createBot({
     )
 
     await bot.telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined)
-    await context.reply(`The sticker has been tagged as "${value}"`)
+    await context.reply(`✅ The sticker has been tagged as "${value}"`)
     
     await sendNextStickerInQueue(context)
   })
@@ -167,9 +167,9 @@ export async function createBot({
     })
 
     if (stickerFileIds.length > 1) {
-      await context.reply(`Added ${stickerFileIds.length} stickers to the queue.`, {
+      await context.reply(`✅ Added ${stickerFileIds.length} stickers to the queue.`, {
         reply_markup: Markup.inlineKeyboard([
-          Markup.button.callback('Start the queue', 'queue:resume')
+          Markup.button.callback('⏯ Start tagging the stickers', 'queue:resume')
         ]).reply_markup,
       })
     }
@@ -262,10 +262,10 @@ export async function createBot({
 
     const count = await queuedStickerRepository.count(userId)
 
-    await context.reply(`There are ${count} stickers in the queue.`, {
+    await context.reply(`✅ There are ${count} stickers in the queue.`, {
       reply_markup: count > 0
         ? Markup.inlineKeyboard([
-          Markup.button.callback('Resume', 'queue:resume')
+          Markup.button.callback('⏯ Start tagging the stickers', 'queue:resume')
         ]).reply_markup
         : undefined,
     })

@@ -1,16 +1,32 @@
-import { config } from 'dotenv'
-import { DynamoDBClient, CreateTableCommand, DeleteTableCommand } from '@aws-sdk/client-dynamodb'
+import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
+import { CreateTableCommand, DeleteTableCommand } from '@aws-sdk/client-dynamodb'
+import { createDynamodbClient } from '../utils/createDynamodbClient.js'
 
-config()
+const dynamodbClient = createDynamodbClient()
 
-const dynamodbClient = new DynamoDBClient({
-  endpoint: process.env.LOCALSTACK_ENDPOINT,
-})
-
-await dynamodbClient.send(new DeleteTableCommand({ TableName: 'queued-stickers' }))
+await dynamodbClient.send(new DeleteTableCommand({ TableName: dynamodbUserSessionsTable })).catch(() => {})
 await dynamodbClient.send(
   new CreateTableCommand({
-    TableName: 'queued-stickers',
+    TableName: dynamodbUserSessionsTable,
+    KeySchema: [{
+      AttributeName: 'userId',
+      KeyType: 'HASH'
+    }],
+    AttributeDefinitions: [{
+      AttributeName: 'userId',
+      AttributeType: 'S'
+    }],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 1,
+      WriteCapacityUnits: 1,
+    }
+  })
+)
+
+await dynamodbClient.send(new DeleteTableCommand({ TableName: dynamodbQueuedStickersTable })).catch(() => {})
+await dynamodbClient.send(
+  new CreateTableCommand({
+    TableName: dynamodbQueuedStickersTable,
     KeySchema: [{
       AttributeName: 'userId',
       KeyType: 'HASH'
@@ -32,10 +48,10 @@ await dynamodbClient.send(
   })
 )
 
-await dynamodbClient.send(new DeleteTableCommand({ TableName: 'tags' }))
+await dynamodbClient.send(new DeleteTableCommand({ TableName: dynamodbTagsTable })).catch(() => {})
 await dynamodbClient.send(
   new CreateTableCommand({
-    TableName: 'tags',
+    TableName: dynamodbTagsTable,
     KeySchema: [{
       AttributeName: 'stickerFileId',
       KeyType: 'HASH'
