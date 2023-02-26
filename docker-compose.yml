@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  localstack:
+    image: localstack/localstack
+    container_name: localstack
+    environment:
+      - SERVICES=dynamodb
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    ports:
+      - "4566:4566"
+    volumes:
+      - "localstack_data:/var/lib/localstack"
+    command: "start"
+
+volumes:
+  localstack_data:
+    driver: local

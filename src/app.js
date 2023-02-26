@@ -1,31 +1,31 @@
-import { config } from 'dotenv'
 import { createBot } from './bot/createBot.js'
-import { InMemoryStickerQueueRepository } from './queue/InMemoryStickerQueueRepository.js'
-import { InMemoryStickerRepository } from './stickers/InMemoryStickerRepository.js'
-import { InMemoryUserSessionRepository } from './users/InMemoryUserSessionRepository.js'
-import { SearchStickersInteractor } from './SearchStickersInteractor.js'
-import { InMemoryTagRepository } from './tags/InMemoryTagRepository.js'
-
-config()
-
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN ?? ''
+import { DynamodbQueuedStickerRepository } from './queue/DynamodbQueuedStickerRepository.js'
+import { DynamodbTagRepository } from './tags/DynamodbTagRepository.js'
+import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable, telegramBotToken } from './env.js'
+import { createDynamodbClient } from './utils/createDynamodbClient.js'
+import { DynamodbUserSessionRepository } from './users/DynamodbUserSessionRepository.js'
 
 async function start() {
-  const userSessionRepository = new InMemoryUserSessionRepository()
-  const stickerRepository = new InMemoryStickerRepository()
-  const stickerQueueRepository = new InMemoryStickerQueueRepository()
-  const tagRepository = new InMemoryTagRepository()
+  const dynamodbClient = createDynamodbClient()
 
-  const searchStickersInteractor = new SearchStickersInteractor({
-    stickerRepository,
-    tagRepository,
+  const userSessionRepository = new DynamodbUserSessionRepository({
+    dynamodbClient,
+    tableName: dynamodbUserSessionsTable,
+  })
+
+  const queuedStickerRepository = new DynamodbQueuedStickerRepository({
+    dynamodbClient,
+    tableName: dynamodbQueuedStickersTable,
+  })
+
+  const tagRepository = new DynamodbTagRepository({
+    dynamodbClient,
+    tableName: dynamodbTagsTable,
   })
 
   const bot = await createBot({
     telegramBotToken,
-    searchStickersInteractor,
-    stickerQueueRepository,
-    stickerRepository,
+    queuedStickerRepository,
     userSessionRepository,
     tagRepository,
   })
