@@ -93,20 +93,24 @@ export class DynamodbQueuedStickerRepository {
 
       if (Items.length === 0) continue
 
-      await this._dynamodbClient.send(
-        new BatchWriteItemCommand({
-          RequestItems: {
-            [this._tableName]: Items.map(item => ({
-              DeleteRequest: {
-                Key: {
-                  userId: item.userId,
-                  stickerFileId: item.stickerFileId,
-                }
-              }
-            }))
-          }
-        })
-      )
+      for (let i = 0; i < Items.length; i += 25) {
+        await this._dynamodbClient.send(
+          new BatchWriteItemCommand({
+            RequestItems: {
+              [this._tableName]: Items
+                .slice(i, i + 25)
+                .map(item => ({
+                  DeleteRequest: {
+                    Key: {
+                      userId: item.userId,
+                      stickerFileId: item.stickerFileId,
+                    }
+                  }
+                }))
+            }
+          })
+        )
+      }
     } while (lastEvaluatedKey)
   }
 

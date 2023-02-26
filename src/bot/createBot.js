@@ -1,5 +1,6 @@
 import { Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
+import { Tag } from '../tags/Tag.js'
 
 export async function createBot({
   telegramBotToken,
@@ -10,10 +11,10 @@ export async function createBot({
   const bot = new Telegraf(telegramBotToken)
 
   await bot.telegram.setMyCommands([
-    { command: 'queue', description: 'Get queue size' },
-    { command: 'start_queue', description: 'Start queue' },
-    { command: 'stop_queue', description: 'Stop queue' },
-    { command: 'clear_queue', description: 'Clear queue' },
+    { command: 'queue', description: 'Check sticker queue size' },
+    { command: 'resume', description: 'Resume sticker tagging' },
+    { command: 'pause', description: 'Pause sticker tagging' },
+    { command: 'clear', description: 'Clear the queue of stickers' },
   ])
 
   bot.use((context, next) => {
@@ -71,25 +72,28 @@ export async function createBot({
       return
     }
 
-    await context.replyWithSticker(queuedSticker.stickerFileId, {
+    const { message_id } = await context.replyWithSticker(queuedSticker.stickerFileId, {
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Skip this sticker', 'queue:skip'),
-        Markup.button.callback('Stop the queue', 'queue:stop'),
+        Markup.button.callback('Skip', 'queue:skip'),
+        Markup.button.callback('Pause', 'queue:pause'),
         Markup.button.callback('Clear the queue', 'queue:clear'),
-      ], { columns: 1 }).reply_markup
+      ], { columns: 2 }).reply_markup
     })
+
+    await context.reply('Please send your tag for this sticker:')
 
     await userSessionRepository.amendContext(userId, {
       inQueue: true,
       stickerSetName: queuedSticker.stickerSetName,
       stickerFileId: queuedSticker.stickerFileId,
+      stickerMessageId: message_id,
     })
   }
 
   async function stopQueue(context) {
     const { userId } = context.state
     await userSessionRepository.amendContext(userId, { inQueue: false })
-    await context.reply('The queue has been stopped.')
+    await context.reply('The queue has been paused.')
   }
 
   async function clearQueue(context) {
@@ -99,36 +103,56 @@ export async function createBot({
     await context.reply('The queue has been cleared.')
   }
 
-  bot.action('queue:start', async (context) => {
-    await sendNextStickerInQueue(context)
+  bot.action('queue:resume', async (context) => {
+    await Promise.all([
+      sendNextStickerInQueue(context),
+      context.deleteMessage()
+    ])
   })
 
   bot.action('queue:skip', async (context) => {
-    await sendNextStickerInQueue(context)
+    await Promise.all([
+      sendNextStickerInQueue(context),
+      context.deleteMessage()
+    ])
   })
 
-  bot.action('queue:stop', async (context) => {
-    await stopQueue(context)
+  bot.action('queue:pause', async (context) => {
+    await Promise.all([
+      stopQueue(context),
+      context.deleteMessage()
+    ])
   })
 
   bot.action('queue:clear', async (context) => {
-    await clearQueue(context)
+    await Promise.all([
+      clearQueue(context),
+      context.deleteMessage()
+    ])
   })
 
   bot.on(message('text'), async (context, next) => {
     if (context.message.text.startsWith('/')) return next()
 
     const { userId } = context.state
-    const { inQueue, stickerSetName, stickerFileId } = await userSessionRepository.getContext(userId)
+    const { inQueue, stickerSetName, stickerFileId, stickerMessageId } = await userSessionRepository.getContext(userId)
 
     if (!inQueue || !stickerSetName || !stickerFileId) return
 
-    await tagRepository.setTag({
-      authorUserId: userId,
-      stickerFileId,
-      stickerSetName,
-      value: context.message.text,
-    })
+    const value = context.message.text.trim().toLowerCase()
+    if (!value) return
+
+    await tagRepository.storeTag(
+      new Tag({
+        authorUserId: userId,
+        stickerFileId,
+        stickerSetName,
+        value,
+      })
+    )
+
+    await bot.telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined)
+    await context.reply(`The sticker has been tagged as "${value}"`)
     
     await sendNextStickerInQueue(context)
   })
@@ -142,11 +166,13 @@ export async function createBot({
       })),
     })
 
-    await context.reply(`Added ${stickerFileIds.length} sticker${stickerFileIds.length !== 1 ? 's' : ''} to the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
-    })
+    if (stickerFileIds.length > 1) {
+      await context.reply(`Added ${stickerFileIds.length} stickers to the queue.`, {
+        reply_markup: Markup.inlineKeyboard([
+          Markup.button.callback('Start the queue', 'queue:resume')
+        ]).reply_markup,
+      })
+    }
   }
 
   bot.action('sticker:tag-single', async (context) => {
@@ -161,6 +187,11 @@ export async function createBot({
       stickerSetName,
       stickerFileIds: [stickerFileId],
     })
+
+    await Promise.all([
+      sendNextStickerInQueue(context),
+      context.deleteMessage()
+    ])
   })
 
   bot.action('sticker:tag-untagged', async (context) => {
@@ -232,22 +263,33 @@ export async function createBot({
     const count = await queuedStickerRepository.count(userId)
 
     await context.reply(`There are ${count} stickers in the queue.`, {
-      reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Start the queue', 'queue:start')
-      ]).reply_markup,
+      reply_markup: count > 0
+        ? Markup.inlineKeyboard([
+          Markup.button.callback('Resume', 'queue:resume')
+        ]).reply_markup
+        : undefined,
     })
   })
 
-  bot.command('start_queue', async (context) => {
-    await sendNextStickerInQueue(context)
+  bot.command('resume', async (context) => {
+    await Promise.all([
+      sendNextStickerInQueue(context),
+      context.deleteMessage()
+    ])
   })
 
-  bot.command('stop_queue', async (context) => {
-    await stopQueue(context)
+  bot.command('pause', async (context) => {
+    await Promise.all([
+      stopQueue(context),
+      context.deleteMessage()
+    ])
   })
 
-  bot.command('clear_queue', async (context) => {
-    await clearQueue(context)
+  bot.command('clear', async (context) => {
+    await Promise.all([
+      clearQueue(context),
+      context.deleteMessage()
+    ])
   })
 
   return bot

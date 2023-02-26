@@ -53,6 +53,21 @@ await dynamodbClient.send(
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
-    }
+    },
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: 'stickerFileId',
+        KeySchema: [
+          { AttributeName: 'stickerFileId', KeyType: 'HASH' },
+        ],
+        Projection: {
+          ProjectionType: 'ALL',
+        },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1
+        }
+      }
+    ]
   })
 )

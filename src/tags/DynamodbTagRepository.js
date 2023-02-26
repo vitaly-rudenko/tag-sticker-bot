@@ -1,6 +1,7 @@
 import { BatchGetItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
 import { Tag } from './Tag.js'
 
+// TODO: do not return duplicates in responses
 export class DynamodbTagRepository {
   /**
    * @param {{
@@ -13,24 +14,17 @@ export class DynamodbTagRepository {
     this._tableName = tableName
   }
 
-  async setTag({ stickerSetName, stickerFileId, authorUserId, value }) {
+  /** @param {Tag} tag */
+  async storeTag(tag) {
     await this._dynamodbClient.send(
       new PutItemCommand({
         TableName: this._tableName,
-        Item: this._toAttributes(
-          new Tag({
-            stickerSetName,
-            stickerFileId,
-            authorUserId,
-            value,
-          })
-        )
+        Item: this._toAttributes(tag)
       })
     )
   }
 
   /**
-   * 
    * @param {{
    *   stickerFileIds: string[]
    *   authorUserId?: string
@@ -39,50 +33,51 @@ export class DynamodbTagRepository {
   async queryTags({ stickerFileIds, authorUserId }) {
     const tags = []
 
-    for (let i = 0; i < stickerFileIds.length; i += 100) {
-      let lastEvaluatedKey = undefined
-  
-      do {
-        const keys = []
-        const values = {}
-  
-        for (const [index, stickerFileId] of stickerFileIds.slice(i, i + 100).entries()) {
-          const key = `:stickerFileId${index}`
-          keys.push(key)
-          values[key] = { S: stickerFileId }
-        }
-  
-        const conditionExpression = `stickerFileId IN (${keys.join(', ')})`
-  
-        console.log({
-          TableName: this._tableName,
-          KeyConditionExpression: authorUserId
-            ? `${conditionExpression} and authorUserId IN (:authorUserId)`
-            : conditionExpression,
-          ExpressionAttributeValues: {
-            ...authorUserId && { ':authorUserId': { S: authorUserId } },
-            ...values,
-          },
-          ExclusiveStartKey: lastEvaluatedKey,
-        })
-
-        const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
-          new QueryCommand({
-            TableName: this._tableName,
-            KeyConditionExpression: authorUserId
-              ? `${conditionExpression} and authorUserId IN (:authorUserId)`
-              : conditionExpression,
-            ExpressionAttributeValues: {
-              ...authorUserId && { ':authorUserId': { S: authorUserId } },
-              ...values,
-            },
-            ExclusiveStartKey: lastEvaluatedKey,
+    if (authorUserId) {
+      for (let i = 0; i < stickerFileIds.length; i += 100) {
+        const { Responses } = await this._dynamodbClient.send(
+          new BatchGetItemCommand({
+            RequestItems: {
+              [this._tableName]: {
+                Keys: stickerFileIds
+                  .slice(i, i + 100)
+                  .map(stickerFileId => ({
+                    authorUserId: { S: authorUserId },
+                    stickerFileId: { S: stickerFileId },
+                  }))
+              }
+            }
           })
         )
-  
-        tags.push(...Items.map(item => this._toEntity(item)))
-        lastEvaluatedKey = LastEvaluatedKey
-      } while (lastEvaluatedKey)
+
+        if (Responses?.[this._tableName]) {
+          tags.push(...Responses[this._tableName].map(item => this._toEntity(item)))
+        }
+      }
+    } else {
+      for (const stickerFileId of stickerFileIds) {
+        let lastEvaluatedKey = undefined
+
+        do {
+          const { Items, LastEvaluatedKey } = await this._dynamodbClient.send(
+            new QueryCommand({
+              TableName: this._tableName,
+              IndexName: 'stickerFileId',
+              KeyConditionExpression: 'stickerFileId = :stickerFileId',
+              ExpressionAttributeValues: {
+                ':stickerFileId': { S: stickerFileId }
+              },
+              ExclusiveStartKey: lastEvaluatedKey,
+            })
+          )
+
+          if (Items) {
+            tags.push(...Items.map(item => this._toEntity(item)))
+          }
+
+          lastEvaluatedKey = LastEvaluatedKey
+        } while (lastEvaluatedKey)
+      }
     }
 
     return tags
@@ -99,7 +94,7 @@ export class DynamodbTagRepository {
 
     return Items
       .map(item => this._toEntity(item))
-      .filter(tag => tag.value.includes(query) && (!authorUserId || tag.authorUserId === authorUserId))
+      .filter(tag => tag.value.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
   }
 
   _toAttributes(tag) {
