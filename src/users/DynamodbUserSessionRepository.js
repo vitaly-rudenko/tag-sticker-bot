@@ -1,4 +1,4 @@
-import { GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb'
+import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb'
 
 export class DynamodbUserSessionRepository {
   /**
@@ -21,6 +21,17 @@ export class DynamodbUserSessionRepository {
         Item: {
           userId: { S: userId },
           context: { S: JSON.stringify({ ...oldContext, ...newContext }) },
+        }
+      })
+    )
+  }
+
+  async clearContext(userId) {
+    await this._dynamodbClient.send(
+      new DeleteItemCommand({
+        TableName: this._tableName,
+        Key: {
+          userId: { S: userId }
         }
       })
     )
