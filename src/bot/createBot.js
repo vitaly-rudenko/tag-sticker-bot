@@ -10,6 +10,7 @@ export async function createBot({
   userSessionRepository,
   queuedStickerRepository,
   tagRepository,
+  stickerFinder,
 }) {
   const bot = new Telegraf(telegramBotToken)
 
@@ -40,7 +41,7 @@ export async function createBot({
 
   const {
     handleSearch,
-  } = useSearchFlow({ tagRepository })
+  } = useSearchFlow({ stickerFinder })
 
   await bot.telegram.setMyCommands([
     { command: 'queue',  description: 'Get queue info' },

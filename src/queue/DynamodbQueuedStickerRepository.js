@@ -1,5 +1,4 @@
 import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
-import { QueuedSticker } from './QueuedSticker.js'
 
 export class DynamodbQueuedStickerRepository {
   /**
@@ -16,11 +15,7 @@ export class DynamodbQueuedStickerRepository {
   /**
    * @param {{
    *   userId: string
-   *   stickers: {
-   *     stickerSetName: string
-   *     stickerFileId: string
-   *     stickerFileUniqueId: string
-   *   }[]
+   *   stickers: Sticker[]
    * }} input
    */
   async enqueue({ userId, stickers }) {
@@ -32,9 +27,7 @@ export class DynamodbQueuedStickerRepository {
               PutRequest: {
                 Item: this._toAttributes({
                   userId,
-                  stickerFileUniqueId: sticker.stickerFileUniqueId,
-                  stickerFileId: sticker.stickerFileId,
-                  stickerSetName: sticker.stickerSetName,
+                  sticker,
                 })
               }
             }))
@@ -132,31 +125,33 @@ export class DynamodbQueuedStickerRepository {
     return Count ?? 0
   }
 
-  /** @param {import('./QueuedSticker').QueuedSticker} queuedSticker */
+  /** @param {QueuedSticker} queuedSticker */
   _toAttributes(queuedSticker) {
     return {
-      stickerFileId: {
-        S: queuedSticker.stickerFileId,
-      },
-      stickerFileUniqueId: {
-        S: queuedSticker.stickerFileUniqueId,
-      },
       userId: {
         S: String(queuedSticker.userId),
       },
+      stickerFileId: {
+        S: queuedSticker.sticker.fileId,
+      },
+      stickerFileUniqueId: {
+        S: queuedSticker.sticker.fileUniqueId,
+      },
       stickerSetName: {
-        S: queuedSticker.stickerSetName,
+        S: queuedSticker.sticker.setName,
       },
     }
   }
   
-  /** @returns {import('./QueuedSticker').QueuedSticker} */
+  /** @returns {QueuedSticker} */
   _toEntity(attributes) {
-    return new QueuedSticker({
+    return {
       userId: attributes.userId.S,
-      stickerSetName: attributes.stickerSetName.S,
-      stickerFileUniqueId: attributes.stickerFileUniqueId.S,
-      stickerFileId: attributes.stickerFileId.S,
-    })
+      sticker: {
+        setName: attributes.stickerSetName.S,
+        fileUniqueId: attributes.stickerFileUniqueId.S,
+        fileId: attributes.stickerFileId.S,
+      }
+    }
   }
 }

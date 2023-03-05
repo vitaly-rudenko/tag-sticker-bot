@@ -1,7 +1,6 @@
 import './setup.js'
 import { randomBytes } from 'crypto'
 import { DynamodbTagRepository } from '../src/tags/DynamodbTagRepository.js'
-import { Tag } from '../src/tags/Tag.js'
 import { createDynamodbClient } from '../src/utils/createDynamodbClient.js'
 import { dynamodbTagsTable } from '../src/env.js'
 
@@ -28,45 +27,55 @@ describe('DynamodbTagRepository', () => {
     const sticker3 = generateId('sticker-3')
     const sticker4 = generateId('sticker-4')
 
-    const tag1 = new Tag({
-      stickerSetName: generateId('sticker-set'),
-      stickerFileUniqueId: sticker1,
-      stickerFileId: generateId('sticker'),
+    const tag1 = {
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker1,
+        fileId: generateId('sticker'),
+      },
       authorUserId: user1,
       value: 'hello world',
-    })
+    }
 
-    const tag2 = new Tag({
-      stickerSetName: generateId('sticker-set'),
-      stickerFileUniqueId: sticker2,
-      stickerFileId: generateId('sticker'),
+    const tag2 = {
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker2,
+        fileId: generateId('sticker'),
+      },
       authorUserId: user2,
       value: 'hello there',
-    })
+    }
 
-    const tag3 = new Tag({
-      stickerSetName: generateId('sticker-set'),
-      stickerFileUniqueId: sticker3,
-      stickerFileId: generateId('sticker'),
+    const tag3 = {
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker3,
+        fileId: generateId('sticker'),
+      },
       authorUserId: user2,
       value: 'there it is',
-    })
+    }
 
-    const tag4 = new Tag({
-      stickerSetName: generateId('sticker-set'),
-      stickerFileUniqueId: sticker4,
-      stickerFileId: generateId('sticker'),
+    const tag4 = {
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker4,
+        fileId: generateId('sticker'),
+      },
       authorUserId: user1,
       value: 'reuse 1',
-    })
+    }
 
-    const tag5 = new Tag({
-      stickerSetName: generateId('sticker-set'),
-      stickerFileUniqueId: sticker4,
-      stickerFileId: generateId('sticker'),
+    const tag5 = {
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker4,
+        fileId: generateId('sticker'),
+      },
       authorUserId: user2,
       value: 'reuse 2',
-    })
+    }
 
     // store
 
@@ -74,25 +83,25 @@ describe('DynamodbTagRepository', () => {
     await tagRepository.storeTag(tag2)
     await tagRepository.storeTag(tag3)
 
-    await tagRepository.storeTag(
-      new Tag({
-        stickerSetName: generateId('sticker-set'),
-        stickerFileUniqueId: sticker4,
-        stickerFileId: generateId('sticker'),
-        authorUserId: user1,
-        value: 'reuse 1 to be overwritten',
-      })
-    )
+    await tagRepository.storeTag({
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker4,
+        fileId: generateId('sticker'),
+      },
+      authorUserId: user1,
+      value: 'reuse 1 to be overwritten',
+    })
 
-    await tagRepository.storeTag(
-      new Tag({
-        stickerSetName: generateId('sticker-set'),
-        stickerFileUniqueId: sticker4,
-        stickerFileId: generateId('sticker'),
-        authorUserId: user2,
-        value: 'reuse 2 to be overwritten',
-      })
-    )
+    await tagRepository.storeTag({
+      sticker: {
+        setName: generateId('sticker-set'),
+        fileUniqueId: sticker4,
+        fileId: generateId('sticker'),
+      },
+      authorUserId: user2,
+      value: 'reuse 2 to be overwritten',
+    })
 
     await tagRepository.storeTag(tag4)
     await tagRepository.storeTag(tag5)
@@ -136,38 +145,38 @@ describe('DynamodbTagRepository', () => {
 
     // search
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'hey'
     })).resolves.toEqual([])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'it is',
       authorUserId: user1,
     })).resolves.toEqual([])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'hello'
     })).resolves.toIncludeSameMembers([tag1, tag2])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'there'
     })).resolves.toIncludeSameMembers([tag2, tag3])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'it is'
     })).resolves.toIncludeSameMembers([tag3])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'hello',
       authorUserId: user1,
     })).resolves.toIncludeSameMembers([tag1])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'hello',
       authorUserId: user2,
     })).resolves.toIncludeSameMembers([tag2])
 
-    await expect(tagRepository.searchTags({
+    await expect(tagRepository.legacySearchTags({
       query: 'reuse',
     })).resolves.toIncludeSameMembers([tag4, tag5])
   })

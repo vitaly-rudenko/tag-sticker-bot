@@ -1,20 +1,31 @@
 import { Markup } from 'telegraf'
 
+/** @typedef {import('telegraf').Context} Context */
+
+/**
+ * @param {{
+ *   userSessionRepository: import('../../users/DynamodbUserSessionRepository').DynamodbUserSessionRepository
+ *   queuedStickerRepository: import('../../queue/DynamodbQueuedStickerRepository').DynamodbQueuedStickerRepository
+ * }} input
+ */
 export function useQueueFlow({
   userSessionRepository,
   queuedStickerRepository,
 }) {
+  /** @param {Context} context */
   async function handleSticker(context) {
-    if (!context.message.sticker.set_name) return
+    if (!context.message?.sticker.set_name) return
 
     const stickerFileUniqueId = context.message.sticker.file_unique_id
     const stickerFileId = context.message.sticker.file_id
     const stickerSetName = context.message.sticker.set_name
 
     await userSessionRepository.amendContext(context.state.userId, {
-      stickerFileUniqueId,
-      stickerFileId,
-      stickerSetName,
+      sticker: {
+        fileUniqueId: stickerFileUniqueId,
+        fileId: stickerFileId,
+        setName: stickerSetName,
+      },
       stickerMessageId: context.message.message_id,
     })
 
@@ -28,6 +39,7 @@ export function useQueueFlow({
     })
   }
 
+  /** @param {Context} context */
   async function getQueueInfo(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery()
 
@@ -37,6 +49,7 @@ export function useQueueFlow({
     await context.reply(`✅ There are ${count} sticker${count === 1 ? '' : 's'} in the queue.`)
   }
 
+  /** @param {Context} context */
   async function clearQueue(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
     context.deleteMessage().catch(() => {})
@@ -47,6 +60,7 @@ export function useQueueFlow({
     await context.reply('⏹ The queue has been cleared.')
   }
 
+  /** @param {Context} context */
   async function skipQueue(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
     context.deleteMessage().catch(() => {})
@@ -54,6 +68,7 @@ export function useQueueFlow({
     await sendNextQueuedSticker(context)
   }
 
+  /** @param {Context} context */
   async function sendNextQueuedSticker(context) {
     const { userId } = context.state
 
@@ -67,7 +82,7 @@ export function useQueueFlow({
     const count = await queuedStickerRepository.count(userId)
 
     const { message_id } = await context.replyWithSticker(
-      queuedSticker.stickerFileId,
+      queuedSticker.sticker.fileId,
       {
         reply_markup: Markup.inlineKeyboard(
           [
@@ -82,9 +97,7 @@ export function useQueueFlow({
     await context.reply('👇 Please send your tag for this sticker')
 
     await userSessionRepository.amendContext(userId, {
-      stickerSetName: queuedSticker.stickerSetName,
-      stickerFileUniqueId: queuedSticker.stickerFileUniqueId,
-      stickerFileId: queuedSticker.stickerFileId,
+      sticker: queuedSticker.sticker,
       stickerMessageId: message_id,
     })
   }

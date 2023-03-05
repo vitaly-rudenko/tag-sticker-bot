@@ -1,5 +1,11 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb'
 
+/**
+ * @typedef Context
+ * @property {Sticker} [sticker]
+ * @property {number} [stickerMessageId]
+ */
+
 export class DynamodbUserSessionRepository {
   /**
    * @param {{
@@ -12,6 +18,10 @@ export class DynamodbUserSessionRepository {
     this._tableName = tableName
   }
 
+  /**
+   * @param {string} userId
+   * @param {Context} newContext
+   */
   async amendContext(userId, newContext) {
     const oldContext = await this.getContext(userId)
 
@@ -37,6 +47,7 @@ export class DynamodbUserSessionRepository {
     )
   }
 
+  /** @returns {Promise<Context>} */
   async getContext(userId) {
     const { Item } = await this._dynamodbClient.send(
       new GetItemCommand({
