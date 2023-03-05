@@ -1,5 +1,6 @@
-import { BatchGetItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
-import { Tag } from './Tag.js'
+import { BatchGetItemCommand, BatchWriteItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
+
+const DEFAULT_AUTHOR_USER_ID = '#default'
 
 // TODO: do not return duplicates in responses
 export class DynamodbTagRepository {
@@ -17,75 +18,69 @@ export class DynamodbTagRepository {
   /** @param {Tag} tag */
   async storeTag(tag) {
     await this._dynamodbClient.send(
-      new PutItemCommand({
-        TableName: this._tableName,
-        Item: this._toAttributes(tag)
+      new BatchWriteItemCommand({
+        RequestItems: {
+          [this._tableName]: [{
+            PutRequest: {
+              Item: this._toAttributes(tag),
+            }
+          }, {
+            PutRequest: {
+              Item: this._toAttributes({
+                sticker: tag.sticker,
+                authorUserId: DEFAULT_AUTHOR_USER_ID,
+              }),
+            }
+          }]
+        }
       })
     )
   }
 
   /**
-   * @param {{
-   *   stickerFileIds: string[]
-   *   authorUserId?: string
-   * }} input
+   * @param {object} params
+   * @param {string[]} params.stickerFileUniqueIds
+   * @param {string} [params.authorUserId]
+   * @returns {Promise<{ [stickerFileUniqueId: string]: boolean }>}
    */
-  async queryTags({ stickerFileIds, authorUserId }) {
+  async queryTagStatus({ stickerFileUniqueIds, authorUserId }) {
+    /** @type {Tag[]} */
     const tags = []
 
-    if (authorUserId) {
-      for (let i = 0; i < stickerFileIds.length; i += 100) {
-        const { Responses } = await this._dynamodbClient.send(
-          new BatchGetItemCommand({
-            RequestItems: {
-              [this._tableName]: {
-                Keys: stickerFileIds
-                  .slice(i, i + 100)
-                  .map(stickerFileId => ({
-                    authorUserId: { S: authorUserId },
-                    stickerFileId: { S: stickerFileId },
-                  }))
-              }
+    for (let i = 0; i < stickerFileUniqueIds.length; i += 100) {
+      const { Responses } = await this._dynamodbClient.send(
+        new BatchGetItemCommand({
+          RequestItems: {
+            [this._tableName]: {
+              Keys: stickerFileUniqueIds
+                .slice(i, i + 100)
+                .map((stickerFileUniqueId) => ({
+                  authorUserId: { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
+                  stickerFileUniqueId: { S: stickerFileUniqueId },
+                }))
             }
-          })
-        )
-
-        if (Responses?.[this._tableName]) {
-          tags.push(...Responses[this._tableName].map(item => this._toEntity(item)))
-        }
-      }
-    } else {
-      for (const stickerFileId of stickerFileIds) {
-        let lastEvaluatedKey = undefined
-
-        do {
-          const { Items, LastEvaluatedKey } = await this._dynamodbClient.send(
-            new QueryCommand({
-              TableName: this._tableName,
-              IndexName: 'stickerFileId',
-              KeyConditionExpression: 'stickerFileId = :stickerFileId',
-              ExpressionAttributeValues: {
-                ':stickerFileId': { S: stickerFileId }
-              },
-              ExclusiveStartKey: lastEvaluatedKey,
-            })
-          )
-
-          if (Items) {
-            tags.push(...Items.map(item => this._toEntity(item)))
           }
+        })
+      )
 
-          lastEvaluatedKey = LastEvaluatedKey
-        } while (lastEvaluatedKey)
+      if (Responses?.[this._tableName]) {
+        tags.push(...Responses[this._tableName].map(item => this._toEntity(item)))
       }
     }
 
-    return tags
+    return stickerFileUniqueIds.reduce((statusMap, stickerFileUniqueId) => ({
+      ...statusMap,
+      [stickerFileUniqueId]: tags.some(tag => tag.sticker.fileUniqueId === stickerFileUniqueId),
+    }), {})
   }
 
-  /** @returns {Promise<import('./Tag').Tag[]>} */
-  async searchTags({ query, authorUserId = undefined }) {
-    // TODO: use CloudSearch
+  // TODO: use CloudSearch
+  /** @returns {Promise<Tag[]>} */
+  async legacySearchTags({ query, authorUserId = undefined }) {
+    if (typeof query !== 'string' || !query) {
+      throw new Error('Invalid query: must be a non-empty string')
+    }
+
     const { Items = [] } = await this._dynamodbClient.send(
       new ScanCommand({
         TableName: this._tableName,
@@ -94,32 +89,42 @@ export class DynamodbTagRepository {
 
     return Items
       .map(item => this._toEntity(item))
-      .filter(tag => tag.value.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
+      .filter(tag => tag.value?.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
   }
 
+  /** @param {Tag} tag */
   _toAttributes(tag) {
     return {
       stickerSetName: {
-        S: tag.stickerSetName,
+        S: tag.sticker.setName,
+      },
+      stickerFileUniqueId: {
+        S: tag.sticker.fileUniqueId,
       },
       stickerFileId: {
-        S: tag.stickerFileId,
+        S: tag.sticker.fileId,
       },
       authorUserId: {
         S: tag.authorUserId,
       },
-      value: {
-        S: tag.value,
+      ...tag.value && {
+        value: {
+          S: tag.value,
+        }
       },
     }
   }
 
+  /** @returns {Tag} */
   _toEntity(attributes) {
-    return new Tag({
-      stickerSetName: attributes.stickerSetName.S,
-      stickerFileId: attributes.stickerFileId.S,
+    return {
+      sticker: {
+        setName: attributes.stickerSetName.S,
+        fileUniqueId: attributes.stickerFileUniqueId.S,
+        fileId: attributes.stickerFileId.S,
+      },
       authorUserId: attributes.authorUserId.S,
-      value: attributes.value.S,
-    })
+      value: attributes.value?.S,
+    }
   }
 }
