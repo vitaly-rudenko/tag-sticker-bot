@@ -7,10 +7,12 @@ export function useQueueFlow({
   async function handleSticker(context) {
     if (!context.message.sticker.set_name) return
 
+    const stickerFileUniqueId = context.message.sticker.file_unique_id
     const stickerFileId = context.message.sticker.file_id
     const stickerSetName = context.message.sticker.set_name
 
     await userSessionRepository.amendContext(context.state.userId, {
+      stickerFileUniqueId,
       stickerFileId,
       stickerSetName,
       stickerMessageId: context.message.message_id,
@@ -32,7 +34,7 @@ export function useQueueFlow({
     const { userId } = context.state
     const count = await queuedStickerRepository.count(userId)
 
-    await context.reply(`✅ There are ${count} stickers in the queue.`)
+    await context.reply(`✅ There are ${count} sticker${count === 1 ? '' : 's'} in the queue.`)
   }
 
   async function clearQueue(context) {
@@ -58,9 +60,11 @@ export function useQueueFlow({
     const queuedSticker = await queuedStickerRepository.take(userId)
     if (!queuedSticker) {
       await userSessionRepository.clearContext(userId)
-      await context.reply("✅ The queue is empty. You're all done!")
+      await context.reply("✅ You're all done!")
       return
     }
+
+    const count = await queuedStickerRepository.count(userId)
 
     const { message_id } = await context.replyWithSticker(
       queuedSticker.stickerFileId,
@@ -68,17 +72,18 @@ export function useQueueFlow({
         reply_markup: Markup.inlineKeyboard(
           [
             Markup.button.callback('⏯ Skip', 'queue:skip'),
-            Markup.button.callback('⏹ Clear the queue', 'queue:clear'),
+            ...count > 0 ? [Markup.button.callback(`⏹ Clear the queue (${count} left)`, 'queue:clear')] : [],
           ],
           { columns: 1 }
         ).reply_markup,
       }
     )
 
-    await context.reply('👇 Please send your tag for this sticker:')
+    await context.reply('👇 Please send your tag for this sticker')
 
     await userSessionRepository.amendContext(userId, {
       stickerSetName: queuedSticker.stickerSetName,
+      stickerFileUniqueId: queuedSticker.stickerFileUniqueId,
       stickerFileId: queuedSticker.stickerFileId,
       stickerMessageId: message_id,
     })

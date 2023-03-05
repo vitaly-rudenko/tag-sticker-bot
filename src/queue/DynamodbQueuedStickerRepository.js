@@ -19,6 +19,7 @@ export class DynamodbQueuedStickerRepository {
    *   stickers: {
    *     stickerSetName: string
    *     stickerFileId: string
+   *     stickerFileUniqueId: string
    *   }[]
    * }} input
    */
@@ -31,6 +32,7 @@ export class DynamodbQueuedStickerRepository {
               PutRequest: {
                 Item: this._toAttributes({
                   userId,
+                  stickerFileUniqueId: sticker.stickerFileUniqueId,
                   stickerFileId: sticker.stickerFileId,
                   stickerSetName: sticker.stickerSetName,
                 })
@@ -63,7 +65,7 @@ export class DynamodbQueuedStickerRepository {
         TableName: this._tableName,
         Key: {
           userId: Items[0].userId,
-          stickerFileId: Items[0].stickerFileId,
+          stickerFileUniqueId: Items[0].stickerFileUniqueId,
         },
         ReturnValues: 'ALL_OLD',
       })
@@ -103,7 +105,7 @@ export class DynamodbQueuedStickerRepository {
                   DeleteRequest: {
                     Key: {
                       userId: item.userId,
-                      stickerFileId: item.stickerFileId,
+                      stickerFileUniqueId: item.stickerFileUniqueId,
                     }
                   }
                 }))
@@ -136,6 +138,9 @@ export class DynamodbQueuedStickerRepository {
       stickerFileId: {
         S: queuedSticker.stickerFileId,
       },
+      stickerFileUniqueId: {
+        S: queuedSticker.stickerFileUniqueId,
+      },
       userId: {
         S: String(queuedSticker.userId),
       },
@@ -150,6 +155,7 @@ export class DynamodbQueuedStickerRepository {
     return new QueuedSticker({
       userId: attributes.userId.S,
       stickerSetName: attributes.stickerSetName.S,
+      stickerFileUniqueId: attributes.stickerFileUniqueId.S,
       stickerFileId: attributes.stickerFileId.S,
     })
   }

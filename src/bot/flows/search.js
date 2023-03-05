@@ -12,7 +12,7 @@ export function useSearchFlow({ tagRepository }) {
       tags.map((tag, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id: tag.stickerFileId
+        sticker_file_id: tag.stickerFileId,
       }))
     )
   }

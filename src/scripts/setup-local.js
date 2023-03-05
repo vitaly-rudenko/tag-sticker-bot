@@ -31,11 +31,11 @@ await dynamodbClient.send(
       AttributeName: 'userId',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'stickerFileId',
+      AttributeName: 'stickerFileUniqueId',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileId',
+      AttributeName: 'stickerFileUniqueId',
       AttributeType: 'S'
     }, {
       AttributeName: 'userId',
@@ -53,14 +53,14 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbTagsTable,
     KeySchema: [{
-      AttributeName: 'stickerFileId',
+      AttributeName: 'stickerFileUniqueId',
       KeyType: 'HASH'
     }, {
       AttributeName: 'authorUserId',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileId',
+      AttributeName: 'stickerFileUniqueId',
       AttributeType: 'S'
     }, {
       AttributeName: 'authorUserId',
@@ -69,21 +69,6 @@ await dynamodbClient.send(
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
-    },
-    GlobalSecondaryIndexes: [
-      {
-        IndexName: 'stickerFileId',
-        KeySchema: [
-          { AttributeName: 'stickerFileId', KeyType: 'HASH' },
-        ],
-        Projection: {
-          ProjectionType: 'ALL',
-        },
-        ProvisionedThroughput: {
-          ReadCapacityUnits: 1,
-          WriteCapacityUnits: 1
-        }
-      }
-    ]
+    }
   })
 )
