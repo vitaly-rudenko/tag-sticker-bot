@@ -61,9 +61,7 @@ export async function createBot({
   bot.action('sticker:tag-single', tagSingle)
   bot.action('sticker:tag-untagged', tagUntagged)
   bot.action('sticker:tag-untagged-by-me', tagUntaggedByMe)
-  bot.action('sticker:tag-all', tagAll, (context) => {
-    context.updateType === 'callback_query'
-  })
+  bot.action('sticker:tag-all', tagAll)
 
   return bot
 }
