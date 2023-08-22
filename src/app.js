@@ -4,7 +4,7 @@ import { DynamodbTagRepository } from './tags/DynamodbTagRepository.js'
 import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable, telegramBotToken } from './env.js'
 import { createDynamodbClient } from './utils/createDynamodbClient.js'
 import { DynamodbUserSessionRepository } from './users/DynamodbUserSessionRepository.js'
-import { DynamodbStickerFinder } from './DynamodbStickerFinder.js'
+import { InefficientDynamodbStickerFinder } from './InefficientDynamodbStickerFinder.js'
 
 async function start() {
   const dynamodbClient = createDynamodbClient()
@@ -24,7 +24,7 @@ async function start() {
     tableName: dynamodbTagsTable,
   })
 
-  const stickerFinder = new DynamodbStickerFinder({
+  const stickerFinder = new InefficientDynamodbStickerFinder({
     dynamodbTagRepository: tagRepository,
   })
 

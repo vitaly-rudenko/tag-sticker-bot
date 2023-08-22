@@ -15,7 +15,7 @@ export class DynamodbTagRepository {
     this._tableName = tableName
   }
 
-  /** @param {Tag} tag */
+  /** @param {import('../types.d.ts').Tag} tag */
   async storeTag(tag) {
     await this._dynamodbClient.send(
       new BatchWriteItemCommand({
@@ -38,13 +38,45 @@ export class DynamodbTagRepository {
   }
 
   /**
+   * @param {string[]} stickerFileUniqueIds
+   * @returns {Promise<import('../types.d.ts').Sticker[]>}
+   */
+  async getTaggedStickers(stickerFileUniqueIds) {
+    /** @type {import('../types.d.ts').Tag[]} */
+    const tags = []
+
+    for (let i = 0; i < stickerFileUniqueIds.length; i += 100) {
+      const { Responses } = await this._dynamodbClient.send(
+        new BatchGetItemCommand({
+          RequestItems: {
+            [this._tableName]: {
+              Keys: stickerFileUniqueIds
+                .slice(i, i + 100)
+                .map((stickerFileUniqueId) => ({
+                  authorUserId: { S: DEFAULT_AUTHOR_USER_ID },
+                  stickerFileUniqueId: { S: stickerFileUniqueId },
+                }))
+            }
+          }
+        })
+      )
+
+      if (Responses?.[this._tableName]) {
+        tags.push(...Responses[this._tableName].map(item => this._toEntity(item)))
+      }
+    }
+
+    return tags.map(tag => tag.sticker)
+  }
+
+  /**
    * @param {object} params
    * @param {string[]} params.stickerFileUniqueIds
    * @param {string} [params.authorUserId]
    * @returns {Promise<{ [stickerFileUniqueId: string]: boolean }>}
    */
   async queryTagStatus({ stickerFileUniqueIds, authorUserId }) {
-    /** @type {Tag[]} */
+    /** @type {import('../types.d.ts').Tag[]} */
     const tags = []
 
     for (let i = 0; i < stickerFileUniqueIds.length; i += 100) {
@@ -74,9 +106,11 @@ export class DynamodbTagRepository {
     }), {})
   }
 
-  // TODO: use CloudSearch
-  /** @returns {Promise<Tag[]>} */
-  async legacySearchTags({ query, authorUserId = undefined }) {
+  /**
+   * NOTE: Only for testing
+   * @returns {Promise<import('../types.d.ts').Tag[]>}
+   */
+  async inefficientlyScanTags({ query, authorUserId = undefined }) {
     if (typeof query !== 'string' || !query) {
       throw new Error('Invalid query: must be a non-empty string')
     }
@@ -92,7 +126,7 @@ export class DynamodbTagRepository {
       .filter(tag => tag.value?.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
   }
 
-  /** @param {Tag} tag */
+  /** @param {import('../types.d.ts').Tag} tag */
   _toAttributes(tag) {
     return {
       stickerSetName: {
@@ -115,7 +149,7 @@ export class DynamodbTagRepository {
     }
   }
 
-  /** @returns {Tag} */
+  /** @returns {import('../types.d.ts').Tag} */
   _toEntity(attributes) {
     return {
       sticker: {

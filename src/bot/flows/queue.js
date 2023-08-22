@@ -4,8 +4,8 @@ import { Markup } from 'telegraf'
 
 /**
  * @param {{
- *   userSessionRepository: import('../../users/DynamodbUserSessionRepository').DynamodbUserSessionRepository
- *   queuedStickerRepository: import('../../queue/DynamodbQueuedStickerRepository').DynamodbQueuedStickerRepository
+ *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
+ *   queuedStickerRepository: import('../../types.d.ts').QueuedStickerRepository
  * }} input
  */
 export function useQueueFlow({
@@ -14,7 +14,7 @@ export function useQueueFlow({
 }) {
   /** @param {Context} context */
   async function handleSticker(context) {
-    if (!context.message?.sticker.set_name) return
+    if (!context.message || !('sticker' in context.message) || !context.message.sticker.set_name) return
 
     const stickerFileUniqueId = context.message.sticker.file_unique_id
     const stickerFileId = context.message.sticker.file_id

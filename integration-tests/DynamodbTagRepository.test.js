@@ -145,38 +145,38 @@ describe('DynamodbTagRepository', () => {
 
     // search
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'hey'
     })).resolves.toEqual([])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'it is',
       authorUserId: user1,
     })).resolves.toEqual([])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'hello'
     })).resolves.toIncludeSameMembers([tag1, tag2])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'there'
     })).resolves.toIncludeSameMembers([tag2, tag3])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'it is'
     })).resolves.toIncludeSameMembers([tag3])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'hello',
       authorUserId: user1,
     })).resolves.toIncludeSameMembers([tag1])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'hello',
       authorUserId: user2,
     })).resolves.toIncludeSameMembers([tag2])
 
-    await expect(tagRepository.legacySearchTags({
+    await expect(tagRepository.inefficientlyScanTags({
       query: 'reuse',
     })).resolves.toIncludeSameMembers([tag4, tag5])
   })

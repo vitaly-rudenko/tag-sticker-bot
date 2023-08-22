@@ -2,7 +2,7 @@
 
 /**
  * @param {{
- *   stickerFinder: import('../../DynamodbStickerFinder').DynamodbStickerFinder
+ *   stickerFinder: import('../../types.d.ts').StickerFinder
  * }} input
  */
 export function useSearchFlow({ stickerFinder }) {
@@ -13,6 +13,8 @@ export function useSearchFlow({ stickerFinder }) {
     const { userId } = context.state
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
     const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
+
+    if (query.length < 2 || query.length > 20) return
 
     const stickers = await stickerFinder.find({ query, authorUserId })
 
