@@ -15,7 +15,7 @@ export class DynamodbQueuedStickerRepository {
   /**
    * @param {{
    *   userId: string
-   *   stickers: Sticker[]
+   *   stickers: import('../types.d.ts').Sticker[]
    * }} input
    */
   async enqueue({ userId, stickers }) {
@@ -125,7 +125,7 @@ export class DynamodbQueuedStickerRepository {
     return Count ?? 0
   }
 
-  /** @param {QueuedSticker} queuedSticker */
+  /** @param {import('../types.d.ts').QueuedSticker} queuedSticker */
   _toAttributes(queuedSticker) {
     return {
       userId: {
@@ -143,7 +143,7 @@ export class DynamodbQueuedStickerRepository {
     }
   }
   
-  /** @returns {QueuedSticker} */
+  /** @returns {import('../types.d.ts').QueuedSticker} */
   _toEntity(attributes) {
     return {
       userId: attributes.userId.S,
