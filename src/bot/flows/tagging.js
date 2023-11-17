@@ -2,9 +2,9 @@
 
 /**
  * @param {{
- *   userSessionRepository: import('../../users/DynamodbUserSessionRepository').DynamodbUserSessionRepository
- *   queuedStickerRepository: import('../../queue/DynamodbQueuedStickerRepository').DynamodbQueuedStickerRepository
- *   tagRepository: import('../../tags/DynamodbTagRepository').DynamodbTagRepository
+ *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
+ *   queuedStickerRepository: import('../../types.d.ts').QueuedStickerRepository
+ *   tagRepository: import('../../types.d.ts').TagRepository
  *   sendNextQueuedSticker: Function
  *   bot: import('telegraf').Telegraf
  * }} input
@@ -12,7 +12,7 @@
 export function useTaggingFlow({ queuedStickerRepository, userSessionRepository, tagRepository, bot, sendNextQueuedSticker }) {
   /** @param {Context} context */
   async function handleTag(context, next) {
-    if (!context.chat || !context.message) return
+    if (!context.chat || !context.message || !('text' in context.message)) return
     if (context.message.text.startsWith('/')) return next()
 
     const { userId } = context.state
@@ -22,6 +22,11 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
 
     const value = context.message.text.trim().toLowerCase()
     if (!value) return
+
+    if (value.length < 2 || value.length > 30) {
+      await context.reply(`❌ The tag is too short or too long, please try again`)
+      return
+    }
 
     await tagRepository.storeTag({
       sticker,
@@ -145,7 +150,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
    * @param {{
    *   context: Context
    *   userId: string
-   *   stickers: Sticker[]
+   *   stickers: import('../../types.d.ts').Sticker[]
    * }} input 
    */
   async function enqueueStickers({ context, userId, stickers }) {
