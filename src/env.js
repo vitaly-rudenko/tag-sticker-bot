@@ -11,6 +11,7 @@ const {
   DYNAMODB_QUEUED_STICKERS_TABLE,
   DYNAMODB_TAGS_TABLE,
   DYNAMODB_USER_SESSIONS_TABLE,
+  IS_LOCAL_TESTING,
 } = z.object({
   TELEGRAM_BOT_TOKEN: z.string(),
   AWS_ACCESS_KEY_ID: z.string(),
@@ -19,6 +20,7 @@ const {
   DYNAMODB_QUEUED_STICKERS_TABLE: z.string(),
   DYNAMODB_TAGS_TABLE: z.string(),
   DYNAMODB_USER_SESSIONS_TABLE: z.string(),
+  IS_LOCAL_TESTING: z.enum(['true', 'false']),
 }).parse(process.env)
 
 export const telegramBotToken = TELEGRAM_BOT_TOKEN
@@ -28,3 +30,4 @@ export const localstackEndpoint = LOCALSTACK_ENDPOINT
 export const dynamodbQueuedStickersTable = DYNAMODB_QUEUED_STICKERS_TABLE
 export const dynamodbTagsTable = DYNAMODB_TAGS_TABLE
 export const dynamodbUserSessionsTable = DYNAMODB_USER_SESSIONS_TABLE
+export const isLocalTesting = IS_LOCAL_TESTING === 'true'
