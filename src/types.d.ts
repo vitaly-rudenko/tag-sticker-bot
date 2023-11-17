@@ -35,12 +35,12 @@ export interface UserSessionRepository {
 
 export interface TagRepository {
   storeTag(tag: Tag): Promise<void>
-  scanTags(input: { query: string; authorUserId?: string })
+  scanTags(input: { query: string; authorUserId?: string; limit: number })
     : Promise<Tag[]>
   queryTagStatus(input: { stickerFileUniqueIds: string[]; authorUserId?: string })
     : Promise<{ [stickerFileUniqueId: string]: boolean }>
 }
 
 export interface StickerFinder {
-  find(input: { query: string; authorUserId?: string }): Promise<Sticker[]>
+  find(input: { query: string; authorUserId?: string; limit: number }): Promise<Sticker[]>
 }

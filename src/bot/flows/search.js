@@ -16,7 +16,7 @@ export function useSearchFlow({ stickerFinder }) {
 
     if (query.length < 2 || query.length > 20) return
 
-    const stickers = await stickerFinder.find({ query, authorUserId })
+    const stickers = await stickerFinder.find({ query, authorUserId, limit: 50 })
 
     await context.answerInlineQuery(
       stickers.map((sticker, i) => ({

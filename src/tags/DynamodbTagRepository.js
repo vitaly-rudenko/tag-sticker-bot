@@ -76,7 +76,7 @@ export class DynamodbTagRepository {
   }
 
   /** @returns {Promise<import('../types.d.ts').Tag[]>} */
-  async scanTags({ query, authorUserId = undefined }) {
+  async scanTags({ query, authorUserId = undefined, limit }) {
     if (typeof query !== 'string' || !query) {
       throw new Error('Invalid query: must be a non-empty string')
     }
@@ -90,6 +90,7 @@ export class DynamodbTagRepository {
     return Items
       .map(item => this._toEntity(item))
       .filter(tag => tag.value?.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
+      .slice(0, limit)
   }
 
   /** @param {import('../types.d.ts').Tag} tag */
