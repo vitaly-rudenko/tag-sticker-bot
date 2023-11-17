@@ -1,3 +1,5 @@
+import { isLocalTesting } from '../../env.js'
+
 /** @typedef {import('telegraf').Context} Context */
 
 /**
@@ -23,7 +25,13 @@ export function useSearchFlow({ stickerFinder }) {
         id: String(i),
         type: 'sticker',
         sticker_file_id: sticker.fileId,
-      }))
+      })),
+      {
+        cache_time: isLocalTesting ? 5 : 300,
+        is_personal: Boolean(authorUserId),
+        switch_pm_text: "Can't find a sticker? Click here to contribute",
+        switch_pm_parameter: 'stub', // for some reason it fails if not provided
+      }
     )
   }
 
