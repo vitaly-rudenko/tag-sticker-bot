@@ -10,6 +10,7 @@ services:
       - DATA_DIR=/tmp/localstack/data
     ports:
       - "4566:4566"
+      - "8000:4566"
     volumes:
       - "localstack_data:/var/lib/localstack"
     command: "start"

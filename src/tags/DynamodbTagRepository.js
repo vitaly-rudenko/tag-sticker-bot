@@ -26,6 +26,7 @@ export class DynamodbTagRepository {
             }
           }, {
             PutRequest: {
+              // mark sticker as tagged for queryTagStatus()
               Item: this._toAttributes({
                 sticker: tag.sticker,
                 authorUserId: DEFAULT_AUTHOR_USER_ID,
