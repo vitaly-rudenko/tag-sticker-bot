@@ -57,7 +57,7 @@ export function useQueueFlow({
     const { userId } = context.state
     await userSessionRepository.clearContext(userId)
     await queuedStickerRepository.clear(userId)
-    await context.reply('⏹ The queue has been cleared.')
+    await context.reply('🗑 The queue has been cleared.')
   }
 
   /** @param {Context} context */
@@ -75,7 +75,7 @@ export function useQueueFlow({
     const queuedSticker = await queuedStickerRepository.take(userId)
     if (!queuedSticker) {
       await userSessionRepository.clearContext(userId)
-      await context.reply("✅ You're all done!")
+      await context.reply("✅ You're all done! It may take up to 5 minutes to see the changes")
       return
     }
 
