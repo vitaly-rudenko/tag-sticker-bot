@@ -1,16 +1,16 @@
-export class DynamodbStickerFinder {
+export class TagRepositoryStickerFinder {
   /**
    * @param {{
-   *   dynamodbTagRepository: import('./tags/DynamodbTagRepository').DynamodbTagRepository
+   *   tagRepository: import('./types.d.ts').TagRepository
    * }} input 
    */
-  constructor({ dynamodbTagRepository }) {
-    this._dynamodbTagRepository = dynamodbTagRepository
+  constructor({ tagRepository }) {
+    this._tagRepository = tagRepository
   }
 
-  /** @returns {Promise<Sticker[]>} */
-  async find({ query, authorUserId = undefined }) {
-    const tags = await this._dynamodbTagRepository.legacySearchTags({ query, authorUserId })
+  /** @returns {Promise<import('./types.d.ts').Sticker[]>} */
+  async find({ query, authorUserId = undefined, limit }) {
+    const tags = await this._tagRepository.scanTags({ query, authorUserId, limit })
     
     const stickers = []
     const addedStickerFileUniqueIds = new Set()

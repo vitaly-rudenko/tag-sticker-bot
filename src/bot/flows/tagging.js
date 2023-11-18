@@ -2,9 +2,9 @@
 
 /**
  * @param {{
- *   userSessionRepository: import('../../users/DynamodbUserSessionRepository').DynamodbUserSessionRepository
- *   queuedStickerRepository: import('../../queue/DynamodbQueuedStickerRepository').DynamodbQueuedStickerRepository
- *   tagRepository: import('../../tags/DynamodbTagRepository').DynamodbTagRepository
+ *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
+ *   queuedStickerRepository: import('../../types.d.ts').QueuedStickerRepository
+ *   tagRepository: import('../../types.d.ts').TagRepository
  *   sendNextQueuedSticker: Function
  *   bot: import('telegraf').Telegraf
  * }} input
@@ -12,7 +12,7 @@
 export function useTaggingFlow({ queuedStickerRepository, userSessionRepository, tagRepository, bot, sendNextQueuedSticker }) {
   /** @param {Context} context */
   async function handleTag(context, next) {
-    if (!context.chat || !context.message) return
+    if (!context.chat || !context.message || !('text' in context.message)) return
     if (context.message.text.startsWith('/')) return next()
 
     const { userId } = context.state
@@ -22,6 +22,11 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
 
     const value = context.message.text.trim().toLowerCase()
     if (!value) return
+
+    if (value.length < 2 || value.length > 100) {
+      await context.reply(`❌ The tag is too short or too long, please try again`)
+      return
+    }
 
     await tagRepository.storeTag({
       sticker,
@@ -38,7 +43,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagSingle(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -57,7 +62,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagUntagged(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -87,7 +92,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagUntaggedByMe(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -117,7 +122,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagAll(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -145,10 +150,11 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
    * @param {{
    *   context: Context
    *   userId: string
-   *   stickers: Sticker[]
+   *   stickers: import('../../types.d.ts').Sticker[]
    * }} input 
    */
   async function enqueueStickers({ context, userId, stickers }) {
+    await queuedStickerRepository.clear(userId)
     await queuedStickerRepository.enqueue({
       userId,
       stickers,
