@@ -9,20 +9,27 @@
     "setup-local": "node src/scripts/setup-local.js",
     "test": "npm run setup-local && npm run jest",
     "jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "lint": "tsc"
+    "lint": "tsc",
+    "build-lambda": "rollup -c",
+    "deploy": "npm run build-lambda && cdk deploy"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.279.0",
     "dotenv": "^16.0.3",
+    "lambda-api": "^1.0.3",
     "telegraf": "^4.11.2",
     "zod": "^3.20.6"
   },
   "devDependencies": {
+    "aws-cdk": "^2.110.0",
+    "aws-cdk-lib": "^2.110.0",
+    "constructs": "^10.3.0",
     "jest": "^29.4.3",
     "jest-extended": "^3.2.4",
     "nodemon": "^2.0.20",
+    "rollup": "^4.4.1",
     "typescript": "^5.2.2"
   },
   "nodemonConfig": {
