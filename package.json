@@ -4,25 +4,25 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/app.js",
+    "start": "node --env-file=.env.local src/app.js",
     "dev": "nodemon --exec 'npm start'",
-    "setup-local": "node src/scripts/setup-local.js",
+    "setup-local": "node --env-file=.env.local src/scripts/setup-local.js",
     "test": "npm run setup-local && npm run jest",
-    "jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
     "build-lambda": "rollup -c",
-    "deploy": "npm run build-lambda && cdk deploy"
+    "deploy": "npm run build-lambda && node --env-file=.env.deploy ./node_modules/.bin/cdk deploy"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.279.0",
-    "dotenv": "^16.0.3",
-    "lambda-api": "^1.0.3",
-    "telegraf": "^4.11.2",
-    "zod": "^3.20.6"
+    "telegraf": "^4.11.2"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-json": "^6.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
     "aws-cdk": "^2.110.0",
     "aws-cdk-lib": "^2.110.0",
     "constructs": "^10.3.0",
