@@ -87,7 +87,7 @@ export function useQueueFlow({
         reply_markup: Markup.inlineKeyboard(
           [
             Markup.button.callback('⏯ Skip', 'queue:skip'),
-            ...count > 0 ? [Markup.button.callback(`⏹ Clear the queue (${count} left)`, 'queue:clear')] : [],
+            ...count > 0 ? [Markup.button.callback(`⏹ Clear queue`, 'queue:clear')] : [],
           ],
           { columns: 1 }
         ).reply_markup,
