@@ -37,12 +37,19 @@ export class TagStickerBotStack extends cdk.Stack {
 
     const lambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(lambda)
 
-    const api = new cdk.aws_apigateway.RestApi(this, 'restApi', {
+    const restApi = new cdk.aws_apigateway.RestApi(this, 'restApi', {
       restApiName: 'tsb-dev-rest-api',
+      deployOptions: {
+        stageName: 'dev',
+      }
     })
 
-    api.root.addResource('health').addMethod('GET', lambdaIntegration)
-    api.root.addResource('webhook').addMethod('POST', lambdaIntegration)
+    restApi.root.addResource('health').addMethod('GET', lambdaIntegration)
+    restApi.root.addResource('webhook').addMethod('POST', lambdaIntegration)
+
+    new cdk.CfnOutput(this, 'restApiUrl', {
+      value: restApi.url,
+    })
   }
 
   createUserSessionsTable() {
