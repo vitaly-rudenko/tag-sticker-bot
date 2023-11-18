@@ -10,8 +10,10 @@
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
-    "build-lambda": "rollup -c",
-    "deploy": "npm run build-lambda && node --env-file=.env.deploy ./node_modules/.bin/cdk deploy"
+    "build-lambdas": "rollup -c",
+    "deploy:dev": "npm run build-lambdas && node --env-file=.env.dev ./node_modules/.bin/cdk deploy",
+    "undeploy:dev": "node --env-file=.env.dev ./node_modules/.bin/cdk destroy",
+    "deploy:prod": "npm run build-lambdas && node --env-file=.env.prod ./node_modules/.bin/cdk deploy"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
