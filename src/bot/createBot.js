@@ -22,7 +22,7 @@ export async function createBot({
 
   const {
     handleSticker,
-    getQueueInfo,
+    handleChooseUntagged,
     skipQueue,
     clearQueue,
     sendNextQueuedSticker,
@@ -51,8 +51,7 @@ export async function createBot({
 
   await bot.telegram.setMyCommands([
     { command: 'start',  description: 'Get help' },
-    { command: 'queue',  description: 'Get queue info' },
-    { command: 'clear',  description: 'Clear the queue' },
+    { command: 'stop',  description: 'Clear the queue' },
   ])
 
   bot.use(withUserId)
@@ -62,16 +61,22 @@ export async function createBot({
   bot.on(message('text'), handleTag)
 
   bot.start(start)
-  bot.command('queue', getQueueInfo)
-  bot.command('clear', clearQueue)
+  bot.command('stop', clearQueue)
   bot.command('version', version)
 
   bot.action('queue:skip', skipQueue)
   bot.action('queue:clear', clearQueue)
   bot.action('sticker:tag-single', tagSingle)
+  bot.action('sticker:choose-untagged', handleChooseUntagged)
   bot.action('sticker:tag-untagged', tagUntagged)
   bot.action('sticker:tag-untagged-by-me', tagUntaggedByMe)
   bot.action('sticker:tag-all', tagAll)
+  
+  bot.action('action:ignore', (context) => context.answerCbQuery())
+  bot.action('action:cancel', async (context) => {
+    context.deleteMessage().catch(() => {})
+    await context.reply('❌ Action cancelled.')
+  })
 
   return bot
 }

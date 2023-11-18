@@ -29,24 +29,34 @@ export function useQueueFlow({
       stickerMessageId: context.message.message_id,
     })
 
-    await context.reply('👇 What do you want to do?', {
+    await context.reply([
+      '👇 What do you want to do?',
+    ].join('\n'), {
+      parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Tag this sticker', 'sticker:tag-single'),
-        Markup.button.callback('Tag untagged stickers in the set', 'sticker:tag-untagged'),
-        Markup.button.callback('Tag untagged (by you) stickers in the set', 'sticker:tag-untagged-by-me'),
-        Markup.button.callback('Tag all stickers in the set', 'sticker:tag-all'),
+        Markup.button.callback('📎 Tag this sticker', 'sticker:tag-single'),
+        Markup.button.callback('🖇 Tag multiple in the set', 'sticker:choose-untagged'),
+        Markup.button.callback('❌ Cancel', 'action:cancel'),
       ], { columns: 1 }).reply_markup,
     })
   }
 
   /** @param {Context} context */
-  async function getQueueInfo(context) {
-    if (context.updateType === 'callback_query') context.answerCbQuery()
+  async function handleChooseUntagged(context) {
+    if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
+    context.deleteMessage().catch(() => {})
 
-    const { userId } = context.state
-    const count = await queuedStickerRepository.count(userId)
-
-    await context.reply(`✅ There are ${count} sticker${count === 1 ? '' : 's'} in the queue.`)
+    await context.reply([
+      '👇 Which stickers from the set do you want to tag?',
+    ].join('\n'), {
+      parse_mode: 'MarkdownV2',
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback('Not tagged by anyone', 'sticker:choose-untagged'),
+        Markup.button.callback('Not tagged by me', 'sticker:tag-untagged-by-me'),
+        Markup.button.callback('Re-tag all of them', 'sticker:tag-all'),
+        Markup.button.callback('❌ Cancel', 'action:cancel'),
+      ], { columns: 1 }).reply_markup,
+    })
   }
 
   /** @param {Context} context */
@@ -87,14 +97,13 @@ export function useQueueFlow({
         reply_markup: Markup.inlineKeyboard(
           [
             Markup.button.callback('⏯ Skip', 'queue:skip'),
-            ...count > 0 ? [Markup.button.callback(`⏹ Clear queue`, 'queue:clear')] : [],
+            ...count > 0 ? [Markup.button.callback(`⏹ Stop`, 'queue:clear')] : [],
+            Markup.button.callback('👇 Send tag for this sticker', 'action:ignore'),
           ],
-          { columns: 1 }
+          { columns: 2 },
         ).reply_markup,
       }
     )
-
-    await context.reply('👇 Please send your tag for this sticker')
 
     await userSessionRepository.amendContext(userId, {
       sticker: queuedSticker.sticker,
@@ -104,7 +113,7 @@ export function useQueueFlow({
 
   return {
     handleSticker,
-    getQueueInfo,
+    handleChooseUntagged,
     clearQueue,
     skipQueue,
     sendNextQueuedSticker,
