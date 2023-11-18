@@ -23,7 +23,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     const value = context.message.text.trim().toLowerCase()
     if (!value) return
 
-    if (value.length < 2 || value.length > 30) {
+    if (value.length < 2 || value.length > 50) {
       await context.reply(`❌ The tag is too short or too long, please try again`)
       return
     }
