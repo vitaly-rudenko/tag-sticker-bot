@@ -1,9 +1,10 @@
 import { Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
+import { withUserId } from './middlewares/withUserId.js'
 import { useQueueFlow } from './flows/queue.js'
 import { useSearchFlow } from './flows/search.js'
 import { useTaggingFlow } from './flows/tagging.js'
-import { withUserId } from './middlewares/withUserId.js'
+import { useStartFlow } from './flows/start.js'
 
 export async function createBot({
   telegramBotToken,
@@ -13,6 +14,10 @@ export async function createBot({
   stickerFinder,
 }) {
   const bot = new Telegraf(telegramBotToken)
+
+  const {
+    start
+  } = useStartFlow()
 
   const {
     handleSticker,
@@ -44,6 +49,7 @@ export async function createBot({
   } = useSearchFlow({ stickerFinder })
 
   await bot.telegram.setMyCommands([
+    { command: 'start',  description: 'Start' },
     { command: 'queue',  description: 'Get queue info' },
     { command: 'clear',  description: 'Clear the queue' },
   ])
@@ -54,6 +60,7 @@ export async function createBot({
   bot.on(message('sticker'), handleSticker)
   bot.on(message('text'), handleTag)
 
+  bot.start(start)
   bot.command('queue', getQueueInfo)
   bot.command('clear', clearQueue)
 
