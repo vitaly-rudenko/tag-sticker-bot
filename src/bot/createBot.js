@@ -4,7 +4,7 @@ import { withUserId } from './middlewares/withUserId.js'
 import { useQueueFlow } from './flows/queue.js'
 import { useSearchFlow } from './flows/search.js'
 import { useTaggingFlow } from './flows/tagging.js'
-import { useStartFlow } from './flows/start.js'
+import { useCommonFlow } from './flows/common.js'
 
 export async function createBot({
   telegramBotToken,
@@ -16,8 +16,9 @@ export async function createBot({
   const bot = new Telegraf(telegramBotToken)
 
   const {
-    start
-  } = useStartFlow()
+    start,
+    version,
+  } = useCommonFlow()
 
   const {
     handleSticker,
@@ -63,6 +64,7 @@ export async function createBot({
   bot.start(start)
   bot.command('queue', getQueueInfo)
   bot.command('clear', clearQueue)
+  bot.command('version', version)
 
   bot.action('queue:skip', skipQueue)
   bot.action('queue:clear', clearQueue)
