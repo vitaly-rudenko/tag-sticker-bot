@@ -1,12 +1,15 @@
 import * as url from 'url'
 import * as path from 'path'
+import * as fs from 'fs'
 import * as cdk from 'aws-cdk-lib'
 import { telegramBotToken, environment } from './env.js'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..', '..')
+const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), { encoding: 'utf-8' }))
 
 const appName = 'tsb'
+const version = packageJson.version
 const isProduction = environment === 'prod'
 
 export class TagStickerBotStack extends cdk.Stack {
@@ -28,6 +31,7 @@ export class TagStickerBotStack extends cdk.Stack {
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
       environment: {
+        VERSION: version,
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
@@ -64,6 +68,7 @@ export class TagStickerBotStack extends cdk.Stack {
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
       environment: {
+        VERSION: version,
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,

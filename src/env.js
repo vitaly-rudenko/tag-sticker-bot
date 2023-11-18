@@ -1,4 +1,5 @@
 const {
+  VERSION,
   TELEGRAM_BOT_TOKEN,
   LOCALSTACK_ENDPOINT,
   DYNAMODB_QUEUED_STICKERS_TABLE,
@@ -7,6 +8,7 @@ const {
   IS_LOCAL_TESTING,
 } = process.env
 
+export const version = VERSION
 export const localstackEndpoint = LOCALSTACK_ENDPOINT
 export const telegramBotToken = requireEnv(TELEGRAM_BOT_TOKEN)
 export const dynamodbQueuedStickersTable = requireEnv(DYNAMODB_QUEUED_STICKERS_TABLE)

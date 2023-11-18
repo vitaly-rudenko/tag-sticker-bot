@@ -10,7 +10,7 @@
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
-    "build-lambdas": "rollup -c",
+    "build-lambdas": "rimraf dist && rollup -c",
     "deploy:dev": "npm run build-lambdas && node --env-file=.env.dev ./node_modules/.bin/cdk deploy",
     "undeploy:dev": "node --env-file=.env.dev ./node_modules/.bin/cdk destroy",
     "deploy:prod": "npm run build-lambdas && node --env-file=.env.prod ./node_modules/.bin/cdk deploy"
@@ -31,6 +31,7 @@
     "jest": "^29.4.3",
     "jest-extended": "^3.2.4",
     "nodemon": "^2.0.20",
+    "rimraf": "^5.0.5",
     "rollup": "^4.4.1",
     "typescript": "^5.2.2"
   },

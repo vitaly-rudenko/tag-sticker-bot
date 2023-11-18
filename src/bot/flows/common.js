@@ -1,11 +1,6 @@
-import fs from 'fs'
-import path from 'path'
-import url from 'url'
+import * as env from '../../env.js'
 
 /** @typedef {import('telegraf').Context} Context */
-
-const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
-const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), { encoding: 'utf-8' }))
 
 export function useCommonFlow() {
   /** @param {Context} context */
@@ -15,7 +10,7 @@ export function useCommonFlow() {
 
   /** @param {Context} context */
   async function version(context) {
-    await context.reply(`Version: ${packageJson.version}`)
+    await context.reply(`Version: ${env.version ?? 'unknown'}`)
   }
 
   return {
