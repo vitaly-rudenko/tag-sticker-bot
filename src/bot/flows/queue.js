@@ -44,14 +44,14 @@ export function useQueueFlow({
   /** @param {Context} context */
   async function handleChooseUntagged(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     await context.reply([
       '👇 Which stickers from the set do you want to tag?',
     ].join('\n'), {
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Not tagged by anyone', 'sticker:choose-untagged'),
+        Markup.button.callback('Not tagged by anyone', 'sticker:tag-untagged'),
         Markup.button.callback('Not tagged by me', 'sticker:tag-untagged-by-me'),
         Markup.button.callback('Re-tag all of them', 'sticker:tag-all'),
         Markup.button.callback('❌ Cancel', 'action:cancel'),
@@ -62,7 +62,7 @@ export function useQueueFlow({
   /** @param {Context} context */
   async function clearQueue(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     await userSessionRepository.clearContext(userId)
@@ -73,8 +73,7 @@ export function useQueueFlow({
   /** @param {Context} context */
   async function skipQueue(context) {
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
-    context.deleteMessage().catch(() => {})
-
+    await context.deleteMessage().catch(() => {})
     await sendNextQueuedSticker(context)
   }
 
@@ -96,11 +95,13 @@ export function useQueueFlow({
       {
         reply_markup: Markup.inlineKeyboard(
           [
-            Markup.button.callback('⏯ Skip', 'queue:skip'),
-            ...count > 0 ? [Markup.button.callback(`⏹ Stop`, 'queue:clear')] : [],
-            Markup.button.callback('👇 Send tag for this sticker', 'action:ignore'),
-          ],
-          { columns: 2 },
+            ...count > 0 ? [
+              Markup.button.callback('➡️ Skip', 'queue:skip')
+            ] : [],
+            Markup.button.callback(count === 0 ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
+            Markup.button.callback('👇 Send your tag', 'action:ignore'),
+          ].filter(Boolean),
+          { wrap: (_, i) => count === 0 || i === 2 },
         ).reply_markup,
       }
     )
