@@ -43,7 +43,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagSingle(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -62,7 +62,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagUntagged(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -92,7 +92,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagUntaggedByMe(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -122,7 +122,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function tagAll(context) {
     if (!context.chat) return
-    context.deleteMessage().catch(() => {})
+    await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
@@ -154,6 +154,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
    * }} input 
    */
   async function enqueueStickers({ context, userId, stickers }) {
+    await queuedStickerRepository.clear(userId)
     await queuedStickerRepository.enqueue({
       userId,
       stickers,
