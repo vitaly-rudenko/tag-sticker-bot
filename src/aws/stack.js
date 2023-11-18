@@ -51,7 +51,7 @@ export class TagStickerBotStack extends cdk.Stack {
 
     restApi.root.addResource('health').addMethod('GET', lambdaIntegration)
     restApi.root.addResource('webhook').addMethod('POST', lambdaIntegration)
-    restApi.root.addResource('debug').addMethod('GET', lambdaIntegration)
+    if (!isProduction) restApi.root.addResource('debug').addMethod('GET', lambdaIntegration)
 
     const healthUrl = `${restApi.url}health`
     const webhookUrl = `${restApi.url}webhook`
@@ -78,7 +78,7 @@ export class TagStickerBotStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'healthUrl', { value: healthUrl })
     new cdk.CfnOutput(this, 'webhookUrl', { value: webhookUrl })
-    new cdk.CfnOutput(this, 'debugUrl', { value: debugUrl })
+    if (!isProduction) new cdk.CfnOutput(this, 'debugUrl', { value: debugUrl })
   }
 
   createUserSessionsTable() {
