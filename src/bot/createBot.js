@@ -18,7 +18,7 @@ export async function createBot({
   const {
     start,
     version,
-  } = useCommonFlow()
+  } = useCommonFlow({ bot })
 
   const {
     handleSticker,
@@ -50,7 +50,7 @@ export async function createBot({
   } = useSearchFlow({ stickerFinder })
 
   await bot.telegram.setMyCommands([
-    { command: 'start',  description: 'Start' },
+    { command: 'start',  description: 'Get help' },
     { command: 'queue',  description: 'Get queue info' },
     { command: 'clear',  description: 'Clear the queue' },
   ])
