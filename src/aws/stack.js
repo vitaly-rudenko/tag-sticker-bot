@@ -114,5 +114,5 @@ export class TagStickerBotStack extends cdk.Stack {
 }
 
 const app = new cdk.App()
-const stack = new TagStickerBotStack(app, `${appName}-${environment}`)
+new TagStickerBotStack(app, `${appName}-${environment}`)
 app.synth()
