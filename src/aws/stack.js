@@ -18,24 +18,17 @@ export class TagStickerBotStack extends cdk.Stack {
     const tagsTable = this.createTagsTable()
     const queuedStickersTable = this.createQueuedStickersTable()
 
-    const lambda = new cdk.aws_lambda_nodejs.NodejsFunction(this, 'lambda', {
+    const lambda = new cdk.aws_lambda.Function(this, 'lambda', {
       functionName: 'tsb-dev-lambda',
-      entry: path.join(root, 'dist', 'lambda.mjs'),
-      architecture: cdk.aws_lambda.Architecture.ARM_64,
-      bundling: {
-        format: cdk.aws_lambda_nodejs.OutputFormat.ESM,
-        externalModules: [
-          'aws-sdk'
-        ]
-      },
-      depsLockFilePath: path.join(root, 'package-lock.json'),
+      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist')),
+      handler: 'lambda.handler',
+      runtime: cdk.aws_lambda.Runtime.NODEJS_18_X,
       environment: {
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
         DYNAMODB_QUEUED_STICKERS_TABLE: queuedStickersTable.tableName,
       },
-      runtime: cdk.aws_lambda.Runtime.NODEJS_18_X,
     })
 
     for (const table of [userSessionsTable, tagsTable, queuedStickersTable]) {
