@@ -1,4 +1,8 @@
-import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand, ReturnValue } from '@aws-sdk/client-dynamodb'
+import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
+
+const BATCH_WRITE_ITEM_LIMIT = 25
+const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
 export class DynamodbQueuedStickerRepository {
   /**
@@ -19,18 +23,25 @@ export class DynamodbQueuedStickerRepository {
    * }} input
    */
   async enqueue({ userId, stickers }) {
-    for (let i = 0; i < stickers.length; i += 25) {
+    for (let i = 0; i < stickers.length; i += BATCH_WRITE_ITEM_LIMIT) {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
-            [this._tableName]: stickers.slice(i, i + 25).map(sticker => ({
-              PutRequest: {
-                Item: this._toAttributes({
-                  userId,
-                  sticker,
-                })
-              }
-            }))
+            [this._tableName]: stickers
+              .slice(i, i + BATCH_WRITE_ITEM_LIMIT)
+              .map(sticker => ({
+                PutRequest: {
+                  Item: {
+                    ...this._toAttributes({
+                      userId,
+                      sticker,
+                    }),
+                    exp: {
+                      N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
+                    }
+                  }
+                }
+              }))
           }
         })
       )
@@ -41,9 +52,12 @@ export class DynamodbQueuedStickerRepository {
     const { Items = [] } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: 'userId = :userId',
+        KeyConditionExpression: '#u = :user',
+        ExpressionAttributeNames: {
+          '#u': 'user'
+        },
         ExpressionAttributeValues: {
-          ':userId': {
+          ':user': {
             S: userId,
           },
         },
@@ -57,10 +71,10 @@ export class DynamodbQueuedStickerRepository {
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          userId: Items[0].userId,
-          stickerFileUniqueId: Items[0].stickerFileUniqueId,
+          user: Items[0].user,
+          uid: Items[0].uid,
         },
-        ReturnValues: 'ALL_OLD',
+        ReturnValues: ReturnValue.ALL_OLD,
       })
     )
 
@@ -74,9 +88,12 @@ export class DynamodbQueuedStickerRepository {
       const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
         new QueryCommand({
           TableName: this._tableName,
-          KeyConditionExpression: 'userId = :userId',
+          KeyConditionExpression: '#u = :user',
+          ExpressionAttributeNames: {
+            '#u': 'user'
+          },
           ExpressionAttributeValues: {
-            ':userId': {
+            ':user': {
               S: userId,
             },
           },
@@ -88,17 +105,17 @@ export class DynamodbQueuedStickerRepository {
 
       if (Items.length === 0) continue
 
-      for (let i = 0; i < Items.length; i += 25) {
+      for (let i = 0; i < Items.length; i += BATCH_WRITE_ITEM_LIMIT) {
         await this._dynamodbClient.send(
           new BatchWriteItemCommand({
             RequestItems: {
               [this._tableName]: Items
-                .slice(i, i + 25)
+                .slice(i, i + BATCH_WRITE_ITEM_LIMIT)
                 .map(item => ({
                   DeleteRequest: {
                     Key: {
-                      userId: item.userId,
-                      stickerFileUniqueId: item.stickerFileUniqueId,
+                      user: item.user,
+                      uid: item.uid,
                     }
                   }
                 }))
@@ -113,9 +130,12 @@ export class DynamodbQueuedStickerRepository {
     const { Count } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: 'userId = :userId',
+        KeyConditionExpression: '#u = :user',
+        ExpressionAttributeNames: {
+          '#u': 'user'
+        },
         ExpressionAttributeValues: {
-          ':userId': {
+          ':user': {
             S: userId,
           },
         },
@@ -128,16 +148,16 @@ export class DynamodbQueuedStickerRepository {
   /** @param {import('../types.d.ts').QueuedSticker} queuedSticker */
   _toAttributes(queuedSticker) {
     return {
-      userId: {
+      user: {
         S: String(queuedSticker.userId),
       },
-      stickerFileId: {
+      id: {
         S: queuedSticker.sticker.fileId,
       },
-      stickerFileUniqueId: {
+      uid: {
         S: queuedSticker.sticker.fileUniqueId,
       },
-      stickerSetName: {
+      set: {
         S: queuedSticker.sticker.setName,
       },
     }
@@ -146,11 +166,11 @@ export class DynamodbQueuedStickerRepository {
   /** @returns {import('../types.d.ts').QueuedSticker} */
   _toEntity(attributes) {
     return {
-      userId: attributes.userId.S,
+      userId: attributes.user.S,
       sticker: {
-        setName: attributes.stickerSetName.S,
-        fileUniqueId: attributes.stickerFileUniqueId.S,
-        fileId: attributes.stickerFileId.S,
+        setName: attributes.set.S,
+        fileUniqueId: attributes.uid.S,
+        fileId: attributes.id.S,
       }
     }
   }

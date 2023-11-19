@@ -1,3 +1,4 @@
+import { INLINE_QUERY_CACHE_TIME_LOCAL_S, INLINE_QUERY_CACHE_TIME_S, INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
 import { isLocalTesting } from '../../env.js'
 
 /** @typedef {import('telegraf').Context} Context */
@@ -16,9 +17,13 @@ export function useSearchFlow({ stickerFinder }) {
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
     const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
 
-    if (query.length < 2 || query.length > 20) return
+    if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
 
-    const stickers = await stickerFinder.find({ query, authorUserId, limit: 50 })
+    const stickers = await stickerFinder.find({
+      query,
+      authorUserId,
+      limit: INLINE_QUERY_RESULT_LIMIT,
+    })
 
     await context.answerInlineQuery(
       stickers.map((sticker, i) => ({
@@ -27,7 +32,9 @@ export function useSearchFlow({ stickerFinder }) {
         sticker_file_id: sticker.fileId,
       })),
       {
-        cache_time: isLocalTesting ? 5 : 300,
+        cache_time: isLocalTesting
+          ? INLINE_QUERY_CACHE_TIME_LOCAL_S
+          : INLINE_QUERY_CACHE_TIME_S,
         is_personal: Boolean(authorUserId),
         switch_pm_text: "Can't find a sticker? Click here to contribute",
         switch_pm_parameter: 'stub', // for some reason it fails if not provided

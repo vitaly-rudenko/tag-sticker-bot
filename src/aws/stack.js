@@ -86,34 +86,42 @@ export class TagStickerBotStack extends cdk.Stack {
     if (!isProduction) new cdk.CfnOutput(this, 'debugUrl', { value: debugUrl })
   }
 
-  createUserSessionsTable() {
-    return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
-      tableName: `${appName}-${environment}-user-sessions`,
-      partitionKey: { name: 'userId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    })
-  }
-
   createTagsTable() {
     return new cdk.aws_dynamodb.Table(this, 'tagsTable', {
       tableName: `${appName}-${environment}-tags`,
-      partitionKey: { name: 'stickerFileUniqueId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      sortKey: { name: 'authorUserId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
+      sortKey: { name: 'author', type: cdk.aws_dynamodb.AttributeType.STRING },
+      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 1,
+      writeCapacity: 1,
       removalPolicy: isProduction
         ? cdk.RemovalPolicy.RETAIN
         : cdk.RemovalPolicy.DESTROY,
     })
   }
 
+  createUserSessionsTable() {
+    return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
+      tableName: `${appName}-${environment}-user-sessions`,
+      partitionKey: { name: 'user', type: cdk.aws_dynamodb.AttributeType.STRING },
+      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 1,
+      writeCapacity: 1,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'exp',
+    })
+  }
+
   createQueuedStickersTable() {
     return new cdk.aws_dynamodb.Table(this, 'queuedStickersTable', {
       tableName: `${appName}-${environment}-queued-stickers`,
-      partitionKey: { name: 'userId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      sortKey: { name: 'stickerFileUniqueId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: 'user', type: cdk.aws_dynamodb.AttributeType.STRING },
+      sortKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
+      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 1,
+      writeCapacity: 1,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: 'exp',
     })
   }
 }

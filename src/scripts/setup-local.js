@@ -1,5 +1,5 @@
 import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
-import { CreateTableCommand, DeleteTableCommand } from '@aws-sdk/client-dynamodb'
+import { BillingMode, CreateTableCommand, DeleteTableCommand, DescribeTimeToLiveCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
 import { createDynamodbClient } from '../utils/createDynamodbClient.js'
 
 const dynamodbClient = createDynamodbClient()
@@ -9,16 +9,26 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbUserSessionsTable,
     KeySchema: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       KeyType: 'HASH'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       AttributeType: 'S'
     }],
+    BillingMode: BillingMode.PROVISIONED,
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
+    },
+  })
+)
+await dynamodbClient.send(
+  new UpdateTimeToLiveCommand({
+    TableName: dynamodbUserSessionsTable,
+    TimeToLiveSpecification: {
+      AttributeName: 'exp',
+      Enabled: true,
     }
   })
 )
@@ -28,22 +38,32 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbQueuedStickersTable,
     KeySchema: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       AttributeType: 'S'
     }, {
-      AttributeName: 'userId',
+      AttributeName: 'user',
       AttributeType: 'S'
     }],
+    BillingMode: BillingMode.PROVISIONED,
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
+    }
+  })
+)
+await dynamodbClient.send(
+  new UpdateTimeToLiveCommand({
+    TableName: dynamodbQueuedStickersTable,
+    TimeToLiveSpecification: {
+      AttributeName: 'exp',
+      Enabled: true,
     }
   })
 )
@@ -53,19 +73,20 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbTagsTable,
     KeySchema: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'authorUserId',
+      AttributeName: 'author',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       AttributeType: 'S'
     }, {
-      AttributeName: 'authorUserId',
+      AttributeName: 'author',
       AttributeType: 'S'
     }],
+    BillingMode: BillingMode.PROVISIONED,
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,

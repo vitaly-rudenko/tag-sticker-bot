@@ -51,7 +51,6 @@ export async function createBot({
 
   await bot.telegram.setMyCommands([
     { command: 'start',  description: 'Get help' },
-    { command: 'stop',  description: 'Clear the queue' },
   ])
 
   bot.use(withUserId)
@@ -61,7 +60,6 @@ export async function createBot({
   bot.on(message('text'), handleTag)
 
   bot.start(start)
-  bot.command('stop', clearQueue)
   bot.command('version', version)
 
   bot.action('queue:skip', skipQueue)
