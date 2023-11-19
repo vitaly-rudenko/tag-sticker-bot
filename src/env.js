@@ -23,7 +23,7 @@ export const debugChatId = DEBUG_CHAT_ID
  * @returns {string}
  */
 function requireEnv(value) {
-  if (value === undefined) {
+  if (!value) {
     throw Error('Missing environment variable')
   }
 
