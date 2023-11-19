@@ -73,7 +73,7 @@ export async function createBot({
   bot.action('action:ignore', (context) => context.answerCbQuery())
   bot.action('action:cancel', async (context) => {
     await context.deleteMessage().catch(() => {})
-    await context.reply('❌ Action cancelled.')
+    await context.reply('👌 Action cancelled.')
   })
 
   return bot

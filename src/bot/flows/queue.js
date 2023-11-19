@@ -61,18 +61,18 @@ export function useQueueFlow({
 
   /** @param {Context} context */
   async function clearQueue(context) {
-    if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
+    if (context.updateType === 'callback_query') context.answerCbQuery('Queue has been cleared')
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
     await userSessionRepository.clearContext(userId)
     await queuedStickerRepository.clear(userId)
-    await context.reply('🗑 The queue has been cleared.')
+    await context.reply('👌 Queue has been cleared.')
   }
 
   /** @param {Context} context */
   async function skipQueue(context) {
-    if (context.updateType === 'callback_query') context.answerCbQuery('Queue cleared')
+    if (context.updateType === 'callback_query') context.answerCbQuery('Sticker has been skipped')
     await context.deleteMessage().catch(() => {})
     await sendNextQueuedSticker(context)
   }
@@ -84,7 +84,7 @@ export function useQueueFlow({
     const queuedSticker = await queuedStickerRepository.take(userId)
     if (!queuedSticker) {
       await userSessionRepository.clearContext(userId)
-      await context.reply("✅ You're all done! It may take up to 5 minutes to see the changes")
+      await context.reply("✅ You're all done! It may take up to 5 minutes to see the changes.")
       return
     }
 

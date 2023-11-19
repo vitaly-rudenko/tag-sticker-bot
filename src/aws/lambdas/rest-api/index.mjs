@@ -1,11 +1,12 @@
 import { Telegraf } from 'telegraf'
 import { TagRepositoryStickerFinder } from '../../../TagRepositoryStickerFinder.js'
 import { createBot } from '../../../bot/createBot.js'
-import { dynamodbUserSessionsTable, dynamodbQueuedStickersTable, dynamodbTagsTable, telegramBotToken } from '../../../env.js'
+import { dynamodbUserSessionsTable, dynamodbQueuedStickersTable, dynamodbTagsTable, telegramBotToken, debugChatId } from '../../../env.js'
 import { DynamodbQueuedStickerRepository } from '../../../queue/DynamodbQueuedStickerRepository.js'
 import { DynamodbTagRepository } from '../../../tags/DynamodbTagRepository.js'
 import { DynamodbUserSessionRepository } from '../../../users/DynamodbUserSessionRepository.js'
 import { createDynamodbClient } from '../../../utils/createDynamodbClient.js'
+import { TelegramErrorLogger } from '../../../bot/TelegramErrorLogger.js'
 
 // https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway.html#apigateway-example-event
 export async function handler(event, context) {
@@ -65,7 +66,16 @@ export async function handler(event, context) {
         stickerFinder,
       })
 
-      await bot.handleUpdate(update)
+      try {
+        await bot.handleUpdate(update)
+      } catch (error) {
+        if (debugChatId) {
+          new TelegramErrorLogger({ telegram: bot.telegram, debugChatId })
+            .log(error, 'Could not handle bot update', update)
+        }
+        
+        throw error
+      }
   
       return {
         statusCode: 200,

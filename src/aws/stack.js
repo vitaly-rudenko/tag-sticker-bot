@@ -2,7 +2,7 @@ import * as url from 'url'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as cdk from 'aws-cdk-lib'
-import { telegramBotToken, environment } from './env.js'
+import { telegramBotToken, environment, debugChatId } from './env.js'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..', '..')
@@ -37,6 +37,7 @@ export class TagStickerBotStack extends cdk.Stack {
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
         DYNAMODB_QUEUED_STICKERS_TABLE: queuedStickersTable.tableName,
+        DEBUG_CHAT_ID: debugChatId,
       },
     })
 
@@ -72,6 +73,7 @@ export class TagStickerBotStack extends cdk.Stack {
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,
+        DEBUG_CHAT_ID: debugChatId,
       },
     })
 
