@@ -1,4 +1,7 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb'
+import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
+
+const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
 export class DynamodbUserSessionRepository {
   /**
@@ -23,8 +26,15 @@ export class DynamodbUserSessionRepository {
       new PutItemCommand({
         TableName: this._tableName,
         Item: {
-          userId: { S: userId },
-          context: { S: JSON.stringify({ ...oldContext, ...newContext }) },
+          userId: {
+            S: userId,
+          },
+          context: {
+            S: JSON.stringify({ ...oldContext, ...newContext }),
+          },
+          expiresAt: {
+            N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
+          }
         }
       })
     )

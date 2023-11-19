@@ -1,6 +1,8 @@
 import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 
 const BATCH_WRITE_ITEM_LIMIT = 25
+const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
 export class DynamodbQueuedStickerRepository {
   /**
@@ -25,14 +27,21 @@ export class DynamodbQueuedStickerRepository {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
-            [this._tableName]: stickers.slice(i, i + 25).map(sticker => ({
-              PutRequest: {
-                Item: this._toAttributes({
-                  userId,
-                  sticker,
-                })
-              }
-            }))
+            [this._tableName]: stickers
+              .slice(i, i + BATCH_WRITE_ITEM_LIMIT)
+              .map(sticker => ({
+                PutRequest: {
+                  Item: {
+                    ...this._toAttributes({
+                      userId,
+                      sticker,
+                    }),
+                    expiresAt: {
+                      N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
+                    }
+                  }
+                }
+              }))
           }
         })
       )
