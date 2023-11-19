@@ -18,8 +18,8 @@
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.279.0",
-    "telegraf": "^4.11.2"
+    "@aws-sdk/client-dynamodb": "^3.454.0",
+    "telegraf": "^4.15.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
