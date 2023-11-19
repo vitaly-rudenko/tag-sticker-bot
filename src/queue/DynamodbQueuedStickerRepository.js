@@ -1,5 +1,7 @@
 import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
 
+const BATCH_WRITE_ITEM_LIMIT = 25
+
 export class DynamodbQueuedStickerRepository {
   /**
    * @param {{
@@ -19,7 +21,7 @@ export class DynamodbQueuedStickerRepository {
    * }} input
    */
   async enqueue({ userId, stickers }) {
-    for (let i = 0; i < stickers.length; i += 25) {
+    for (let i = 0; i < stickers.length; i += BATCH_WRITE_ITEM_LIMIT) {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
@@ -88,12 +90,12 @@ export class DynamodbQueuedStickerRepository {
 
       if (Items.length === 0) continue
 
-      for (let i = 0; i < Items.length; i += 25) {
+      for (let i = 0; i < Items.length; i += BATCH_WRITE_ITEM_LIMIT) {
         await this._dynamodbClient.send(
           new BatchWriteItemCommand({
             RequestItems: {
               [this._tableName]: Items
-                .slice(i, i + 25)
+                .slice(i, i + BATCH_WRITE_ITEM_LIMIT)
                 .map(item => ({
                   DeleteRequest: {
                     Key: {

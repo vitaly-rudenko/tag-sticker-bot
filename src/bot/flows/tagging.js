@@ -1,3 +1,5 @@
+import { MAX_TAG_VALUE_LENGTH, MIN_TAG_VALUE_LENGTH } from '../../constants.js'
+
 /** @typedef {import('telegraf').Context} Context */
 
 /**
@@ -23,7 +25,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     const value = context.message.text.trim().toLowerCase()
     if (!value) return
 
-    if (value.length < 2 || value.length > 100) {
+    if (value.length < MIN_TAG_VALUE_LENGTH || value.length > MAX_TAG_VALUE_LENGTH) {
       await context.reply(`❌ The tag is too short or too long, please try again`)
       return
     }

@@ -1,6 +1,7 @@
 import { BatchGetItemCommand, BatchWriteItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
 
 const DEFAULT_AUTHOR_USER_ID = '#default'
+const BATCH_GET_ITEM_LIMIT = 100
 
 // TODO: do not return duplicates in responses
 export class DynamodbTagRepository {
@@ -48,13 +49,13 @@ export class DynamodbTagRepository {
     /** @type {import('../types.d.ts').Tag[]} */
     const tags = []
 
-    for (let i = 0; i < stickerFileUniqueIds.length; i += 100) {
+    for (let i = 0; i < stickerFileUniqueIds.length; i += BATCH_GET_ITEM_LIMIT) {
       const { Responses } = await this._dynamodbClient.send(
         new BatchGetItemCommand({
           RequestItems: {
             [this._tableName]: {
               Keys: stickerFileUniqueIds
-                .slice(i, i + 100)
+                .slice(i, i + BATCH_GET_ITEM_LIMIT)
                 .map((stickerFileUniqueId) => ({
                   authorUserId: { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
                   stickerFileUniqueId: { S: stickerFileUniqueId },
