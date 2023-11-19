@@ -28,10 +28,14 @@ export class DynamodbTagRepository {
           }, {
             PutRequest: {
               // mark sticker as tagged for queryTagStatus()
-              Item: this._toAttributes({
-                sticker: tag.sticker,
-                authorUserId: DEFAULT_AUTHOR_USER_ID,
-              }),
+              Item: {
+                uid: {
+                  S: tag.sticker.fileUniqueId,
+                },
+                author: {
+                  S: DEFAULT_AUTHOR_USER_ID,
+                },
+              }
             }
           }]
         }
@@ -46,8 +50,7 @@ export class DynamodbTagRepository {
    * @returns {Promise<{ [stickerFileUniqueId: string]: boolean }>}
    */
   async queryTagStatus({ stickerFileUniqueIds, authorUserId }) {
-    /** @type {import('../types.d.ts').Tag[]} */
-    const tags = []
+    const fileUniqueIdMap = new Set()
 
     for (let i = 0; i < stickerFileUniqueIds.length; i += BATCH_GET_ITEM_LIMIT) {
       const { Responses } = await this._dynamodbClient.send(
@@ -66,13 +69,15 @@ export class DynamodbTagRepository {
       )
 
       if (Responses?.[this._tableName]) {
-        tags.push(...Responses[this._tableName].map(item => this._toEntity(item)))
+        for (const item of Responses[this._tableName]) {
+          fileUniqueIdMap.add(item.uid.S)
+        }
       }
     }
 
     return stickerFileUniqueIds.reduce((statusMap, stickerFileUniqueId) => ({
       ...statusMap,
-      [stickerFileUniqueId]: tags.some(tag => tag.sticker.fileUniqueId === stickerFileUniqueId),
+      [stickerFileUniqueId]: fileUniqueIdMap.has(stickerFileUniqueId),
     }), {})
   }
 
