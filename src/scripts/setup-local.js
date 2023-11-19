@@ -9,11 +9,11 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbUserSessionsTable,
     KeySchema: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       KeyType: 'HASH'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       AttributeType: 'S'
     }],
     BillingMode: BillingMode.PROVISIONED,
@@ -27,7 +27,7 @@ await dynamodbClient.send(
   new UpdateTimeToLiveCommand({
     TableName: dynamodbUserSessionsTable,
     TimeToLiveSpecification: {
-      AttributeName: 'expiresAt',
+      AttributeName: 'exp',
       Enabled: true,
     }
   })
@@ -38,17 +38,17 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbQueuedStickersTable,
     KeySchema: [{
-      AttributeName: 'userId',
+      AttributeName: 'user',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       AttributeType: 'S'
     }, {
-      AttributeName: 'userId',
+      AttributeName: 'user',
       AttributeType: 'S'
     }],
     BillingMode: BillingMode.PROVISIONED,
@@ -62,7 +62,7 @@ await dynamodbClient.send(
   new UpdateTimeToLiveCommand({
     TableName: dynamodbQueuedStickersTable,
     TimeToLiveSpecification: {
-      AttributeName: 'expiresAt',
+      AttributeName: 'exp',
       Enabled: true,
     }
   })
@@ -73,17 +73,17 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbTagsTable,
     KeySchema: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'authorUserId',
+      AttributeName: 'author',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'stickerFileUniqueId',
+      AttributeName: 'uid',
       AttributeType: 'S'
     }, {
-      AttributeName: 'authorUserId',
+      AttributeName: 'author',
       AttributeType: 'S'
     }],
     BillingMode: BillingMode.PROVISIONED,

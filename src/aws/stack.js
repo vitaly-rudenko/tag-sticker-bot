@@ -89,8 +89,8 @@ export class TagStickerBotStack extends cdk.Stack {
   createTagsTable() {
     return new cdk.aws_dynamodb.Table(this, 'tagsTable', {
       tableName: `${appName}-${environment}-tags`,
-      partitionKey: { name: 'stickerFileUniqueId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      sortKey: { name: 'authorUserId', type: cdk.aws_dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
+      sortKey: { name: 'author', type: cdk.aws_dynamodb.AttributeType.STRING },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1,
       writeCapacity: 1,
@@ -103,25 +103,25 @@ export class TagStickerBotStack extends cdk.Stack {
   createUserSessionsTable() {
     return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
       tableName: `${appName}-${environment}-user-sessions`,
-      partitionKey: { name: 'userId', type: cdk.aws_dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'user', type: cdk.aws_dynamodb.AttributeType.STRING },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1,
       writeCapacity: 1,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      timeToLiveAttribute: 'expiresAt',
+      timeToLiveAttribute: 'exp',
     })
   }
 
   createQueuedStickersTable() {
     return new cdk.aws_dynamodb.Table(this, 'queuedStickersTable', {
       tableName: `${appName}-${environment}-queued-stickers`,
-      partitionKey: { name: 'userId', type: cdk.aws_dynamodb.AttributeType.STRING },
-      sortKey: { name: 'stickerFileUniqueId', type: cdk.aws_dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'user', type: cdk.aws_dynamodb.AttributeType.STRING },
+      sortKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1,
       writeCapacity: 1,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      timeToLiveAttribute: 'expiresAt',
+      timeToLiveAttribute: 'exp',
     })
   }
 }

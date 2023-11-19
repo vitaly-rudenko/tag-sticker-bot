@@ -1,6 +1,6 @@
 import { BatchGetItemCommand, BatchWriteItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
 
-const DEFAULT_AUTHOR_USER_ID = '#default'
+const DEFAULT_AUTHOR_USER_ID = '#'
 const BATCH_GET_ITEM_LIMIT = 100
 
 // TODO: do not return duplicates in responses
@@ -57,8 +57,8 @@ export class DynamodbTagRepository {
               Keys: stickerFileUniqueIds
                 .slice(i, i + BATCH_GET_ITEM_LIMIT)
                 .map((stickerFileUniqueId) => ({
-                  authorUserId: { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
-                  stickerFileUniqueId: { S: stickerFileUniqueId },
+                  author: { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
+                  uid: { S: stickerFileUniqueId },
                 }))
             }
           }
@@ -97,7 +97,7 @@ export class DynamodbTagRepository {
         new ScanCommand({
           TableName: this._tableName,
           FilterExpression: authorUserId
-            ? 'authorUserId = :authorUserId AND contains(#value, :query)'
+            ? 'author = :author AND contains(#value, :query)'
             : 'contains(#value, :query)',
           ExpressionAttributeNames: {
             '#value': 'value'
@@ -107,7 +107,7 @@ export class DynamodbTagRepository {
               S: query.toLowerCase().trim(),
             },
             ...authorUserId && {
-              ':authorUserId': {
+              ':author': {
                 S: authorUserId,
               }
             }
@@ -129,16 +129,16 @@ export class DynamodbTagRepository {
   /** @param {import('../types.d.ts').Tag} tag */
   _toAttributes(tag) {
     return {
-      stickerSetName: {
+      set: {
         S: tag.sticker.setName,
       },
-      stickerFileUniqueId: {
+      uid: {
         S: tag.sticker.fileUniqueId,
       },
-      stickerFileId: {
+      id: {
         S: tag.sticker.fileId,
       },
-      authorUserId: {
+      author: {
         S: tag.authorUserId,
       },
       ...tag.value && {
@@ -153,11 +153,11 @@ export class DynamodbTagRepository {
   _toEntity(attributes) {
     return {
       sticker: {
-        setName: attributes.stickerSetName.S,
-        fileUniqueId: attributes.stickerFileUniqueId.S,
-        fileId: attributes.stickerFileId.S,
+        setName: attributes.set.S,
+        fileUniqueId: attributes.uid.S,
+        fileId: attributes.id.S,
       },
-      authorUserId: attributes.authorUserId.S,
+      authorUserId: attributes.author.S,
       value: attributes.value?.S,
     }
   }

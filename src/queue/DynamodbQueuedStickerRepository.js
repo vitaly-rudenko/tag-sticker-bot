@@ -1,4 +1,4 @@
-import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand } from '@aws-sdk/client-dynamodb'
+import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand, ReturnValue } from '@aws-sdk/client-dynamodb'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 
 const BATCH_WRITE_ITEM_LIMIT = 25
@@ -36,7 +36,7 @@ export class DynamodbQueuedStickerRepository {
                       userId,
                       sticker,
                     }),
-                    expiresAt: {
+                    exp: {
                       N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
                     }
                   }
@@ -52,9 +52,12 @@ export class DynamodbQueuedStickerRepository {
     const { Items = [] } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: 'userId = :userId',
+        KeyConditionExpression: '#u = :user',
+        ExpressionAttributeNames: {
+          '#u': 'user'
+        },
         ExpressionAttributeValues: {
-          ':userId': {
+          ':user': {
             S: userId,
           },
         },
@@ -68,10 +71,10 @@ export class DynamodbQueuedStickerRepository {
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          userId: Items[0].userId,
-          stickerFileUniqueId: Items[0].stickerFileUniqueId,
+          user: Items[0].user,
+          uid: Items[0].uid,
         },
-        ReturnValues: 'ALL_OLD',
+        ReturnValues: ReturnValue.ALL_OLD,
       })
     )
 
@@ -85,9 +88,12 @@ export class DynamodbQueuedStickerRepository {
       const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
         new QueryCommand({
           TableName: this._tableName,
-          KeyConditionExpression: 'userId = :userId',
+          KeyConditionExpression: '#u = :user',
+          ExpressionAttributeNames: {
+            '#u': 'user'
+          },
           ExpressionAttributeValues: {
-            ':userId': {
+            ':user': {
               S: userId,
             },
           },
@@ -108,8 +114,8 @@ export class DynamodbQueuedStickerRepository {
                 .map(item => ({
                   DeleteRequest: {
                     Key: {
-                      userId: item.userId,
-                      stickerFileUniqueId: item.stickerFileUniqueId,
+                      user: item.user,
+                      uid: item.uid,
                     }
                   }
                 }))
@@ -124,9 +130,12 @@ export class DynamodbQueuedStickerRepository {
     const { Count } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: 'userId = :userId',
+        KeyConditionExpression: '#u = :user',
+        ExpressionAttributeNames: {
+          '#u': 'user'
+        },
         ExpressionAttributeValues: {
-          ':userId': {
+          ':user': {
             S: userId,
           },
         },
@@ -139,16 +148,16 @@ export class DynamodbQueuedStickerRepository {
   /** @param {import('../types.d.ts').QueuedSticker} queuedSticker */
   _toAttributes(queuedSticker) {
     return {
-      userId: {
+      user: {
         S: String(queuedSticker.userId),
       },
-      stickerFileId: {
+      id: {
         S: queuedSticker.sticker.fileId,
       },
-      stickerFileUniqueId: {
+      uid: {
         S: queuedSticker.sticker.fileUniqueId,
       },
-      stickerSetName: {
+      set: {
         S: queuedSticker.sticker.setName,
       },
     }
@@ -157,11 +166,11 @@ export class DynamodbQueuedStickerRepository {
   /** @returns {import('../types.d.ts').QueuedSticker} */
   _toEntity(attributes) {
     return {
-      userId: attributes.userId.S,
+      userId: attributes.user.S,
       sticker: {
-        setName: attributes.stickerSetName.S,
-        fileUniqueId: attributes.stickerFileUniqueId.S,
-        fileId: attributes.stickerFileId.S,
+        setName: attributes.set.S,
+        fileUniqueId: attributes.uid.S,
+        fileId: attributes.id.S,
       }
     }
   }

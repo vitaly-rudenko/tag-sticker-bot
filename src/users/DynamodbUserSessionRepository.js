@@ -26,13 +26,13 @@ export class DynamodbUserSessionRepository {
       new PutItemCommand({
         TableName: this._tableName,
         Item: {
-          userId: {
+          user: {
             S: userId,
           },
-          context: {
+          ctx: {
             S: JSON.stringify({ ...oldContext, ...newContext }),
           },
-          expiresAt: {
+          exp: {
             N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
           }
         }
@@ -45,7 +45,7 @@ export class DynamodbUserSessionRepository {
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          userId: { S: userId }
+          user: { S: userId }
         }
       })
     )
@@ -57,11 +57,11 @@ export class DynamodbUserSessionRepository {
       new GetItemCommand({
         TableName: this._tableName,
         Key: {
-          userId: { S: userId }
+          user: { S: userId }
         }
       })
     )
 
-    return Item?.context?.S ? JSON.parse(Item.context.S) : {}
+    return Item?.ctx?.S ? JSON.parse(Item.ctx.S) : {}
   }
 }
