@@ -76,22 +76,54 @@ export class DynamodbTagRepository {
     }), {})
   }
 
-  /** @returns {Promise<import('../types.d.ts').Tag[]>} */
+  /**
+   * @param {{
+   *   query: string
+   *   limit: number
+   *   authorUserId?: string
+   * }} input
+   * @returns {Promise<import('../types.d.ts').Tag[]>}
+   */
   async scanTags({ query, authorUserId = undefined, limit }) {
     if (typeof query !== 'string' || !query) {
       throw new Error('Invalid query: must be a non-empty string')
     }
 
-    const { Items = [] } = await this._dynamodbClient.send(
-      new ScanCommand({
-        TableName: this._tableName,
-      })
-    )
+    let lastEvaluatedKey = undefined
+    let result = []
 
-    return Items
-      .map(item => this._toEntity(item))
-      .filter(tag => tag.value?.includes(query.toLowerCase()) && (!authorUserId || tag.authorUserId === authorUserId))
+    do {
+      const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
+        new ScanCommand({
+          TableName: this._tableName,
+          FilterExpression: authorUserId
+            ? 'authorUserId = :authorUserId AND contains(#value, :query)'
+            : 'contains(#value, :query)',
+          ExpressionAttributeNames: {
+            '#value': 'value'
+          },
+          ExpressionAttributeValues: {
+            ':query': {
+              S: query.toLowerCase().trim(),
+            },
+            ...authorUserId && {
+              ':authorUserId': {
+                S: authorUserId,
+              }
+            }
+          },
+          ExclusiveStartKey: lastEvaluatedKey,
+        })
+      )
+
+      result.push(...Items)
+
+      lastEvaluatedKey = LastEvaluatedKey
+    } while (lastEvaluatedKey && result.length < limit)
+
+    return result
       .slice(0, limit)
+      .map(item => this._toEntity(item))
   }
 
   /** @param {import('../types.d.ts').Tag} tag */
