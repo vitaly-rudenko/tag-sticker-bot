@@ -91,7 +91,7 @@ export class TagStickerBotStack extends cdk.Stack {
   createTagsTable() {
     return new cdk.aws_dynamodb.Table(this, 'tagsTable', {
       tableName: `${appName}-${environment}-tags`,
-      partitionKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'fuid', type: cdk.aws_dynamodb.AttributeType.STRING },
       sortKey: { name: 'author', type: cdk.aws_dynamodb.AttributeType.STRING },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1,
@@ -118,7 +118,7 @@ export class TagStickerBotStack extends cdk.Stack {
     return new cdk.aws_dynamodb.Table(this, 'queuedStickersTable', {
       tableName: `${appName}-${environment}-queued-stickers`,
       partitionKey: { name: 'user', type: cdk.aws_dynamodb.AttributeType.STRING },
-      sortKey: { name: 'uid', type: cdk.aws_dynamodb.AttributeType.STRING },
+      sortKey: { name: 'fuid', type: cdk.aws_dynamodb.AttributeType.STRING },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1,
       writeCapacity: 1,

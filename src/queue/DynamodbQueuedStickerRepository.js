@@ -72,7 +72,7 @@ export class DynamodbQueuedStickerRepository {
         TableName: this._tableName,
         Key: {
           user: Items[0].user,
-          uid: Items[0].uid,
+          fuid: Items[0].fuid,
         },
         ReturnValues: ReturnValue.ALL_OLD,
       })
@@ -115,7 +115,7 @@ export class DynamodbQueuedStickerRepository {
                   DeleteRequest: {
                     Key: {
                       user: item.user,
-                      uid: item.uid,
+                      fuid: item.fuid,
                     }
                   }
                 }))
@@ -151,10 +151,10 @@ export class DynamodbQueuedStickerRepository {
       user: {
         S: String(queuedSticker.userId),
       },
-      id: {
+      fid: {
         S: queuedSticker.sticker.fileId,
       },
-      uid: {
+      fuid: {
         S: queuedSticker.sticker.fileUniqueId,
       },
       set: {
@@ -169,8 +169,8 @@ export class DynamodbQueuedStickerRepository {
       userId: attributes.user.S,
       sticker: {
         setName: attributes.set.S,
-        fileUniqueId: attributes.uid.S,
-        fileId: attributes.id.S,
+        fileUniqueId: attributes.fuid.S,
+        fileId: attributes.fid.S,
       }
     }
   }

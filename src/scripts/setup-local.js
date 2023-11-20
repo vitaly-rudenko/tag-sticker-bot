@@ -1,5 +1,5 @@
 import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
-import { BillingMode, CreateTableCommand, DeleteTableCommand, DescribeTimeToLiveCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
+import { CreateTableCommand, DeleteTableCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
 import { createDynamodbClient } from '../utils/createDynamodbClient.js'
 
 const dynamodbClient = createDynamodbClient()
@@ -16,7 +16,7 @@ await dynamodbClient.send(
       AttributeName: 'user',
       AttributeType: 'S'
     }],
-    BillingMode: BillingMode.PROVISIONED,
+    BillingMode: 'PROVISIONED',
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
@@ -41,17 +41,17 @@ await dynamodbClient.send(
       AttributeName: 'user',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'uid',
+      AttributeName: 'fuid',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'uid',
-      AttributeType: 'S'
-    }, {
       AttributeName: 'user',
       AttributeType: 'S'
+    }, {
+      AttributeName: 'fuid',
+      AttributeType: 'S'
     }],
-    BillingMode: BillingMode.PROVISIONED,
+    BillingMode: 'PROVISIONED',
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
@@ -73,23 +73,63 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbTagsTable,
     KeySchema: [{
-      AttributeName: 'uid',
+      AttributeName: 'id',
       KeyType: 'HASH'
     }, {
-      AttributeName: 'author',
+      AttributeName: 'value',
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'uid',
+      AttributeName: 'id',
+      AttributeType: 'S'
+    }, {
+      AttributeName: 'value',
       AttributeType: 'S'
     }, {
       AttributeName: 'author',
       AttributeType: 'S'
+    }, {
+      AttributeName: 'set',
+      AttributeType: 'S'
     }],
-    BillingMode: BillingMode.PROVISIONED,
+    BillingMode: 'PROVISIONED',
     ProvisionedThroughput: {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
-    }
+    },
+    GlobalSecondaryIndexes: [{
+      IndexName: 'search-by-value-index',
+      KeySchema: [{
+        AttributeName: 'author',
+        KeyType: 'HASH'
+      }, {
+        AttributeName: 'value',
+        KeyType: 'RANGE'
+      }],
+      Projection: {
+        ProjectionType: 'ALL',
+      },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1,
+      }
+    }, {
+      IndexName: 'query-status-index',
+      KeySchema: [{
+        AttributeName: 'set',
+        KeyType: 'HASH'
+      }, {
+        AttributeName: 'author',
+        KeyType: 'RANGE'
+      }],
+      Projection: {
+        ProjectionType: 'INCLUDE',
+        NonKeyAttributes: ['fuid'],
+      },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1,
+      }
+    }]
   })
 )

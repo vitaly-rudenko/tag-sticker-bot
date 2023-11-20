@@ -1,14 +1,17 @@
 import { Markup } from 'telegraf'
+import { deleteMessages } from '../../utils/deleteMessages.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
 /**
  * @param {{
+ *   telegram: import('telegraf').Telegram,
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  *   queuedStickerRepository: import('../../types.d.ts').QueuedStickerRepository
  * }} input
  */
 export function useQueueFlow({
+  telegram,
   userSessionRepository,
   queuedStickerRepository,
 }) {
@@ -61,19 +64,33 @@ export function useQueueFlow({
 
   /** @param {Context} context */
   async function clearQueue(context) {
+    if (!context.chat) return
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue has been cleared')
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    await userSessionRepository.clearContext(userId)
-    await queuedStickerRepository.clear(userId)
+    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+    
+    await Promise.all([
+      userSessionRepository.clearContext(userId),
+      queuedStickerRepository.clear(userId),
+      deleteMessages(telegram, context.chat.id, relevantMessageIds)
+    ])
+
     await context.reply('👌 Queue has been cleared.')
   }
 
   /** @param {Context} context */
   async function skipQueue(context) {
+    if (!context.chat) return
     if (context.updateType === 'callback_query') context.answerCbQuery('Sticker has been skipped')
     await context.deleteMessage().catch(() => {})
+
+    const { userId } = context.state
+    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+
+    await deleteMessages(telegram, context.chat.id, relevantMessageIds)
+
     await sendNextQueuedSticker(context)
   }
 
@@ -90,7 +107,7 @@ export function useQueueFlow({
 
     const count = await queuedStickerRepository.count(userId)
 
-    const { message_id } = await context.replyWithSticker(
+    const { message_id: stickerMessageId } = await context.replyWithSticker(
       queuedSticker.sticker.fileId,
       {
         reply_markup: Markup.inlineKeyboard(
@@ -99,16 +116,18 @@ export function useQueueFlow({
               Markup.button.callback('➡️ Skip', 'queue:skip')
             ] : [],
             Markup.button.callback(count === 0 ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
-            Markup.button.callback('👇 Send your tag', 'action:ignore'),
           ].filter(Boolean),
-          { wrap: (_, i) => count === 0 || i === 2 },
+          { columns: 2 },
         ).reply_markup,
       }
     )
 
+    const { message_id } = await context.reply('👇 Send tag for this sticker \\(for example: `cute cat funny cat`\\)\\.', { parse_mode: 'MarkdownV2' })
+
     await userSessionRepository.amendContext(userId, {
       sticker: queuedSticker.sticker,
-      stickerMessageId: message_id,
+      stickerMessageId,
+      relevantMessageIds: [message_id],
     })
   }
 

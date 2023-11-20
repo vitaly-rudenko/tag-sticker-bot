@@ -1,4 +1,6 @@
-import { MAX_TAG_VALUE_LENGTH, MIN_TAG_VALUE_LENGTH } from '../../constants.js'
+import { MAX_TAGS_PER_STICKER, MIN_TAG_VALUE_LENGTH, MAX_TAG_VALUE_INPUT_LENGTH } from '../../constants.js'
+import { deleteMessages } from '../../utils/deleteMessages.js'
+import { parseTagValues } from '../../utils/tags.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
@@ -15,29 +17,33 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
   /** @param {Context} context */
   async function handleTag(context, next) {
     if (!context.chat || !context.message || !('text' in context.message)) return
-    if (context.message.text.startsWith('/')) return next()
+    
+    const text = context.message.text
+    if (text.startsWith('/')) return next()
 
-    const { userId } = context.state
-    const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
+    const { userId: authorUserId } = context.state
+    const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(authorUserId)
+    if (!sticker) return
 
-    if (!sticker || !stickerMessageId) return
+    if (text.length < MIN_TAG_VALUE_LENGTH)
+      return context.reply(`❌ The tag is too short, please try again`)
+    if (text.length > MAX_TAG_VALUE_INPUT_LENGTH)
+      return context.reply(`❌ The tag is too long, please try again`)
 
-    const value = context.message.text.trim().toLowerCase()
-    if (!value) return
+    const values = parseTagValues(text).filter(value => value.length >= MIN_TAG_VALUE_LENGTH)
+    if (values.length === 0)
+      return context.reply(`❌ Invalid tag, please try again`)
+    if (values.length > MAX_TAGS_PER_STICKER)
+      return context.reply(`❌ Too many words in your tag, please try again`)
 
-    if (value.length < MIN_TAG_VALUE_LENGTH || value.length > MAX_TAG_VALUE_LENGTH) {
-      await context.reply(`❌ The tag is too short or too long, please try again`)
-      return
-    }
+    await tagRepository.store({ sticker, authorUserId, values })
 
-    await tagRepository.storeTag({
-      sticker,
-      authorUserId: userId,
-      value,
-    })
+    await Promise.allSettled([
+      bot.telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined),
+      deleteMessages(bot.telegram, context.chat.id, relevantMessageIds),
+    ])
 
-    await bot.telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined)
-    await context.reply(`✏️ The sticker has been tagged as "${value}"`)
+    await context.reply(`✏️ The sticker has been tagged as "${text}"`),
 
     await sendNextQueuedSticker(context)
   }
@@ -48,11 +54,10 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
+    const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(userId)
+    if (!sticker) return
 
-    if (!sticker || !stickerMessageId) return
-
-    bot.telegram.deleteMessage(context.chat.id, stickerMessageId).catch(() => {})
+    await deleteMessages(bot.telegram, context.chat.id, stickerMessageId, relevantMessageIds)
 
     await enqueueStickers({
       context,
@@ -67,16 +72,14 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
+    const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(userId)
+    if (!sticker) return
 
-    if (!sticker || !stickerMessageId) return
-
-    bot.telegram.deleteMessage(context.chat.id, stickerMessageId).catch(() => {})
+    await deleteMessages(bot.telegram, context.chat.id, stickerMessageId, relevantMessageIds)
 
     const stickerSetName = sticker.setName
     const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
-    const stickerFileUniqueIds = stickerSet.stickers.map(sticker => sticker.file_unique_id)
-    const statusMap = await tagRepository.queryTagStatus({ stickerFileUniqueIds })
+    const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName })
 
     await enqueueStickers({
       context,
@@ -87,7 +90,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
           fileId: sticker.file_id,
           fileUniqueId: sticker.file_unique_id
         }))
-        .filter((sticker) => !statusMap[sticker.fileUniqueId])
+        .filter((sticker) => !taggedStickerFileUniqueIds.includes(sticker.fileUniqueId))
     })
   }
 
@@ -97,16 +100,14 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
+    const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(userId)
+    if (!sticker) return
 
-    if (!sticker || !stickerMessageId) return
-
-    bot.telegram.deleteMessage(context.chat.id, stickerMessageId).catch(() => {})
+    await deleteMessages(bot.telegram, context.chat.id, stickerMessageId, relevantMessageIds)
 
     const stickerSetName = sticker.setName
     const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
-    const stickerFileUniqueIds = stickerSet.stickers.map(sticker => sticker.file_unique_id)
-    const statusMap = await tagRepository.queryTagStatus({ stickerFileUniqueIds, authorUserId: userId })
+    const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName, authorUserId: userId })
 
     await enqueueStickers({
       context,
@@ -117,7 +118,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
           fileId: sticker.file_id,
           fileUniqueId: sticker.file_unique_id
         }))
-        .filter((sticker) => !statusMap[sticker.fileUniqueId])
+        .filter((sticker) => !taggedStickerFileUniqueIds.includes(sticker.fileUniqueId))
     })
   }
 
@@ -127,14 +128,14 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker, stickerMessageId } = await userSessionRepository.getContext(userId)
+    const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(userId)
 
     if (!sticker || !stickerMessageId) return
 
     const stickerSetName = sticker.setName
     const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
 
-    bot.telegram.deleteMessage(context.chat.id, stickerMessageId).catch(() => {})
+    await deleteMessages(bot.telegram, context.chat.id, stickerMessageId, relevantMessageIds)
 
     await enqueueStickers({
       context,

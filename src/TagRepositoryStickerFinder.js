@@ -9,8 +9,8 @@ export class TagRepositoryStickerFinder {
   }
 
   /** @returns {Promise<import('./types.d.ts').Sticker[]>} */
-  async find({ query, authorUserId = undefined, limit }) {
-    const tags = await this._tagRepository.scanTags({ query, authorUserId, limit })
+  async find({ query, limit, authorUserId = undefined }) {
+    const tags = await this._tagRepository.search({ query, limit, authorUserId })
     
     const stickers = []
     const addedStickerFileUniqueIds = new Set()

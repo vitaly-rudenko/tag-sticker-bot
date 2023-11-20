@@ -1,7 +1,8 @@
-import { BatchGetItemCommand, BatchWriteItemCommand, PutItemCommand, QueryCommand, ScanCommand } from '@aws-sdk/client-dynamodb'
+import { BatchGetItemCommand, BatchWriteItemCommand, PutItemCommand, QueryCommand, ScanCommand, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb'
 
 const DEFAULT_AUTHOR_USER_ID = '#'
 const BATCH_GET_ITEM_LIMIT = 100
+const BATCH_WRITE_ITEM_LIMIT = 25
 
 // TODO: do not return duplicates in responses
 export class DynamodbTagRepository {
@@ -16,72 +17,108 @@ export class DynamodbTagRepository {
     this._tableName = tableName
   }
 
-  /** @param {import('../types.d.ts').Tag} tag */
-  async storeTag(tag) {
+  /**
+   * TODO: transaction possible?
+   * 
+   * @param {{
+   *   authorUserId: string
+   *   sticker: import('../types.d.ts').Sticker
+   *   values: string[]
+   * }} input
+   */
+  async store({ authorUserId, sticker, values }) {
+    if (values.length === 0) {
+      throw new Error('Values list is empty')
+    }
+    if (values.length > BATCH_WRITE_ITEM_LIMIT) {
+      throw new Error(`Cannot store more than ${BATCH_WRITE_ITEM_LIMIT} tags per request`)
+    }
+
+    const { Items = [] } = await this._dynamodbClient.send(
+      new QueryCommand({
+        TableName: this._tableName,
+        KeyConditionExpression: '#id = :id',
+        ExpressionAttributeNames: {
+          '#id': 'id',
+        },
+        ExpressionAttributeValues: {
+          ':id': { S: `${authorUserId}#${sticker.fileUniqueId}` }
+        },
+      })
+    )
+
+    if (Items.length > 0) {
+      await this._dynamodbClient.send(
+        new BatchWriteItemCommand({
+          RequestItems: {
+            [this._tableName]: Items.map(item => ({
+              DeleteRequest: {
+                Key: {
+                  id: item.id,
+                  value: item.value,
+                }
+              }
+            }))
+          }
+        })
+      )
+    }
+
     await this._dynamodbClient.send(
       new BatchWriteItemCommand({
         RequestItems: {
-          [this._tableName]: [{
+          [this._tableName]: values.flatMap(value => [{
             PutRequest: {
-              Item: this._toAttributes(tag),
+              Item: this._toAttributes({
+                authorUserId,
+                sticker,
+                value,
+              })
             }
           }, {
             PutRequest: {
-              // mark sticker as tagged for queryTagStatus()
-              Item: {
-                uid: {
-                  S: tag.sticker.fileUniqueId,
-                },
-                author: {
-                  S: DEFAULT_AUTHOR_USER_ID,
-                },
-              }
+              Item: this._toAttributes({
+                authorUserId: DEFAULT_AUTHOR_USER_ID,
+                sticker,
+                value,
+              }),
             }
-          }]
+          }])
         }
       })
     )
   }
 
   /**
-   * @param {object} params
-   * @param {string[]} params.stickerFileUniqueIds
-   * @param {string} [params.authorUserId]
-   * @returns {Promise<{ [stickerFileUniqueId: string]: boolean }>}
+   * @param {{
+   *   stickerSetName: string
+   *   authorUserId?: string
+   * }} input
+   * @returns {Promise<string[]>} Array of stickerFileUniqueId
    */
-  async queryTagStatus({ stickerFileUniqueIds, authorUserId }) {
-    const fileUniqueIdMap = new Set()
-
-    for (let i = 0; i < stickerFileUniqueIds.length; i += BATCH_GET_ITEM_LIMIT) {
-      const { Responses } = await this._dynamodbClient.send(
-        new BatchGetItemCommand({
-          RequestItems: {
-            [this._tableName]: {
-              Keys: stickerFileUniqueIds
-                .slice(i, i + BATCH_GET_ITEM_LIMIT)
-                .map((stickerFileUniqueId) => ({
-                  author: { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
-                  uid: { S: stickerFileUniqueId },
-                }))
-            }
-          }
-        })
-      )
-
-      if (Responses?.[this._tableName]) {
-        for (const item of Responses[this._tableName]) {
-          fileUniqueIdMap.add(item.uid.S)
+  async queryStatus({ stickerSetName, authorUserId }) {
+    const { Items = [] } = await this._dynamodbClient.send(
+      new QueryCommand({
+        TableName: this._tableName,
+        IndexName: 'query-status-index',
+        KeyConditionExpression: '#set = :set AND author = :author',
+        ExpressionAttributeNames: {
+          '#set': 'set'
+        },
+        ExpressionAttributeValues: {
+          ':set': { S: stickerSetName },
+          ':author': { S: authorUserId || DEFAULT_AUTHOR_USER_ID },
         }
-      }
-    }
+      })
+    )
 
-    return stickerFileUniqueIds.reduce((statusMap, stickerFileUniqueId) => ({
-      ...statusMap,
-      [stickerFileUniqueId]: fileUniqueIdMap.has(stickerFileUniqueId),
-    }), {})
+    // @ts-ignore
+    return Items.map(item => item.fuid.S)
   }
 
   /**
+   * TODO: test limit & evaluation key
+   * 
    * @param {{
    *   query: string
    *   limit: number
@@ -89,9 +126,9 @@ export class DynamodbTagRepository {
    * }} input
    * @returns {Promise<import('../types.d.ts').Tag[]>}
    */
-  async scanTags({ query, authorUserId = undefined, limit }) {
+  async search({ query, limit, authorUserId }) {
     if (typeof query !== 'string' || !query) {
-      throw new Error('Invalid query: must be a non-empty string')
+      throw new Error('Query must be a non-empty string')
     }
 
     let lastEvaluatedKey = undefined
@@ -99,25 +136,19 @@ export class DynamodbTagRepository {
 
     do {
       const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
-        new ScanCommand({
+        new QueryCommand({
+          IndexName: 'search-by-value-index',
           TableName: this._tableName,
-          FilterExpression: authorUserId
-            ? 'author = :author AND contains(#value, :query)'
-            : 'contains(#value, :query)',
+          KeyConditionExpression: 'author = :author AND begins_with(#v, :value)',
           ExpressionAttributeNames: {
-            '#value': 'value'
+            '#v': 'value',
           },
           ExpressionAttributeValues: {
-            ':query': {
-              S: query.toLowerCase().trim(),
-            },
-            ...authorUserId && {
-              ':author': {
-                S: authorUserId,
-              }
-            }
+            ':value': { S: query },
+            ':author': { S: authorUserId || '#' },
           },
           ExclusiveStartKey: lastEvaluatedKey,
+          Limit: limit - result.length,
         })
       )
 
@@ -126,21 +157,22 @@ export class DynamodbTagRepository {
       lastEvaluatedKey = LastEvaluatedKey
     } while (lastEvaluatedKey && result.length < limit)
 
-    return result
-      .slice(0, limit)
-      .map(item => this._toEntity(item))
+    return result.map(item => this._toEntity(item))
   }
 
   /** @param {import('../types.d.ts').Tag} tag */
   _toAttributes(tag) {
     return {
+      id: {
+        S: `${tag.authorUserId}#${tag.sticker.fileUniqueId}`
+      },
       set: {
         S: tag.sticker.setName,
       },
-      uid: {
+      fuid: {
         S: tag.sticker.fileUniqueId,
       },
-      id: {
+      fid: {
         S: tag.sticker.fileId,
       },
       author: {
@@ -159,8 +191,8 @@ export class DynamodbTagRepository {
     return {
       sticker: {
         setName: attributes.set.S,
-        fileUniqueId: attributes.uid.S,
-        fileId: attributes.id.S,
+        fileUniqueId: attributes.fuid.S,
+        fileId: attributes.fid.S,
       },
       authorUserId: attributes.author.S,
       value: attributes.value?.S,

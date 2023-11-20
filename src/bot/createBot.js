@@ -5,7 +5,17 @@ import { useQueueFlow } from './flows/queue.js'
 import { useSearchFlow } from './flows/search.js'
 import { useTaggingFlow } from './flows/tagging.js'
 import { useCommonFlow } from './flows/common.js'
+import { deleteMessages } from '../utils/deleteMessages.js'
 
+/**
+ * @param {{
+ *   telegramBotToken: string
+ *   userSessionRepository: import('../types.d.ts').UserSessionRepository,
+ *   queuedStickerRepository: import('../types.d.ts').QueuedStickerRepository,
+ *   tagRepository: import('../types.d.ts').TagRepository,
+ *   stickerFinder: import('../types.d.ts').StickerFinder,
+ * }} input
+ */
 export async function createBot({
   telegramBotToken,
   userSessionRepository,
@@ -27,6 +37,7 @@ export async function createBot({
     clearQueue,
     sendNextQueuedSticker,
   } = useQueueFlow({
+    telegram: bot.telegram,
     userSessionRepository,
     queuedStickerRepository,
   })
@@ -72,7 +83,13 @@ export async function createBot({
   
   bot.action('action:ignore', (context) => context.answerCbQuery())
   bot.action('action:cancel', async (context) => {
+    if (!context.chat) return
     await context.deleteMessage().catch(() => {})
+
+    const { userId } = context.state
+    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+
+    await deleteMessages(bot.telegram, context.chat.id, relevantMessageIds)
     await context.reply('👌 Action cancelled.')
   })
 

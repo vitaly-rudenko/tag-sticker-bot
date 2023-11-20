@@ -15,7 +15,9 @@ export function useSearchFlow({ stickerFinder }) {
 
     const { userId } = context.state
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
-    const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
+    const query = authorUserId
+      ? context.inlineQuery.query.slice(1)
+      : context.inlineQuery.query
 
     if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
 
