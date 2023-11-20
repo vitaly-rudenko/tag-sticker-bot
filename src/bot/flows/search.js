@@ -36,8 +36,10 @@ export function useSearchFlow({ stickerFinder }) {
           ? INLINE_QUERY_CACHE_TIME_LOCAL_S
           : INLINE_QUERY_CACHE_TIME_S,
         is_personal: Boolean(authorUserId),
-        switch_pm_text: "Can't find a sticker? Click here to contribute",
-        switch_pm_parameter: 'stub', // for some reason it fails if not provided
+        button: {
+          text: "Can't find a sticker? Click here to contribute",
+          start_parameter: 'stub', // for some reason is required
+        }
       }
     )
   }
