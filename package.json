@@ -1,12 +1,13 @@
 {
   "name": "tag-sticker-bot",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env.local src/app.js",
     "dev": "nodemon --exec 'npm start'",
     "setup-local": "node --env-file=.env.local src/scripts/setup-local.js",
+    "generate-secret-token": "node src/scripts/generate-secret-token.js",
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
@@ -18,13 +19,16 @@
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.279.0",
-    "telegraf": "^4.11.2"
+    "@aws-sdk/client-dynamodb": "^3.454.0",
+    "markdown-escapes": "^2.0.1",
+    "safe-compare": "^1.1.4",
+    "telegraf": "^4.15.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-json": "^6.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@types/jest": "^29.5.8",
     "aws-cdk": "^2.110.0",
     "aws-cdk-lib": "^2.110.0",
     "constructs": "^10.3.0",

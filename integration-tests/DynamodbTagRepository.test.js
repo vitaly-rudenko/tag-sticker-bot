@@ -8,6 +8,13 @@ function generateId(name) {
   return `${name}-${randomBytes(8).toString('hex')}`
 }
 
+function defaultTag(tag) {
+  return {
+    ...tag,
+    authorUserId: '#',
+  }
+}
+
 describe('DynamodbTagRepository', () => {
   /** @type {DynamodbTagRepository} */
   let tagRepository
@@ -22,6 +29,8 @@ describe('DynamodbTagRepository', () => {
   it('should handle tag querying and searching', async () => {
     const user1 = generateId('user-1')
     const user2 = generateId('user-2')
+    const set1 = generateId('set-1')
+    const set2 = generateId('set-2')
     const sticker1 = generateId('sticker-1')
     const sticker2 = generateId('sticker-2')
     const sticker3 = generateId('sticker-3')
@@ -29,7 +38,7 @@ describe('DynamodbTagRepository', () => {
 
     const tag1 = {
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set1,
         fileUniqueId: sticker1,
         fileId: generateId('sticker'),
       },
@@ -39,7 +48,7 @@ describe('DynamodbTagRepository', () => {
 
     const tag2 = {
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set1,
         fileUniqueId: sticker2,
         fileId: generateId('sticker'),
       },
@@ -49,7 +58,7 @@ describe('DynamodbTagRepository', () => {
 
     const tag3 = {
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set2,
         fileUniqueId: sticker3,
         fileId: generateId('sticker'),
       },
@@ -59,7 +68,7 @@ describe('DynamodbTagRepository', () => {
 
     const tag4 = {
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set2,
         fileUniqueId: sticker4,
         fileId: generateId('sticker'),
       },
@@ -69,7 +78,7 @@ describe('DynamodbTagRepository', () => {
 
     const tag5 = {
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set2,
         fileUniqueId: sticker4,
         fileId: generateId('sticker'),
       },
@@ -79,104 +88,107 @@ describe('DynamodbTagRepository', () => {
 
     // store
 
-    await tagRepository.storeTag(tag1)
-    await tagRepository.storeTag(tag2)
-    await tagRepository.storeTag(tag3)
+    await tagRepository.store({
+      authorUserId: tag1.authorUserId,
+      sticker: tag1.sticker,
+      values: [tag1.value],
+    })
 
-    await tagRepository.storeTag({
+    await tagRepository.store({
+      authorUserId: tag2.authorUserId,
+      sticker: tag2.sticker,
+      values: [tag2.value],
+    })
+
+    await tagRepository.store({
+      authorUserId: tag3.authorUserId,
+      sticker: tag3.sticker,
+      values: [tag3.value],
+    })
+
+    await tagRepository.store({
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set2,
         fileUniqueId: sticker4,
         fileId: generateId('sticker'),
       },
       authorUserId: user1,
-      value: 'reuse 1 to be overwritten',
+      values: ['reuse 1 to be overwritten'],
     })
 
-    await tagRepository.storeTag({
+    await tagRepository.store({
       sticker: {
-        setName: generateId('sticker-set'),
+        setName: set2,
         fileUniqueId: sticker4,
         fileId: generateId('sticker'),
       },
       authorUserId: user2,
-      value: 'reuse 2 to be overwritten',
+      values: ['reuse 2 to be overwritten'],
     })
 
-    await tagRepository.storeTag(tag4)
-    await tagRepository.storeTag(tag5)
+    await tagRepository.store({
+      authorUserId: tag4.authorUserId,
+      sticker: tag4.sticker,
+      values: [tag4.value],
+    })
+
+    await tagRepository.store({
+      authorUserId: tag5.authorUserId,
+      sticker: tag5.sticker,
+      values: [tag5.value],
+    })
 
     // query
 
-    await expect(tagRepository.queryTagStatus({
-      stickerFileUniqueIds: [sticker1, sticker3]
-    })).resolves.toEqual({
-      [sticker1]: true,
-      [sticker3]: true,
-    })
+    await expect(tagRepository.queryStatus({
+      stickerSetName: set1,
+    })).resolves.toIncludeSameMembers([sticker1, sticker2])
 
-    await expect(tagRepository.queryTagStatus({
-      stickerFileUniqueIds: [sticker2]
-    })).resolves.toEqual({
-      [sticker2]: true,
-    })
-    
-    await expect(tagRepository.queryTagStatus({
-      stickerFileUniqueIds: [sticker1, sticker2, sticker3], authorUserId: user1
-    })).resolves.toEqual({
-      [sticker1]: true,
-      [sticker2]: false,
-      [sticker3]: false,
-    })
+    await expect(tagRepository.queryStatus({
+      stickerSetName: set2,
+    })).resolves.toIncludeSameMembers([sticker3, sticker4])
 
-    await expect(tagRepository.queryTagStatus({
-      stickerFileUniqueIds: [sticker1, sticker2, sticker3], authorUserId: user2
-    })).resolves.toEqual({
-      [sticker1]: false,
-      [sticker2]: true,
-      [sticker3]: true,
-    })
-
-    await expect(tagRepository.queryTagStatus({
-      stickerFileUniqueIds: [sticker4]
-    })).resolves.toEqual({
-      [sticker4]: true,
-    })
+    await expect(tagRepository.queryStatus({
+      stickerSetName: generateId('set-3'),
+    })).resolves.toEqual([])
 
     // search
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'hey'
     })).resolves.toEqual([])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'it is',
       authorUserId: user1,
     })).resolves.toEqual([])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'hello'
     })).resolves.toIncludeSameMembers([tag1, tag2])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([tag2, tag3])
-
-    await expect(tagRepository.scanTags({
-      query: 'it is'
     })).resolves.toIncludeSameMembers([tag3])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'hello',
       authorUserId: user1,
     })).resolves.toIncludeSameMembers([tag1])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'hello',
       authorUserId: user2,
     })).resolves.toIncludeSameMembers([tag2])
 
-    await expect(tagRepository.scanTags({
+    await expect(tagRepository.search({
+      limit: 100,
       query: 'reuse',
     })).resolves.toIncludeSameMembers([tag4, tag5])
   })

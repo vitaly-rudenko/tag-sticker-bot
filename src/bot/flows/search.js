@@ -15,7 +15,9 @@ export function useSearchFlow({ stickerFinder }) {
 
     const { userId } = context.state
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
-    const query = context.inlineQuery.query.slice(authorUserId ? 1 : 0)
+    const query = authorUserId
+      ? context.inlineQuery.query.slice(1)
+      : context.inlineQuery.query
 
     if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
 
@@ -36,8 +38,10 @@ export function useSearchFlow({ stickerFinder }) {
           ? INLINE_QUERY_CACHE_TIME_LOCAL_S
           : INLINE_QUERY_CACHE_TIME_S,
         is_personal: Boolean(authorUserId),
-        switch_pm_text: "Can't find a sticker? Click here to contribute",
-        switch_pm_parameter: 'stub', // for some reason it fails if not provided
+        button: {
+          text: "Can't find a sticker? Click here to contribute",
+          start_parameter: 'stub', // for some reason is required
+        }
       }
     )
   }

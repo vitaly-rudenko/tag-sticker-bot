@@ -1,5 +1,6 @@
 import { BatchWriteItemCommand, DeleteItemCommand, QueryCommand, ReturnValue } from '@aws-sdk/client-dynamodb'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
+import { queuedStickerAttributes as attr } from './attributes.js'
 
 const BATCH_WRITE_ITEM_LIMIT = 25
 const EXPIRATION_TIME_S = 60 * 60 // 1 hour
@@ -32,13 +33,11 @@ export class DynamodbQueuedStickerRepository {
               .map(sticker => ({
                 PutRequest: {
                   Item: {
-                    ...this._toAttributes({
-                      userId,
-                      sticker,
-                    }),
-                    exp: {
-                      N: String(calculateExpiresAt(EXPIRATION_TIME_S)),
-                    }
+                    [attr.userId]: { S: String(userId) },
+                    [attr.stickerFileId]: { S: sticker.fileId },
+                    [attr.stickerFileUniqueId]: { S: sticker.fileUniqueId },
+                    [attr.stickerSetName]: { S: sticker.setName },
+                    [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) }
                   }
                 }
               }))
@@ -52,14 +51,12 @@ export class DynamodbQueuedStickerRepository {
     const { Items = [] } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: '#u = :user',
+        KeyConditionExpression: '#userId = :userId',
         ExpressionAttributeNames: {
-          '#u': 'user'
+          '#userId': attr.userId,
         },
         ExpressionAttributeValues: {
-          ':user': {
-            S: userId,
-          },
+          ':userId': { S: userId },
         },
         Limit: 1,
       })
@@ -71,8 +68,8 @@ export class DynamodbQueuedStickerRepository {
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          user: Items[0].user,
-          uid: Items[0].uid,
+          [attr.userId]: Items[0][attr.userId],
+          [attr.stickerFileUniqueId]: Items[0][attr.stickerFileUniqueId],
         },
         ReturnValues: ReturnValue.ALL_OLD,
       })
@@ -82,20 +79,17 @@ export class DynamodbQueuedStickerRepository {
   }
 
   async clear(userId) {
-    let lastEvaluatedKey = undefined
-
+    let lastEvaluatedKey
     do {
       const { Items = [], LastEvaluatedKey } = await this._dynamodbClient.send(
         new QueryCommand({
           TableName: this._tableName,
-          KeyConditionExpression: '#u = :user',
+          KeyConditionExpression: '#userId = :userId',
           ExpressionAttributeNames: {
-            '#u': 'user'
+            '#userId': attr.userId,
           },
           ExpressionAttributeValues: {
-            ':user': {
-              S: userId,
-            },
+            ':userId': { S: userId },
           },
           ExclusiveStartKey: lastEvaluatedKey,
         })
@@ -114,8 +108,8 @@ export class DynamodbQueuedStickerRepository {
                 .map(item => ({
                   DeleteRequest: {
                     Key: {
-                      user: item.user,
-                      uid: item.uid,
+                      [attr.userId]: item[attr.userId],
+                      [attr.stickerFileUniqueId]: item[attr.stickerFileUniqueId],
                     }
                   }
                 }))
@@ -126,51 +120,32 @@ export class DynamodbQueuedStickerRepository {
     } while (lastEvaluatedKey)
   }
 
-  async count(userId) {
-    const { Count } = await this._dynamodbClient.send(
+  async empty(userId) {
+    const { Items = [] } = await this._dynamodbClient.send(
       new QueryCommand({
         TableName: this._tableName,
-        KeyConditionExpression: '#u = :user',
+        KeyConditionExpression: '#userId = :userId',
         ExpressionAttributeNames: {
-          '#u': 'user'
+          '#userId': attr.userId,
         },
         ExpressionAttributeValues: {
-          ':user': {
-            S: userId,
-          },
+          ':userId': { S: userId },
         },
+        Limit: 1,
       })
     )
 
-    return Count ?? 0
-  }
-
-  /** @param {import('../types.d.ts').QueuedSticker} queuedSticker */
-  _toAttributes(queuedSticker) {
-    return {
-      user: {
-        S: String(queuedSticker.userId),
-      },
-      id: {
-        S: queuedSticker.sticker.fileId,
-      },
-      uid: {
-        S: queuedSticker.sticker.fileUniqueId,
-      },
-      set: {
-        S: queuedSticker.sticker.setName,
-      },
-    }
+    return Items.length === 0
   }
   
   /** @returns {import('../types.d.ts').QueuedSticker} */
   _toEntity(attributes) {
     return {
-      userId: attributes.user.S,
+      userId: attributes[attr.userId].S,
       sticker: {
-        setName: attributes.set.S,
-        fileUniqueId: attributes.uid.S,
-        fileId: attributes.id.S,
+        setName: attributes[attr.stickerSetName].S,
+        fileUniqueId: attributes[attr.stickerFileUniqueId].S,
+        fileId: attributes[attr.stickerFileId].S,
       }
     }
   }

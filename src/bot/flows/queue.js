@@ -1,14 +1,17 @@
 import { Markup } from 'telegraf'
+import { deleteMessages } from '../../utils/deleteMessages.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
 /**
  * @param {{
+ *   telegram: import('telegraf').Telegram,
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  *   queuedStickerRepository: import('../../types.d.ts').QueuedStickerRepository
  * }} input
  */
 export function useQueueFlow({
+  telegram,
   userSessionRepository,
   queuedStickerRepository,
 }) {
@@ -35,7 +38,7 @@ export function useQueueFlow({
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('📎 Tag this sticker', 'sticker:tag-single'),
-        Markup.button.callback('🖇 Tag multiple in the set', 'sticker:choose-untagged'),
+        Markup.button.callback('🖇 Tag all stickers in the set', 'sticker:choose-untagged'),
         Markup.button.callback('❌ Cancel', 'action:cancel'),
       ], { columns: 1 }).reply_markup,
     })
@@ -51,7 +54,7 @@ export function useQueueFlow({
     ].join('\n'), {
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Not tagged by anyone', 'sticker:tag-untagged'),
+        Markup.button.callback('Not tagged by anyone yet', 'sticker:tag-untagged'),
         Markup.button.callback('Not tagged by me', 'sticker:tag-untagged-by-me'),
         Markup.button.callback('Re-tag all of them', 'sticker:tag-all'),
         Markup.button.callback('❌ Cancel', 'action:cancel'),
@@ -61,19 +64,33 @@ export function useQueueFlow({
 
   /** @param {Context} context */
   async function clearQueue(context) {
+    if (!context.chat) return
     if (context.updateType === 'callback_query') context.answerCbQuery('Queue has been cleared')
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    await userSessionRepository.clearContext(userId)
-    await queuedStickerRepository.clear(userId)
+    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+    
+    await Promise.all([
+      userSessionRepository.clearContext(userId),
+      queuedStickerRepository.clear(userId),
+      deleteMessages(telegram, context.chat.id, relevantMessageIds)
+    ])
+
     await context.reply('👌 Queue has been cleared.')
   }
 
   /** @param {Context} context */
   async function skipQueue(context) {
+    if (!context.chat) return
     if (context.updateType === 'callback_query') context.answerCbQuery('Sticker has been skipped')
     await context.deleteMessage().catch(() => {})
+
+    const { userId } = context.state
+    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+
+    await deleteMessages(telegram, context.chat.id, relevantMessageIds)
+
     await sendNextQueuedSticker(context)
   }
 
@@ -88,27 +105,30 @@ export function useQueueFlow({
       return
     }
 
-    const count = await queuedStickerRepository.count(userId)
+    const isEmpty = await queuedStickerRepository.empty(userId)
 
-    const { message_id } = await context.replyWithSticker(
+    const { message_id: stickerMessageId } = await context.replyWithSticker(
       queuedSticker.sticker.fileId,
       {
         reply_markup: Markup.inlineKeyboard(
           [
-            ...count > 0 ? [
-              Markup.button.callback('➡️ Skip', 'queue:skip')
-            ] : [],
-            Markup.button.callback(count === 0 ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
-            Markup.button.callback('👇 Send your tag', 'action:ignore'),
+            ...!isEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
+            Markup.button.callback(isEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
           ].filter(Boolean),
-          { wrap: (_, i) => count === 0 || i === 2 },
+          { columns: 2 },
         ).reply_markup,
       }
     )
 
+    const { message_id } = await context.reply(
+      '👇 Send tags for this sticker separated by comma \\(for example: *__cute cat, funny cat__*\\)\\.',
+      { parse_mode: 'MarkdownV2' }
+    )
+
     await userSessionRepository.amendContext(userId, {
       sticker: queuedSticker.sticker,
-      stickerMessageId: message_id,
+      stickerMessageId,
+      relevantMessageIds: [message_id],
     })
   }
 

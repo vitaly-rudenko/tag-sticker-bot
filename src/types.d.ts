@@ -7,7 +7,7 @@ export type Sticker = {
 export type Tag = {
   sticker: Sticker
   authorUserId: string
-  value?: string
+  value: string
 }
 
 export type QueuedSticker = {
@@ -19,12 +19,13 @@ export interface QueuedStickerRepository {
   enqueue(input: { userId: string; stickers: Sticker[] }): Promise<void>
   take(userId: string): Promise<QueuedSticker | undefined>
   clear(userId: string): Promise<void>
-  count(userId: string): Promise<number>
+  empty(userId: string): Promise<boolean>
 }
 
 export type UserSessionContext = {
   sticker?: Sticker
   stickerMessageId?: number
+  relevantMessageIds?: number[]
 }
 
 export interface UserSessionRepository {
@@ -34,11 +35,20 @@ export interface UserSessionRepository {
 }
 
 export interface TagRepository {
-  storeTag(tag: Tag): Promise<void>
-  scanTags(input: { query: string; authorUserId?: string; limit: number })
-    : Promise<Tag[]>
-  queryTagStatus(input: { stickerFileUniqueIds: string[]; authorUserId?: string })
-    : Promise<{ [stickerFileUniqueId: string]: boolean }>
+  store(input: {
+    authorUserId: string
+    sticker: Sticker
+    values: string[]
+  }): Promise<void>
+  search(input: {
+    query: string
+    limit: number
+    authorUserId?: string
+  }): Promise<Tag[]>
+  queryStatus(input: {
+    stickerSetName: string
+    authorUserId?: string
+  }): Promise<string[]>
 }
 
 export interface StickerFinder {
