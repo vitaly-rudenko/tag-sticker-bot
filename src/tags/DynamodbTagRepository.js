@@ -70,38 +70,40 @@ export class DynamodbTagRepository {
       }
     }
 
-    for (let i = 0; i < values.length; i += BATCH_WRITE_ITEM_LIMIT) {
+    const requestItems = values.flatMap(value => {
+      const attributes = {
+        [attr.tagId]: { S: tagId(authorUserId, sticker.fileUniqueId) },
+        [attr.authorUserId]: { S: authorUserId },
+        [attr.stickerSetName]: { S: sticker.setName },
+        [attr.stickerFileUniqueId]: { S: sticker.fileUniqueId },
+        [attr.stickerFileId]: { S: sticker.fileId },
+        [attr.value]: { S: value },
+      }
+
+      return [{
+        PutRequest: {
+          Item: {
+            ...attributes,
+            [attr.queryId]: { S: queryId(value, authorUserId) },
+            [attr.valueHash]: { S: valueHash(value, authorUserId) },
+          }
+        }
+      }, {
+        PutRequest: {
+          Item: {
+            ...attributes,
+            [attr.queryId]: { S: queryId(value) },
+            [attr.valueHash]: { S: valueHash(value) },
+          }
+        }
+      }]
+    })
+
+    for (let i = 0; i < requestItems.length; i += BATCH_WRITE_ITEM_LIMIT) {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
-            [this._tableName]: values.slice(i, i + BATCH_WRITE_ITEM_LIMIT).flatMap(value => {
-              const attributes = {
-                [attr.tagId]: { S: tagId(authorUserId, sticker.fileUniqueId) },
-                [attr.authorUserId]: { S: authorUserId },
-                [attr.stickerSetName]: { S: sticker.setName },
-                [attr.stickerFileUniqueId]: { S: sticker.fileUniqueId },
-                [attr.stickerFileId]: { S: sticker.fileId },
-                [attr.value]: { S: value },
-              }
-  
-              return [{
-                PutRequest: {
-                  Item: {
-                    ...attributes,
-                    [attr.queryId]: { S: queryId(value, authorUserId) },
-                    [attr.valueHash]: { S: valueHash(value, authorUserId) },
-                  }
-                }
-              }, {
-                PutRequest: {
-                  Item: {
-                    ...attributes,
-                    [attr.queryId]: { S: queryId(value) },
-                    [attr.valueHash]: { S: valueHash(value) },
-                  }
-                }
-              }]
-            })
+            [this._tableName]: requestItems.slice(i, i + BATCH_WRITE_ITEM_LIMIT)
           }
         })
       )

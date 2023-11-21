@@ -192,4 +192,25 @@ describe('DynamodbTagRepository', () => {
       query: 'reuse',
     })).resolves.toIncludeSameMembers([tag4, tag5])
   })
+
+  it('should handle high throughput for store()', async () => {
+    const authorUserId = generateId('user')
+    const sticker = {
+      fileId: generateId('file'),
+      fileUniqueId: generateId('unique'),
+      setName: generateId('set'),
+    }
+
+    await tagRepository.store({
+      authorUserId,
+      sticker,
+      values: Array.from(new Array(25), () => generateId('value')),
+    })
+
+    await tagRepository.store({
+      authorUserId,
+      sticker,
+      values: Array.from(new Array(25), () => generateId('value')),
+    })
+  })
 })
