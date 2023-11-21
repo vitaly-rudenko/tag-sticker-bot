@@ -41,6 +41,12 @@ describe('tags', () => {
           'hello world!',
           'world!',
         ])
+      
+      expect(parseTagValues('hello, hello, hello, hello world, hello world, hello world'))
+        .toEqual([
+          'hello world',
+          'world',
+        ])
     })
   })
 })
