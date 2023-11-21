@@ -32,11 +32,12 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
       return context.reply(`❌ Input is too long, please try again`)
 
     const values = parseTagValues(text)
-      .filter(value => value.length >= MIN_QUERY_LENGTH && value.length <= MAX_QUERY_LENGTH)
+      .filter(value => value.length >= MIN_QUERY_LENGTH)
+      .map(value => value.slice(0, MAX_QUERY_LENGTH))
+      .filter(Boolean)
+      .slice(0, MAX_TAGS_PER_STICKER)
     if (values.length === 0)
       return context.reply(`❌ Your tags are either too short or too long, please try again`)
-    if (values.length > MAX_TAGS_PER_STICKER)
-      return context.reply(`❌ Too many tags or too many words in your tags, please try again`)
 
     await tagRepository.store({ sticker, authorUserId, values })
 
