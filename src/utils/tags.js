@@ -29,5 +29,5 @@ export function parseTagValues(input) {
 }
 
 export function normalizeTagValue(input) {
-  return input.toLowerCase().replace(/\s+/g, ' ').trim()
+  return input.toLowerCase().replace(/[^a-zA-Z0-9\u0400-\u04FF\s]+/g, '').replace(/[\s]+/g, ' ').trim()
 }
