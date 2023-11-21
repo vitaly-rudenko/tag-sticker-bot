@@ -20,17 +20,26 @@ describe('tags', () => {
           'up?',
         ])
       
-      expect(parseTagValues('Cute little tiny foxy,cute fox, little fox\ncute animal'))
+      expect(parseTagValues('Cute little tiny foxy,cute fox, little fox\ncute animal\nanimals are cute!'))
         .toEqual([
           'cute little tiny foxy',
           'little tiny foxy',
           'tiny foxy',
           'foxy',
           'cute fox',
-          'fox',
           'little fox',
           'cute animal',
-          'animal',
+          'animals are cute!',
+          'are cute!',
+          'cute!',
+        ])
+
+      expect(parseTagValues('hello, hello world, hello there, hello world!'))
+        .toEqual([
+          'hello there',
+          'there',
+          'hello world!',
+          'world!',
         ])
     })
   })
