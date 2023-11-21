@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf'
-import { requireEnv, telegramBotToken } from '../../env.js'
+import { requireEnv, telegramBotToken, webhookSecretToken } from '../../env.js'
 
 export async function handler() {
   try {
@@ -7,7 +7,7 @@ export async function handler() {
   
     const bot = new Telegraf(telegramBotToken)
     await bot.telegram.setWebhook(webhookUrl, {
-      secret_token: process.env.WEBHOOK_SECRET_TOKEN
+      secret_token: webhookSecretToken
     })
 
     return { statusCode: 200 }
