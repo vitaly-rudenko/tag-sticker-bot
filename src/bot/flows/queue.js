@@ -121,7 +121,7 @@ export function useQueueFlow({
     )
 
     const { message_id } = await context.reply(
-      '👇 Send tags for this sticker separated by comma \\(for example: `cute cat, funny cat`\\)\\.',
+      '👇 Send tags for this sticker separated by comma \\(for example: *__cute cat, funny cat__*\\)\\.',
       { parse_mode: 'MarkdownV2' }
     )
 

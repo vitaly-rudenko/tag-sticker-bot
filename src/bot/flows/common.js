@@ -17,8 +17,8 @@ export function useCommonFlow({ bot }) {
     await context.reply([
       '👋 Hi, just send a sticker to continue\\.',
       '',
-      '📝 Tags may contain whitespace and special symbols, for example: \`cute distorted cat!\`\\.',
-      `🔍 After tagging a sticker, type \`@${escapeMd(bot.botInfo.username)} <tag>\` to quickly find it\\.`
+      '📝 Tags may contain whitespace and special symbols, for example: *__cute distorted cat__*\\.',
+      `🔍 After tagging a sticker, type \`@${escapeMd(bot.botInfo.username)} cat\` to quickly find it\\.`
     ].join('\n'), { parse_mode: 'MarkdownV2' })
   }
 

@@ -47,7 +47,7 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     ])
 
     await context.reply([
-      `✏️ This sticker is now searchable by these tags: ${values.map(value => `\`${escapeMd(value)}\``).join(', ')}\\.`,
+      `✏️ This sticker is now searchable by these tags: ${values.map(value => `*__${escapeMd(value)}__*`).join(', ')}\\.`,
     ].filter(Boolean).join('\n'), { parse_mode: 'MarkdownV2' }),
 
     await sendNextQueuedSticker(context)
