@@ -1,5 +1,6 @@
 import { INLINE_QUERY_CACHE_TIME_LOCAL_S, INLINE_QUERY_CACHE_TIME_S, INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
 import { isLocalTesting } from '../../env.js'
+import { normalizeTagValue } from '../../utils/tags.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
@@ -15,9 +16,11 @@ export function useSearchFlow({ stickerFinder }) {
 
     const { userId } = context.state
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
-    const query = authorUserId
-      ? context.inlineQuery.query.slice(1)
-      : context.inlineQuery.query
+    const query = normalizeTagValue(
+      authorUserId
+        ? context.inlineQuery.query.slice(1)
+        : context.inlineQuery.query
+    )
 
     if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
 
