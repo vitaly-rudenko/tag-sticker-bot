@@ -10,6 +10,10 @@ export async function handler() {
       secret_token: webhookSecretToken
     })
 
+    await bot.telegram.setMyCommands([
+      { command: 'start',  description: 'Get help' },
+    ])
+
     return { statusCode: 200 }
   } catch (error) {
     console.error(error)

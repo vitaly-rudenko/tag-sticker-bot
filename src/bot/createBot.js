@@ -60,10 +60,6 @@ export async function createBot({
     handleSearch,
   } = useSearchFlow({ stickerFinder })
 
-  await bot.telegram.setMyCommands([
-    { command: 'start',  description: 'Get help' },
-  ])
-
   bot.use(withUserId)
   bot.on('inline_query', handleSearch)
 

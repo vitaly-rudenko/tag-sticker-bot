@@ -67,9 +67,9 @@ export class TagStickerBotStack extends cdk.Stack {
     const webhookUrl = `${restApi.url}webhook`
     const debugUrl = `${restApi.url}debug`
 
-    const setWebhookLambda = new cdk.aws_lambda.Function(this, 'setWebhookLambda', {
-      functionName: `${appName}-${environment}-set-webhook`,
-      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'set-webhook')),
+    const initLambda = new cdk.aws_lambda.Function(this, 'initLambda', {
+      functionName: `${appName}-${environment}-init`,
+      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'init')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
@@ -83,8 +83,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
     })
 
-    new cdk.triggers.Trigger(this, 'setWebhookTrigger', {
-      handler: setWebhookLambda,
+    new cdk.triggers.Trigger(this, 'initTrigger', {
+      handler: initLambda,
       invocationType: cdk.triggers.InvocationType.REQUEST_RESPONSE,
       timeout: cdk.Duration.minutes(1),
     })
