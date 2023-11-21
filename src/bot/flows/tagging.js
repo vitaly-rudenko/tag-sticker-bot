@@ -1,5 +1,6 @@
-import { MAX_TAGS_PER_STICKER, MIN_TAG_VALUE_LENGTH, MAX_TAG_VALUE_INPUT_LENGTH } from '../../constants.js'
+import { MAX_TAGS_PER_STICKER, MIN_QUERY_LENGTH, MAX_QUERY_LENGTH, MAX_TAG_INPUT_LENGTH } from '../../constants.js'
 import { deleteMessages } from '../../utils/deleteMessages.js'
+import { escapeMd } from '../../utils/escapeMd.js'
 import { parseTagValues } from '../../utils/tags.js'
 
 /** @typedef {import('telegraf').Context} Context */
@@ -25,16 +26,17 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
     const { sticker, stickerMessageId, relevantMessageIds } = await userSessionRepository.getContext(authorUserId)
     if (!sticker) return
 
-    if (text.length < MIN_TAG_VALUE_LENGTH)
-      return context.reply(`❌ The tag is too short, please try again`)
-    if (text.length > MAX_TAG_VALUE_INPUT_LENGTH)
-      return context.reply(`❌ The tag is too long, please try again`)
+    if (text.length < MIN_QUERY_LENGTH)
+      return context.reply(`❌ Input is too short, please try again`)
+    if (text.length > MAX_TAG_INPUT_LENGTH)
+      return context.reply(`❌ Input is too long, please try again`)
 
-    const values = parseTagValues(text).filter(value => value.length >= MIN_TAG_VALUE_LENGTH)
+    const values = parseTagValues(text)
+      .filter(value => value.length >= MIN_QUERY_LENGTH && value.length <= MAX_QUERY_LENGTH)
     if (values.length === 0)
-      return context.reply(`❌ Invalid tag, please try again`)
+      return context.reply(`❌ Your tags are either too short or too long, please try again`)
     if (values.length > MAX_TAGS_PER_STICKER)
-      return context.reply(`❌ Too many words in your tag, please try again`)
+      return context.reply(`❌ Too many tags or too many words in your tags, please try again`)
 
     await tagRepository.store({ sticker, authorUserId, values })
 
@@ -43,7 +45,9 @@ export function useTaggingFlow({ queuedStickerRepository, userSessionRepository,
       deleteMessages(bot.telegram, context.chat.id, relevantMessageIds),
     ])
 
-    await context.reply(`✏️ The sticker has been tagged as "${text}"`),
+    await context.reply([
+      `✏️ This sticker is now searchable by these tags: ${values.map(value => `\`${escapeMd(value)}\``).join(', ')}\\.`,
+    ].filter(Boolean).join('\n'), { parse_mode: 'MarkdownV2' }),
 
     await sendNextQueuedSticker(context)
   }

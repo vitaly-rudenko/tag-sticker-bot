@@ -99,6 +99,7 @@ export class TagStickerBotStack extends cdk.Stack {
       removalPolicy: isProduction
         ? cdk.RemovalPolicy.RETAIN
         : cdk.RemovalPolicy.DESTROY,
+      contributorInsightsEnabled: true,
     })
   }
 

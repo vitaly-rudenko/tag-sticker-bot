@@ -2,90 +2,48 @@
 
 ## Tags
 
-1. Store tags for sticker  
-  Operation: `BatchWriteItem`  
-
-### Access patterns
-
-1. Search by `value` (& optionally `authorUserId`) – without duplicates  
-  Operation: `Query`  
-2. Remove by `fileUniqueId` & `authorUserId` – to replace with another tag for that sticker  
-  Operation: `BatchWriteItem`
-3. Query status – whether a sticker is tagged (by me) or not  
-  Operation: `BatchGetItem`  
-4. (Not implemented) Search by `authorUserId` – to list tags created by user
-
 ```
-Tag {
-  setName: S
-  fileUniqueId: S
-  fileId: S
-  authorUserId: S
-  value: S
-}
+| tagId         | queryId     | valueHash | authorUserId | fileUniqueId | value   | setName | ... |
+|---------------|-------------|-----------|--------------|--------------|---------|---------|-----|
+| user-1#fuid-1 | user-1#val  | <hash>    | user-1       | fuid-1       | value-1 | set-1   | ... |
+| user-1#fuid-1 | #val        | <hash>    | user-1       | fuid-1       | value-1 | set-1   | ... |
+| user-1#fuid-1 | user-1#val  | <hash>    | user-1       | fuid-1       | value-2 | set-1   | ... |
+| user-1#fuid-1 | #val        | <hash>    | user-1       | fuid-1       | value-2 | set-1   | ... |
+| user-1#fuid-1 | user-1#val  | <hash>    | user-1       | fuid-1       | value-3 | set-1   | ... |
+| user-1#fuid-1 | #val        | <hash>    | user-1       | fuid-1       | value-3 | set-1   | ... |
+| user-2#fuid-2 | user-1#val  | <hash>    | user-2       | fuid-2       | value-3 | set-2   | ... |
+| user-2#fuid-2 | #val        | <hash>    | user-2       | fuid-2       | value-3 | set-2   | ... |
+
+tagId = authorUserId + fileUniqueId
+queryId = partially(value) + optional(authorUserId)
+valueHash = hash(value + optional(authorUserId))
 ```
 
-Unique ID: `(authorUserId, fileUniqueId, value)`
+### Query by `authorUserId` & `fileUniqueId`
 
-HASH: `authorUserId` + `fileUniqueId`  
-RANGE: `value`
-
-```
-| id            | authorUserId | fileUniqueId | value   | setName | fileId |
-|---------------|--------------|--------------|---------|---------|--------|
-| user-1#fuid-1 | user-1       | fuid-1       | value-1 | set-1   | *      |
-| user-1#fuid-1 | #            | fuid-1       | value-1 | set-1   | *      |
-| user-1#fuid-1 | user-1       | fuid-1       | value-2 | set-1   | *      |
-| user-1#fuid-1 | #            | fuid-1       | value-2 | set-1   | *      |
-| user-1#fuid-2 | user-1       | fuid-2       | value-3 | set-2   | *      |
-| user-1#fuid-2 | #            | fuid-2       | value-3 | set-2   | *      |
-```
-
-#### 1. Search by value
-
-> Index: **GSI**
-
-HASH: `authorUserId`
-RANGE: `value`
-
-Search by `value` (and optionally by `authorUserId`):
-```js
-const { Items } = new QueryCommand({
-  KeyConditionExpression: 'authorUserId = :authorUserId AND begins_with(#value, :value)'
-  ExpressionAttributeNames: {
-    '#value': 'value',
-  },
-  ExpressionAttributeValues: {
-    ':value': { S: query },
-    ':authorUserId': { S: authorUserId || '#' },
-  },
-})
-```
-
-#### 2. Remove
-
-> Without index
-
-HASH: `id`  
+HASH: `tagId`
 
 ```js
 const { Items } = new QueryCommand({
-  KeyConditionExpression: '#id = :id',
-  ExpressionAttributeNames: {
-    '#id': 'id',
-  },
+  KeyConditionExpression: 'tagId = :tagId'
   ExpressionAttributeValues: {
-    ':id': { S: `${authorUserId}#${fileUniqueId}` }
+    ':tagId': { S: `${authorUserId}#${fileUniqueId}` },
   },
 })
+```
+### Delete items from previous operation
 
+HASH: `tagId`
+RANGE: `valueHash`
+
+```js
 new BatchWriteItemCommand({
   RequestItems: {
     [tableName]: Items.map(item => ({
       DeleteRequest: {
         Key: {
-          id: item.id,
-          value: item.value,
+          tagId: item.tagId,
+          valueHash: item.valueHash,
         }
       }
     }))
@@ -93,49 +51,65 @@ new BatchWriteItemCommand({
 })
 ```
 
-#### 3. Query status
+### Query tag status
 
-> Index: **GSI**
-
-HASH: `setName`  
+HASH: `setName`
 RANGE: `authorUserId`
 
+#### Tagged by anyone
 ```js
-const { Items } = new BatchGetItemCommand({
-  RequestItems: {
-    [tableName]: {
-      Keys: {
-        setName: { S: setName },
-        authorUserId: { S: authorUserId || '#' },
-      }
-    }
-  }
-})
-
 const { Items } = new QueryCommand({
-  KeyConditionExpression: 'setName = :setName AND authorUserId = :authorUserId'
+  KeyConditionExpression: 'setName = :setName'
   ExpressionAttributeValues: {
     ':setName': { S: setName },
-    ':authorUserId': { S: authorUserId || '#' },
   },
 })
 ```
 
-#### 4. Search by author
+> Returns too many results just for an existence check
 
-Index: **GSI**
-
-HASH*: `authorUserId`  
-RANGE*: `setName`
-
+#### Tagged by user
 ```js
 const { Items } = new QueryCommand({
-  KeyConditionExpression: setName
-    ? 'authorUserId = :authorUserId AND setName = :setName'
-    : 'authorUserId = :authorUserId'
+  KeyConditionExpression: 'setName = :setName AND begins_with(authorUserId, :authorUserId)'
   ExpressionAttributeValues: {
-    ':authorUserId': authorUserId,
-    ':setName': setName,
+    ':setName': { S: setName },
+    ':authorUserId': { S: authorUserId + '#' },
+  },
+})
+```
+
+> Returns many results just for an existence check
+
+### Search by value
+
+HASH: `queryId`
+RANGE: `value`
+
+Search by all tags:
+```js
+const { Items } = new QueryCommand({
+  KeyConditionExpression: 'queryId = :queryId AND begins_with(#value, :value)'
+  ExpressionAttributeNames: {
+    '#value': 'value',
+  },
+  ExpressionAttributeValues: {
+    ':value': { S: query },
+    ':queryId': { S: authorUserId ? `${query.slice(0, 2)}#${authorUserId}` : query.slice(0,2) },
+  },
+})
+```
+
+Search by user's tags:
+```js
+const { Items } = new QueryCommand({
+  KeyConditionExpression: 'queryId = :queryId AND begins_with(#value, :value)'
+  ExpressionAttributeNames: {
+    '#value': 'value',
+  },
+  ExpressionAttributeValues: {
+    ':value': { S: query },
+    ':queryId': { S: `${query.slice(0, 2)}#${authorUserId}` },
   },
 })
 ```

@@ -105,24 +105,25 @@ export function useQueueFlow({
       return
     }
 
-    const count = await queuedStickerRepository.count(userId)
+    const isEmpty = await queuedStickerRepository.empty(userId)
 
     const { message_id: stickerMessageId } = await context.replyWithSticker(
       queuedSticker.sticker.fileId,
       {
         reply_markup: Markup.inlineKeyboard(
           [
-            ...count > 0 ? [
-              Markup.button.callback('➡️ Skip', 'queue:skip')
-            ] : [],
-            Markup.button.callback(count === 0 ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
+            ...!isEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
+            Markup.button.callback(isEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
           ].filter(Boolean),
           { columns: 2 },
         ).reply_markup,
       }
     )
 
-    const { message_id } = await context.reply('👇 Send tag for this sticker \\(for example: `cute cat funny cat`\\)\\.', { parse_mode: 'MarkdownV2' })
+    const { message_id } = await context.reply(
+      '👇 Send tags for this sticker separated by comma \\(for example: `cute cat, funny cat`\\)\\.',
+      { parse_mode: 'MarkdownV2' }
+    )
 
     await userSessionRepository.amendContext(userId, {
       sticker: queuedSticker.sticker,

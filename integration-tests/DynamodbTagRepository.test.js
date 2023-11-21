@@ -8,6 +8,13 @@ function generateId(name) {
   return `${name}-${randomBytes(8).toString('hex')}`
 }
 
+function defaultTag(tag) {
+  return {
+    ...tag,
+    authorUserId: '#',
+  }
+}
+
 describe('DynamodbTagRepository', () => {
   /** @type {DynamodbTagRepository} */
   let tagRepository
@@ -135,11 +142,11 @@ describe('DynamodbTagRepository', () => {
 
     await expect(tagRepository.queryStatus({
       stickerSetName: set1,
-    })).resolves.toEqual([sticker1, sticker3])
+    })).resolves.toIncludeSameMembers([sticker1, sticker2])
 
     await expect(tagRepository.queryStatus({
       stickerSetName: set2,
-    })).resolves.toEqual([sticker1, sticker3])
+    })).resolves.toIncludeSameMembers([sticker3, sticker4])
 
     await expect(tagRepository.queryStatus({
       stickerSetName: generateId('set-3'),
@@ -166,11 +173,6 @@ describe('DynamodbTagRepository', () => {
     await expect(tagRepository.search({
       limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([tag2, tag3])
-
-    await expect(tagRepository.search({
-      limit: 100,
-      query: 'it is'
     })).resolves.toIncludeSameMembers([tag3])
 
     await expect(tagRepository.search({

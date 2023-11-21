@@ -7,7 +7,7 @@ export type Sticker = {
 export type Tag = {
   sticker: Sticker
   authorUserId: string
-  value?: string
+  value: string
 }
 
 export type QueuedSticker = {
@@ -19,7 +19,7 @@ export interface QueuedStickerRepository {
   enqueue(input: { userId: string; stickers: Sticker[] }): Promise<void>
   take(userId: string): Promise<QueuedSticker | undefined>
   clear(userId: string): Promise<void>
-  count(userId: string): Promise<number>
+  empty(userId: string): Promise<boolean>
 }
 
 export type UserSessionContext = {

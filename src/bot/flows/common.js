@@ -1,4 +1,5 @@
 import * as env from '../../env.js'
+import { escapeMd } from '../../utils/escapeMd.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
@@ -17,7 +18,7 @@ export function useCommonFlow({ bot }) {
       '👋 Hi, just send a sticker to continue\\.',
       '',
       '📝 Tags may contain whitespace and special symbols, for example: \`cute distorted cat!\`\\.',
-      `🔍 After tagging a sticker, type \`@${bot.botInfo.username} <tag>\` to quickly find it\\.`
+      `🔍 After tagging a sticker, type \`@${escapeMd(bot.botInfo.username)} <tag>\` to quickly find it\\.`
     ].join('\n'), { parse_mode: 'MarkdownV2' })
   }
 

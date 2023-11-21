@@ -13,10 +13,11 @@ export class TagRepositoryStickerFinder {
     const tags = await this._tagRepository.search({ query, limit, authorUserId })
     
     const stickers = []
-    const addedStickerFileUniqueIds = new Set()
+    const stickerFileUniqueIds = new Set()
 
     for (const tag of tags) {
-      if (addedStickerFileUniqueIds.has(tag.sticker.fileUniqueId)) continue
+      if (stickerFileUniqueIds.has(tag.sticker.fileUniqueId)) continue
+      stickerFileUniqueIds.add(tag.sticker.fileUniqueId)
 
       stickers.push({
         setName: tag.sticker.setName,

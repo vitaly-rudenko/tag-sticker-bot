@@ -1,6 +1,10 @@
 import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
 import { CreateTableCommand, DeleteTableCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
 import { createDynamodbClient } from '../utils/createDynamodbClient.js'
+import { userSessionAttributes } from '../users/attributes.js'
+import { queuedStickerAttributes } from '../queue/attributes.js'
+import { tagAttributes } from '../tags/attributes.js'
+import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
 
 const dynamodbClient = createDynamodbClient()
 
@@ -9,11 +13,11 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbUserSessionsTable,
     KeySchema: [{
-      AttributeName: 'user',
+      AttributeName: userSessionAttributes.userId,
       KeyType: 'HASH'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'user',
+      AttributeName: userSessionAttributes.userId,
       AttributeType: 'S'
     }],
     BillingMode: 'PROVISIONED',
@@ -27,7 +31,7 @@ await dynamodbClient.send(
   new UpdateTimeToLiveCommand({
     TableName: dynamodbUserSessionsTable,
     TimeToLiveSpecification: {
-      AttributeName: 'exp',
+      AttributeName: userSessionAttributes.expiresAt,
       Enabled: true,
     }
   })
@@ -38,17 +42,17 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbQueuedStickersTable,
     KeySchema: [{
-      AttributeName: 'user',
+      AttributeName: queuedStickerAttributes.userId,
       KeyType: 'HASH'
     }, {
-      AttributeName: 'fuid',
+      AttributeName: queuedStickerAttributes.stickerFileUniqueId,
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'user',
+      AttributeName: queuedStickerAttributes.userId,
       AttributeType: 'S'
     }, {
-      AttributeName: 'fuid',
+      AttributeName: queuedStickerAttributes.stickerFileUniqueId,
       AttributeType: 'S'
     }],
     BillingMode: 'PROVISIONED',
@@ -62,7 +66,7 @@ await dynamodbClient.send(
   new UpdateTimeToLiveCommand({
     TableName: dynamodbQueuedStickersTable,
     TimeToLiveSpecification: {
-      AttributeName: 'exp',
+      AttributeName: queuedStickerAttributes.expiresAt,
       Enabled: true,
     }
   })
@@ -73,23 +77,26 @@ await dynamodbClient.send(
   new CreateTableCommand({
     TableName: dynamodbTagsTable,
     KeySchema: [{
-      AttributeName: 'id',
+      AttributeName: tagAttributes.tagId,
       KeyType: 'HASH'
     }, {
-      AttributeName: 'value',
+      AttributeName: tagAttributes.valueHash,
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
-      AttributeName: 'id',
+      AttributeName: tagAttributes.tagId,
       AttributeType: 'S'
     }, {
-      AttributeName: 'value',
+      AttributeName: tagAttributes.queryId,
       AttributeType: 'S'
     }, {
-      AttributeName: 'author',
+      AttributeName: tagAttributes.valueHash,
       AttributeType: 'S'
     }, {
-      AttributeName: 'set',
+      AttributeName: tagAttributes.value,
+      AttributeType: 'S'
+    }, {
+      AttributeName: tagAttributes.stickerSetName,
       AttributeType: 'S'
     }],
     BillingMode: 'PROVISIONED',
@@ -98,12 +105,12 @@ await dynamodbClient.send(
       WriteCapacityUnits: 1,
     },
     GlobalSecondaryIndexes: [{
-      IndexName: 'search-by-value-index',
+      IndexName: SEARCH_BY_VALUE_INDEX,
       KeySchema: [{
-        AttributeName: 'author',
+        AttributeName: tagAttributes.queryId,
         KeyType: 'HASH'
       }, {
-        AttributeName: 'value',
+        AttributeName: tagAttributes.value,
         KeyType: 'RANGE'
       }],
       Projection: {
@@ -114,17 +121,17 @@ await dynamodbClient.send(
         WriteCapacityUnits: 1,
       }
     }, {
-      IndexName: 'query-status-index',
+      IndexName: QUERY_STATUS_INDEX,
       KeySchema: [{
-        AttributeName: 'set',
+        AttributeName: tagAttributes.stickerSetName,
         KeyType: 'HASH'
       }, {
-        AttributeName: 'author',
+        AttributeName: tagAttributes.queryId,
         KeyType: 'RANGE'
       }],
       Projection: {
         ProjectionType: 'INCLUDE',
-        NonKeyAttributes: ['fuid'],
+        NonKeyAttributes: [tagAttributes.stickerFileUniqueId],
       },
       ProvisionedThroughput: {
         ReadCapacityUnits: 1,
