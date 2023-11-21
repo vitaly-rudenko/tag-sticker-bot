@@ -65,8 +65,13 @@ export async function createBot({
   ])
 
   bot.use(withUserId)
-
   bot.on('inline_query', handleSearch)
+
+  bot.use((context, next) => {
+    if (context.chat?.type === 'private') {
+      return next()
+    }
+  })
   bot.on(message('sticker'), handleSticker)
   bot.on(message('text'), handleTag)
 
