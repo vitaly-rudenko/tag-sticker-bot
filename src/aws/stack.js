@@ -2,7 +2,7 @@ import * as url from 'url'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as cdk from 'aws-cdk-lib'
-import { telegramBotToken, environment, debugChatId } from './env.js'
+import { telegramBotToken, environment, debugChatId, webhookSecretToken } from './env.js'
 import { userSessionAttributes } from '../users/attributes.js'
 import { queuedStickerAttributes } from '../queue/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
@@ -38,6 +38,7 @@ export class TagStickerBotStack extends cdk.Stack {
         VERSION: version,
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
+        WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
         DYNAMODB_QUEUED_STICKERS_TABLE: queuedStickersTable.tableName,
@@ -77,6 +78,7 @@ export class TagStickerBotStack extends cdk.Stack {
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,
+        WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
