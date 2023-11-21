@@ -38,7 +38,7 @@ export function useQueueFlow({
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('📎 Tag this sticker', 'sticker:tag-single'),
-        Markup.button.callback('🖇 Tag multiple in the set', 'sticker:choose-untagged'),
+        Markup.button.callback('🖇 Tag all stickers in the set', 'sticker:choose-untagged'),
         Markup.button.callback('❌ Cancel', 'action:cancel'),
       ], { columns: 1 }).reply_markup,
     })
@@ -54,7 +54,7 @@ export function useQueueFlow({
     ].join('\n'), {
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard([
-        Markup.button.callback('Not tagged by anyone', 'sticker:tag-untagged'),
+        Markup.button.callback('Not tagged by anyone yet', 'sticker:tag-untagged'),
         Markup.button.callback('Not tagged by me', 'sticker:tag-untagged-by-me'),
         Markup.button.callback('Re-tag all of them', 'sticker:tag-all'),
         Markup.button.callback('❌ Cancel', 'action:cancel'),
