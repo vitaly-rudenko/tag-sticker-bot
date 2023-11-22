@@ -27,7 +27,7 @@ export class TagStickerBotStack extends cdk.Stack {
     const userSessionsTable = this.createUserSessionsTable()
     const tagsTable = this.createTagsTable()
 
-    const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
+    const restApiLambda = new cdk.aws_lambda.Function(this, 'rest-api-lambda', {
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'rest-api')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
@@ -51,7 +51,7 @@ export class TagStickerBotStack extends cdk.Stack {
 
     const lambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(restApiLambda)
 
-    const restApi = new cdk.aws_apigateway.RestApi(this, 'restApi', {
+    const restApi = new cdk.aws_apigateway.RestApi(this, 'rest-api', {
       deployOptions: {
         stageName: environment,
       }
@@ -65,7 +65,7 @@ export class TagStickerBotStack extends cdk.Stack {
     const webhookUrl = `${restApi.url}webhook`
     const debugUrl = `${restApi.url}debug`
 
-    const initLambda = new cdk.aws_lambda.Function(this, 'initLambda', {
+    const initLambda = new cdk.aws_lambda.Function(this, 'init-lambda', {
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'init')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
@@ -80,19 +80,19 @@ export class TagStickerBotStack extends cdk.Stack {
       },
     })
 
-    new cdk.triggers.Trigger(this, 'initTrigger', {
+    new cdk.triggers.Trigger(this, 'init-trigger', {
       handler: initLambda,
       invocationType: cdk.triggers.InvocationType.REQUEST_RESPONSE,
       timeout: cdk.Duration.minutes(1),
     })
 
-    new cdk.CfnOutput(this, 'healthUrl', { value: healthUrl })
-    new cdk.CfnOutput(this, 'webhookUrl', { value: webhookUrl })
-    if (!isProduction) new cdk.CfnOutput(this, 'debugUrl', { value: debugUrl })
+    new cdk.CfnOutput(this, 'health-url', { value: healthUrl })
+    new cdk.CfnOutput(this, 'webhook-url', { value: webhookUrl })
+    if (!isProduction) new cdk.CfnOutput(this, 'debug-url', { value: debugUrl })
   }
 
   createTagsTable() {
-    const table = new cdk.aws_dynamodb.Table(this, 'tagsTable', {
+    const table = new cdk.aws_dynamodb.Table(this, 'tags-table', {
       partitionKey: {
         name: tagAttributes.tagId,
         type: cdk.aws_dynamodb.AttributeType.STRING
@@ -144,7 +144,7 @@ export class TagStickerBotStack extends cdk.Stack {
   }
 
   createUserSessionsTable() {
-    return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
+    return new cdk.aws_dynamodb.Table(this, 'user-sessions-table', {
       partitionKey: {
         name: userSessionAttributes.userId,
         type: cdk.aws_dynamodb.AttributeType.STRING
