@@ -52,8 +52,11 @@ export class TagStickerBotStack extends cdk.Stack {
     const lambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(restApiLambda)
 
     const restApi = new cdk.aws_apigateway.RestApi(this, 'restApi', {
+      restApiName: `${appName}-${environment}-rest-api`,
       deployOptions: {
         stageName: environment,
+        throttlingRateLimit: 5,
+        throttlingBurstLimit: 50,
       }
     })
 
@@ -71,12 +74,9 @@ export class TagStickerBotStack extends cdk.Stack {
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
       environment: {
-        VERSION: version,
-        ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
-        DEBUG_CHAT_ID: debugChatId,
       },
     })
 

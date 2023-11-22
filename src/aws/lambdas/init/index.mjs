@@ -1,5 +1,5 @@
 import { Telegraf } from 'telegraf'
-import { telegramBotToken, webhookSecretToken, webhookUrl } from '../../../env.js'
+import { telegramBotToken, webhookSecretToken, webhookUrl } from './init-env.mjs'
 
 export async function handler() {
   try {

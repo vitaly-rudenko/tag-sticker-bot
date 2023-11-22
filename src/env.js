@@ -1,7 +1,6 @@
 const {
   VERSION,
   TELEGRAM_BOT_TOKEN,
-  WEBHOOK_URL,
   WEBHOOK_SECRET_TOKEN,
   INLINE_QUERY_CACHE_TIME_S,
   LOCALSTACK_ENDPOINT,
@@ -14,7 +13,6 @@ const {
 export const version = VERSION
 export const localstackEndpoint = LOCALSTACK_ENDPOINT
 export const telegramBotToken = requireEnv(TELEGRAM_BOT_TOKEN)
-export const webhookUrl = WEBHOOK_URL
 export const webhookSecretToken = WEBHOOK_SECRET_TOKEN
 export const inlineQueryCacheTimeS = Number(requireEnv(INLINE_QUERY_CACHE_TIME_S))
 export const dynamodbTagsTable = requireEnv(DYNAMODB_TAGS_TABLE)
