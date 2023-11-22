@@ -1,4 +1,4 @@
-import { BatchWriteItemCommand, QueryCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
+import { BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { DEFAULT_AUTHOR_USER_ID, tagAttributes as attr, queryId, tagId, valueHash } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
 
