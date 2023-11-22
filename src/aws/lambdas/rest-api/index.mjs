@@ -2,8 +2,7 @@ import { Telegraf } from 'telegraf'
 import safeCompare from 'safe-compare'
 import { TagRepositoryStickerFinder } from '../../../TagRepositoryStickerFinder.js'
 import { createBot } from '../../../bot/createBot.js'
-import { dynamodbUserSessionsTable, dynamodbQueuedStickersTable, dynamodbTagsTable, telegramBotToken, debugChatId } from '../../../env.js'
-import { DynamodbQueuedStickerRepository } from '../../../queue/DynamodbQueuedStickerRepository.js'
+import { dynamodbUserSessionsTable, dynamodbTagsTable, telegramBotToken, debugChatId } from '../../../env.js'
 import { DynamodbTagRepository } from '../../../tags/DynamodbTagRepository.js'
 import { DynamodbUserSessionRepository } from '../../../users/DynamodbUserSessionRepository.js'
 import { createDynamodbClient } from '../../../utils/createDynamodbClient.js'
@@ -57,11 +56,6 @@ export async function handler(event, context) {
         tableName: dynamodbUserSessionsTable,
       })
     
-      const queuedStickerRepository = new DynamodbQueuedStickerRepository({
-        dynamodbClient,
-        tableName: dynamodbQueuedStickersTable,
-      })
-    
       const tagRepository = new DynamodbTagRepository({
         dynamodbClient,
         tableName: dynamodbTagsTable,
@@ -71,7 +65,6 @@ export async function handler(event, context) {
     
       const bot = await createBot({
         telegramBotToken,
-        queuedStickerRepository,
         userSessionRepository,
         tagRepository,
         stickerFinder,

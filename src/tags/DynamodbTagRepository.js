@@ -41,7 +41,7 @@ export class DynamodbTagRepository {
         '#tagId': attr.tagId,
       },
       ExpressionAttributeValues: {
-        ':tagId': { S: tagId(authorUserId, sticker.fileUniqueId) }
+        ':tagId': { S: tagId(authorUserId, sticker.file_unique_id) }
       },
     })
 
@@ -72,11 +72,11 @@ export class DynamodbTagRepository {
 
     const requestItems = values.flatMap(value => {
       const attributes = {
-        [attr.tagId]: { S: tagId(authorUserId, sticker.fileUniqueId) },
+        [attr.tagId]: { S: tagId(authorUserId, sticker.file_unique_id) },
         [attr.authorUserId]: { S: authorUserId },
-        [attr.stickerSetName]: { S: sticker.setName },
-        [attr.stickerFileUniqueId]: { S: sticker.fileUniqueId },
-        [attr.stickerFileId]: { S: sticker.fileId },
+        ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
+        [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
+        [attr.stickerFileId]: { S: sticker.file_id },
         [attr.value]: { S: value },
       }
 
@@ -111,6 +111,8 @@ export class DynamodbTagRepository {
   }
 
   /**
+   * TODO: might be too slow when a lot of stickers are tagged in the set
+   * 
    * @param {{
    *   stickerSetName: string
    *   authorUserId?: string
@@ -185,9 +187,9 @@ export class DynamodbTagRepository {
   _toEntity(attributes) {
     return {
       sticker: {
-        setName: attributes[attr.stickerSetName].S,
-        fileUniqueId: attributes[attr.stickerFileUniqueId].S,
-        fileId: attributes[attr.stickerFileId].S,
+        set_name: attributes[attr.stickerSetName]?.S,
+        file_unique_id: attributes[attr.stickerFileUniqueId].S,
+        file_id: attributes[attr.stickerFileId].S,
       },
       authorUserId: attributes[attr.authorUserId].S,
       value: attributes[attr.value]?.S,

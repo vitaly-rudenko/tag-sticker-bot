@@ -4,7 +4,6 @@ import * as fs from 'fs'
 import * as cdk from 'aws-cdk-lib'
 import { telegramBotToken, environment, debugChatId, webhookSecretToken } from './env.js'
 import { userSessionAttributes } from '../users/attributes.js'
-import { queuedStickerAttributes } from '../queue/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
 
@@ -26,7 +25,6 @@ export class TagStickerBotStack extends cdk.Stack {
 
     const userSessionsTable = this.createUserSessionsTable()
     const tagsTable = this.createTagsTable()
-    const queuedStickersTable = this.createQueuedStickersTable()
 
     const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
       functionName: `${appName}-${environment}-rest-api`,
@@ -41,12 +39,11 @@ export class TagStickerBotStack extends cdk.Stack {
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
-        DYNAMODB_QUEUED_STICKERS_TABLE: queuedStickersTable.tableName,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
 
-    for (const table of [userSessionsTable, tagsTable, queuedStickersTable]) {
+    for (const table of [userSessionsTable, tagsTable]) {
       table.grantReadWriteData(restApiLambda)
     }
 
@@ -160,25 +157,6 @@ export class TagStickerBotStack extends cdk.Stack {
       writeCapacity: 1,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: userSessionAttributes.expiresAt,
-    })
-  }
-
-  createQueuedStickersTable() {
-    return new cdk.aws_dynamodb.Table(this, 'queuedStickersTable', {
-      tableName: `${appName}-${environment}-queued-stickers`,
-      partitionKey: {
-        name: queuedStickerAttributes.userId,
-        type: cdk.aws_dynamodb.AttributeType.STRING
-      },
-      sortKey: {
-        name: queuedStickerAttributes.stickerFileUniqueId,
-        type: cdk.aws_dynamodb.AttributeType.STRING
-      },
-      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      timeToLiveAttribute: queuedStickerAttributes.expiresAt,
     })
   }
 }

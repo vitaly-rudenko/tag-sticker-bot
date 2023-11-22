@@ -34,7 +34,7 @@ export function useSearchFlow({ stickerFinder }) {
       stickers.map((sticker, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id: sticker.fileId,
+        sticker_file_id: sticker.file_id,
       })),
       {
         cache_time: isLocalTesting

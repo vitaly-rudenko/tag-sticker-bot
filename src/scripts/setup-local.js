@@ -1,8 +1,7 @@
-import { dynamodbQueuedStickersTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
+import { dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
 import { CreateTableCommand, DeleteTableCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
 import { createDynamodbClient } from '../utils/createDynamodbClient.js'
 import { userSessionAttributes } from '../users/attributes.js'
-import { queuedStickerAttributes } from '../queue/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
 
@@ -32,41 +31,6 @@ await dynamodbClient.send(
     TableName: dynamodbUserSessionsTable,
     TimeToLiveSpecification: {
       AttributeName: userSessionAttributes.expiresAt,
-      Enabled: true,
-    }
-  })
-)
-
-await dynamodbClient.send(new DeleteTableCommand({ TableName: dynamodbQueuedStickersTable })).catch(() => {})
-await dynamodbClient.send(
-  new CreateTableCommand({
-    TableName: dynamodbQueuedStickersTable,
-    KeySchema: [{
-      AttributeName: queuedStickerAttributes.userId,
-      KeyType: 'HASH'
-    }, {
-      AttributeName: queuedStickerAttributes.stickerFileUniqueId,
-      KeyType: 'RANGE'
-    }],
-    AttributeDefinitions: [{
-      AttributeName: queuedStickerAttributes.userId,
-      AttributeType: 'S'
-    }, {
-      AttributeName: queuedStickerAttributes.stickerFileUniqueId,
-      AttributeType: 'S'
-    }],
-    BillingMode: 'PROVISIONED',
-    ProvisionedThroughput: {
-      ReadCapacityUnits: 1,
-      WriteCapacityUnits: 1,
-    }
-  })
-)
-await dynamodbClient.send(
-  new UpdateTimeToLiveCommand({
-    TableName: dynamodbQueuedStickersTable,
-    TimeToLiveSpecification: {
-      AttributeName: queuedStickerAttributes.expiresAt,
       Enabled: true,
     }
   })

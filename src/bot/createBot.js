@@ -11,7 +11,6 @@ import { deleteMessages } from '../utils/deleteMessages.js'
  * @param {{
  *   telegramBotToken: string
  *   userSessionRepository: import('../types.d.ts').UserSessionRepository,
- *   queuedStickerRepository: import('../types.d.ts').QueuedStickerRepository,
  *   tagRepository: import('../types.d.ts').TagRepository,
  *   stickerFinder: import('../types.d.ts').StickerFinder,
  * }} input
@@ -19,7 +18,6 @@ import { deleteMessages } from '../utils/deleteMessages.js'
 export async function createBot({
   telegramBotToken,
   userSessionRepository,
-  queuedStickerRepository,
   tagRepository,
   stickerFinder,
 }) {
@@ -39,7 +37,6 @@ export async function createBot({
   } = useQueueFlow({
     telegram: bot.telegram,
     userSessionRepository,
-    queuedStickerRepository,
   })
 
   const {
@@ -52,7 +49,6 @@ export async function createBot({
     bot,
     tagRepository,
     userSessionRepository,
-    queuedStickerRepository,
     sendNextQueuedSticker,
   })
 
@@ -82,15 +78,15 @@ export async function createBot({
   bot.action('sticker:tag-untagged-by-me', tagUntaggedByMe)
   bot.action('sticker:tag-all', tagAll)
   
-  bot.action('action:ignore', (context) => context.answerCbQuery())
+  bot.action('action:ignore', (context) => context.answerCbQuery().catch(() => {}))
   bot.action('action:cancel', async (context) => {
     if (!context.chat) return
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds } = await userSessionRepository.getContext(userId)
+    const { relevantMessageIds } = await userSessionRepository.get(userId)
 
-    await deleteMessages(bot.telegram, context.chat.id, relevantMessageIds)
+    await deleteMessages(bot.telegram, context.chat.id, [relevantMessageIds])
     await context.reply('👌 Action cancelled.')
   })
 
