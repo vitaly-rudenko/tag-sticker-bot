@@ -32,6 +32,7 @@ export class TagStickerBotStack extends cdk.Stack {
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
+      logRetention: cdk.aws_logs.RetentionDays.ONE_WEEK,
       environment: {
         VERSION: version,
         ENVIRONMENT: environment,
@@ -73,6 +74,7 @@ export class TagStickerBotStack extends cdk.Stack {
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
+      logRetention: cdk.aws_logs.RetentionDays.ONE_WEEK,
       environment: {
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,
