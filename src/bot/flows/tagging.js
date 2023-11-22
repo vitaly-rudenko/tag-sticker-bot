@@ -49,7 +49,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
 
     await context.reply([
       `✏️ This sticker is now searchable by these tags: ${values.map(value => `*__${escapeMd(value)}__*`).join(', ')}\\.`,
-      ...!queue ? ["🕒 It may take up to 5 minutes to see the changes\\."] : []
+      ...!queue ? ["🕒 It may take up to 10 minutes to see the changes\\."] : []
     ].join('\n'), { parse_mode: 'MarkdownV2' })
 
     await proceedTagging(context, { userId, queue })

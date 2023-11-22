@@ -1,10 +1,13 @@
 import { Telegraf } from 'telegraf'
-import { requireEnv, telegramBotToken, webhookSecretToken } from '../../env.js'
+import { telegramBotToken, webhookSecretToken, webhookUrl } from '../../../env.js'
 
 export async function handler() {
   try {
-    const webhookUrl = requireEnv(process.env.WEBHOOK_URL)
-  
+    if (!webhookUrl)
+      throw new Error('Webhook URL is not provided')
+    if (!webhookSecretToken)
+      throw new Error('Webhook secret token is not provided')
+
     const bot = new Telegraf(telegramBotToken)
     await bot.telegram.setWebhook(webhookUrl, {
       secret_token: webhookSecretToken

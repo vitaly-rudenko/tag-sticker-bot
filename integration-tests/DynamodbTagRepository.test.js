@@ -23,6 +23,7 @@ describe('DynamodbTagRepository', () => {
     tagRepository = new DynamodbTagRepository({
       dynamodbClient: createDynamodbClient(),
       tableName: dynamodbTagsTable,
+      batchWriteItemLimit: 25,
     })
   })
 

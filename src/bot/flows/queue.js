@@ -99,7 +99,7 @@ export function useQueueFlow({
     if (!sticker && (!queue || queue.index === -1)) {
       await userSessionRepository.clear(userId)
       if (queue) {
-        await context.reply("✅ You're all done! It may take up to 5 minutes to see the changes.")
+        await context.reply("✅ You're all done! It may take up to 10 minutes to see the changes.")
       }
       return
     }

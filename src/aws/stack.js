@@ -1,8 +1,9 @@
-import * as url from 'url'
-import * as path from 'path'
-import * as fs from 'fs'
-import * as cdk from 'aws-cdk-lib'
-import { telegramBotToken, environment, debugChatId, webhookSecretToken } from './env.js'
+import url from 'url'
+import path from 'path'
+import fs from 'fs'
+import cdk from 'aws-cdk-lib'
+
+import { telegramBotToken, environment, debugChatId, webhookSecretToken, dynamodbTagsTableBatchWriteItemLimit, inlineQueryCacheTimeS } from './stack-env.js'
 import { userSessionAttributes } from '../users/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
@@ -36,9 +37,11 @@ export class TagStickerBotStack extends cdk.Stack {
         VERSION: version,
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
+        INLINE_QUERY_CACHE_TIME_S: inlineQueryCacheTimeS,
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
+        DYNAMODB_TAGS_TABLE_WRITE_LIMIT: dynamodbTagsTableBatchWriteItemLimit,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
@@ -103,8 +106,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 3,
+      writeCapacity: 3,
       removalPolicy: isProduction
         ? cdk.RemovalPolicy.RETAIN
         : cdk.RemovalPolicy.DESTROY,
@@ -122,8 +125,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.ALL,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 3,
+      writeCapacity: 3,
     })
 
     table.addGlobalSecondaryIndex({
@@ -138,8 +141,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId],
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
     })
 
     return table
@@ -153,8 +156,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: userSessionAttributes.expiresAt,
     })

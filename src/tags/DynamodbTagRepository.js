@@ -2,18 +2,18 @@ import { BatchWriteItemCommand, QueryCommand, paginateQuery } from '@aws-sdk/cli
 import { DEFAULT_AUTHOR_USER_ID, tagAttributes as attr, queryId, tagId, valueHash } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
 
-const BATCH_WRITE_ITEM_LIMIT = 25
-
 export class DynamodbTagRepository {
   /**
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
+   *   batchWriteItemLimit: number
    * }} options 
    */
-  constructor({ dynamodbClient, tableName }) {
+  constructor({ dynamodbClient, tableName, batchWriteItemLimit }) {
     this._dynamodbClient = dynamodbClient
     this._tableName = tableName
+    this._batchWriteItemLimit = batchWriteItemLimit
   }
 
   /**
@@ -30,8 +30,8 @@ export class DynamodbTagRepository {
     if (values.length === 0) {
       throw new Error('Values list is empty')
     }
-    if (values.length > BATCH_WRITE_ITEM_LIMIT) {
-      throw new Error(`Cannot store more than ${BATCH_WRITE_ITEM_LIMIT} tags per request`)
+    if (values.length > this._batchWriteItemLimit) {
+      throw new Error(`Cannot store more than ${this._batchWriteItemLimit} tags per request`)
     }
 
     const existingTagPaginator = paginateQuery({ client: this._dynamodbClient }, {
@@ -52,11 +52,11 @@ export class DynamodbTagRepository {
     }
 
     if (existingItems.length > 0) {
-      for (let i = 0; i < existingItems.length; i += BATCH_WRITE_ITEM_LIMIT) {
+      for (let i = 0; i < existingItems.length; i += this._batchWriteItemLimit) {
         await this._dynamodbClient.send(
           new BatchWriteItemCommand({
             RequestItems: {
-              [this._tableName]: existingItems.slice(i, i + BATCH_WRITE_ITEM_LIMIT).map(item => ({
+              [this._tableName]: existingItems.slice(i, i + this._batchWriteItemLimit).map(item => ({
                 DeleteRequest: {
                   Key: {
                     [attr.tagId]: item[attr.tagId],
@@ -99,11 +99,11 @@ export class DynamodbTagRepository {
       }]
     })
 
-    for (let i = 0; i < requestItems.length; i += BATCH_WRITE_ITEM_LIMIT) {
+    for (let i = 0; i < requestItems.length; i += this._batchWriteItemLimit) {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
-            [this._tableName]: requestItems.slice(i, i + BATCH_WRITE_ITEM_LIMIT)
+            [this._tableName]: requestItems.slice(i, i + this._batchWriteItemLimit)
           }
         })
       )
