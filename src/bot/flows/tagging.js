@@ -11,11 +11,11 @@ import { parseTagValues } from '../../utils/tags.js'
  * @param {{
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  *   tagRepository: import('../../types.d.ts').TagRepository
- *   sendNextQueuedSticker: import('../../types.d.ts').sendNextQueuedSticker,
+ *   proceedTagging: import('../../types.d.ts').proceedTagging,
  *   bot: import('telegraf').Telegraf
  * }} input
  */
-export function useTaggingFlow({ userSessionRepository, tagRepository, bot, sendNextQueuedSticker }) {
+export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proceedTagging }) {
   /** @param {Context} context */
   async function handleTag(context, next) {
     if (!context.chat || !context.message || !('text' in context.message)) return
@@ -52,7 +52,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, send
       ...!queue ? ["🕒 It may take up to 5 minutes to see the changes\\."] : []
     ].join('\n'), { parse_mode: 'MarkdownV2' })
 
-    await sendNextQueuedSticker(context, { userId, queue })
+    await proceedTagging(context, { userId, queue })
   }
 
   /** @param {Context} context */
@@ -67,7 +67,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, send
 
     await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, relevantMessageIds])
 
-    await sendNextQueuedSticker(context, { userId, sticker })
+    await proceedTagging(context, { userId, sticker })
   }
 
   /** @param {Context} context */
@@ -95,7 +95,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, send
       s => !taggedStickerFileUniqueIds.includes(s.file_unique_id)
     )
 
-    await sendNextQueuedSticker(context, {
+    await proceedTagging(context, {
       userId,
       queue: {
         stickerSetName,
@@ -131,7 +131,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, send
       s => !taggedStickerFileUniqueIds.includes(s.file_unique_id)
     )
 
-    await sendNextQueuedSticker(context, {
+    await proceedTagging(context, {
       userId,
       queue: {
         stickerSetName,
@@ -162,7 +162,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, send
 
     await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, relevantMessageIds])
 
-    await sendNextQueuedSticker(context, {
+    await proceedTagging(context, {
       userId,
       queue: {
         stickerSetName,

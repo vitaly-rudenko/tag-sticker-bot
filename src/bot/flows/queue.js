@@ -91,12 +91,12 @@ export function useQueueFlow({
     await deleteMessages(telegram, context.chat.id, [relevantMessageIds])
     
     if (!queue) return
-    await sendNextQueuedSticker(context, { userId, queue })
+    await proceedTagging(context, { userId, queue })
   }
 
-  /** @type {import('../../types.d.ts').sendNextQueuedSticker} */
-  async function sendNextQueuedSticker(context, { userId, queue, sticker }) {
-    if (!sticker && (!queue || queue.index === queue.stickerSetBitmap.length)) {
+  /** @type {import('../../types.d.ts').proceedTagging} */
+  async function proceedTagging(context, { userId, queue, sticker }) {
+    if (!sticker && (!queue || queue.index === -1)) {
       await userSessionRepository.clear(userId)
       if (queue) {
         await context.reply("✅ You're all done! It may take up to 5 minutes to see the changes.")
@@ -113,7 +113,23 @@ export function useQueueFlow({
       return 
     }
 
-    const { stickerMessageId, relevantMessageIds } = await sendStickerForTagging(context, { sticker, isQueueEmpty })
+    const { message_id: stickerMessageId } = await context.replyWithSticker(
+      sticker.file_id,
+      {
+        reply_markup: Markup.inlineKeyboard(
+          [
+            ...!isQueueEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
+            Markup.button.callback(isQueueEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
+          ].filter(Boolean),
+          { columns: 2 },
+        ).reply_markup,
+      }
+    )
+ 
+    const { message_id } = await context.reply(
+      '👇 Send tags separated by comma \\(keep them short, for example: *__cute cat, funny cat__*\\)\\.',
+      { parse_mode: 'MarkdownV2' }
+    )
 
     await userSessionRepository.set(userId, {
       sticker: {
@@ -122,7 +138,7 @@ export function useQueueFlow({
         file_unique_id: sticker.file_unique_id,
       },
       stickerMessageId,
-      relevantMessageIds,
+      relevantMessageIds: [message_id],
       ...queue && {
         queue: {
           stickerSetBitmap: queue.stickerSetBitmap,
@@ -134,40 +150,11 @@ export function useQueueFlow({
     })
   }
 
-  /**
-   * @param {Context} context
-   * @param {{
-  *   sticker: import('../../types.d.ts').Sticker
-  *   isQueueEmpty: boolean
-  * }} input 
-  */
- async function sendStickerForTagging(context, { sticker, isQueueEmpty }) {
-   const { message_id: stickerMessageId } = await context.replyWithSticker(
-     sticker.file_id,
-     {
-       reply_markup: Markup.inlineKeyboard(
-         [
-           ...!isQueueEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
-           Markup.button.callback(isQueueEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
-         ].filter(Boolean),
-         { columns: 2 },
-       ).reply_markup,
-     }
-   )
-
-   const { message_id } = await context.reply(
-     '👇 Send tags separated by comma \\(keep them short, for example: *__cute cat, funny cat__*\\)\\.',
-     { parse_mode: 'MarkdownV2' }
-   )
-
-   return { stickerMessageId, relevantMessageIds: [message_id] }
- }
-
   return {
     handleSticker,
     handleChooseUntagged,
     clearQueue,
     skipQueue,
-    sendNextQueuedSticker,
+    proceedTagging,
   }
 }

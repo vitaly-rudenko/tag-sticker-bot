@@ -49,7 +49,7 @@ export interface StickerFinder {
   find(input: { query: string; authorUserId?: string; limit: number }): Promise<Sticker[]>
 }
 
-export type sendNextQueuedSticker = (context: Context, input: {
+export type proceedTagging = (context: Context, input: {
   userId: string
   queue?: Queue
   sticker?: Sticker

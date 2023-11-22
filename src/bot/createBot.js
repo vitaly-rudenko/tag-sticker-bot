@@ -33,7 +33,7 @@ export async function createBot({
     handleChooseUntagged,
     skipQueue,
     clearQueue,
-    sendNextQueuedSticker,
+    proceedTagging,
   } = useQueueFlow({
     telegram: bot.telegram,
     userSessionRepository,
@@ -49,7 +49,7 @@ export async function createBot({
     bot,
     tagRepository,
     userSessionRepository,
-    sendNextQueuedSticker,
+    proceedTagging,
   })
 
   const {
