@@ -1,5 +1,5 @@
-import { INLINE_QUERY_CACHE_TIME_LOCAL_S, INLINE_QUERY_CACHE_TIME_S, INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
-import { isLocalTesting } from '../../env.js'
+import { INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
+import { inlineQueryCacheTimeS } from '../../env.js'
 import { normalizeTagValue } from '../../utils/tags.js'
 
 /** @typedef {import('telegraf').Context} Context */
@@ -34,12 +34,10 @@ export function useSearchFlow({ stickerFinder }) {
       stickers.map((sticker, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id: sticker.fileId,
+        sticker_file_id: sticker.file_id,
       })),
       {
-        cache_time: isLocalTesting
-          ? INLINE_QUERY_CACHE_TIME_LOCAL_S
-          : INLINE_QUERY_CACHE_TIME_S,
+        cache_time: inlineQueryCacheTimeS,
         is_personal: Boolean(authorUserId),
         button: {
           text: "Can't find a sticker? Click here to contribute",

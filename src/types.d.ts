@@ -1,8 +1,6 @@
-export type Sticker = {
-  setName: string
-  fileUniqueId: string
-  fileId: string
-}
+import type { Telegram, Context } from 'telegraf'
+
+export type Sticker = Pick<Awaited<ReturnType<Telegram['getStickerSet']>>['stickers'][number], 'set_name' | 'file_id' | 'file_unique_id'>
 
 export type Tag = {
   sticker: Sticker
@@ -10,28 +8,24 @@ export type Tag = {
   value: string
 }
 
-export type QueuedSticker = {
-  sticker: Sticker
-  userId: string
-}
-
-export interface QueuedStickerRepository {
-  enqueue(input: { userId: string; stickers: Sticker[] }): Promise<void>
-  take(userId: string): Promise<QueuedSticker | undefined>
-  clear(userId: string): Promise<void>
-  empty(userId: string): Promise<boolean>
-}
-
 export type UserSessionContext = {
   sticker?: Sticker
   stickerMessageId?: number
   relevantMessageIds?: number[]
+  queue?: Queue
+}
+
+export type Queue = {
+  stickerSetName: string
+  stickerSetBitmap: string
+  index: number
+  size: number
 }
 
 export interface UserSessionRepository {
-  amendContext(userId: string, newContext: UserSessionContext): Promise<void>
-  clearContext(userId: string): Promise<void>
-  getContext(userId: string): Promise<UserSessionContext>
+  set(userId: string, newContext: UserSessionContext): Promise<void>
+  get(userId: string): Promise<UserSessionContext>
+  clear(userId: string): Promise<void>
 }
 
 export interface TagRepository {
@@ -54,3 +48,9 @@ export interface TagRepository {
 export interface StickerFinder {
   find(input: { query: string; authorUserId?: string; limit: number }): Promise<Sticker[]>
 }
+
+export type proceedTagging = (context: Context, input: {
+  userId: string
+  queue?: Queue
+  sticker?: Sticker
+}) => Promise<void>

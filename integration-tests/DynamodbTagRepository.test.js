@@ -23,6 +23,7 @@ describe('DynamodbTagRepository', () => {
     tagRepository = new DynamodbTagRepository({
       dynamodbClient: createDynamodbClient(),
       tableName: dynamodbTagsTable,
+      batchWriteItemLimit: 25,
     })
   })
 
@@ -35,12 +36,13 @@ describe('DynamodbTagRepository', () => {
     const sticker2 = generateId('sticker-2')
     const sticker3 = generateId('sticker-3')
     const sticker4 = generateId('sticker-4')
+    const sticker5 = generateId('sticker-5')
 
     const tag1 = {
       sticker: {
-        setName: set1,
-        fileUniqueId: sticker1,
-        fileId: generateId('sticker'),
+        set_name: set1,
+        file_unique_id: sticker1,
+        file_id: generateId('sticker'),
       },
       authorUserId: user1,
       value: 'hello world',
@@ -48,9 +50,9 @@ describe('DynamodbTagRepository', () => {
 
     const tag2 = {
       sticker: {
-        setName: set1,
-        fileUniqueId: sticker2,
-        fileId: generateId('sticker'),
+        set_name: set1,
+        file_unique_id: sticker2,
+        file_id: generateId('sticker'),
       },
       authorUserId: user2,
       value: 'hello there',
@@ -58,9 +60,9 @@ describe('DynamodbTagRepository', () => {
 
     const tag3 = {
       sticker: {
-        setName: set2,
-        fileUniqueId: sticker3,
-        fileId: generateId('sticker'),
+        set_name: set2,
+        file_unique_id: sticker3,
+        file_id: generateId('sticker'),
       },
       authorUserId: user2,
       value: 'there it is',
@@ -68,9 +70,9 @@ describe('DynamodbTagRepository', () => {
 
     const tag4 = {
       sticker: {
-        setName: set2,
-        fileUniqueId: sticker4,
-        fileId: generateId('sticker'),
+        set_name: set2,
+        file_unique_id: sticker4,
+        file_id: generateId('sticker'),
       },
       authorUserId: user1,
       value: 'reuse 1',
@@ -78,12 +80,21 @@ describe('DynamodbTagRepository', () => {
 
     const tag5 = {
       sticker: {
-        setName: set2,
-        fileUniqueId: sticker4,
-        fileId: generateId('sticker'),
+        set_name: set2,
+        file_unique_id: sticker4,
+        file_id: generateId('sticker'),
       },
       authorUserId: user2,
       value: 'reuse 2',
+    }
+
+    const tag6 = {
+      sticker: {
+        file_unique_id: sticker5,
+        file_id: generateId('sticker'),
+      },
+      authorUserId: user2,
+      value: 'setless sticker',
     }
 
     // store
@@ -108,9 +119,9 @@ describe('DynamodbTagRepository', () => {
 
     await tagRepository.store({
       sticker: {
-        setName: set2,
-        fileUniqueId: sticker4,
-        fileId: generateId('sticker'),
+        set_name: set2,
+        file_unique_id: sticker4,
+        file_id: generateId('sticker'),
       },
       authorUserId: user1,
       values: ['reuse 1 to be overwritten'],
@@ -118,9 +129,9 @@ describe('DynamodbTagRepository', () => {
 
     await tagRepository.store({
       sticker: {
-        setName: set2,
-        fileUniqueId: sticker4,
-        fileId: generateId('sticker'),
+        set_name: set2,
+        file_unique_id: sticker4,
+        file_id: generateId('sticker'),
       },
       authorUserId: user2,
       values: ['reuse 2 to be overwritten'],
@@ -136,6 +147,12 @@ describe('DynamodbTagRepository', () => {
       authorUserId: tag5.authorUserId,
       sticker: tag5.sticker,
       values: [tag5.value],
+    })
+
+    await tagRepository.store({
+      authorUserId: tag6.authorUserId,
+      sticker: tag6.sticker,
+      values: [tag6.value],
     })
 
     // query
@@ -191,5 +208,31 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'reuse',
     })).resolves.toIncludeSameMembers([tag4, tag5])
+
+    await expect(tagRepository.search({
+      limit: 100,
+      query: 'set',
+    })).resolves.toIncludeSameMembers([tag6])
+  })
+
+  it('should handle high throughput for store()', async () => {
+    const authorUserId = generateId('user')
+    const sticker = {
+      file_id: generateId('file'),
+      file_unique_id: generateId('unique'),
+      set_name: generateId('set'),
+    }
+
+    await tagRepository.store({
+      authorUserId,
+      sticker,
+      values: Array.from(new Array(25), () => generateId('value')),
+    })
+
+    await tagRepository.store({
+      authorUserId,
+      sticker,
+      values: Array.from(new Array(25), () => generateId('value')),
+    })
   })
 })

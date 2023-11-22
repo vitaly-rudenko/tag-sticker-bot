@@ -4,7 +4,7 @@
  * @param {number | string} chatId 
  * @param {(number | undefined | (number | undefined)[])[]} messageIds 
  */
-export async function deleteMessages(telegram, chatId, ...messageIds) {
+export async function deleteMessages(telegram, chatId, messageIds) {
   /** @type {number[]} */
   // @ts-ignore
   const filteredMessageIds = messageIds.flat().filter(Boolean)

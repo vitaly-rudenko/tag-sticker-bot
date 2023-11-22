@@ -1,19 +1,19 @@
-import { BatchWriteItemCommand, QueryCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
+import { BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { DEFAULT_AUTHOR_USER_ID, tagAttributes as attr, queryId, tagId, valueHash } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
-
-const BATCH_WRITE_ITEM_LIMIT = 25
 
 export class DynamodbTagRepository {
   /**
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
+   *   batchWriteItemLimit: number
    * }} options 
    */
-  constructor({ dynamodbClient, tableName }) {
+  constructor({ dynamodbClient, tableName, batchWriteItemLimit }) {
     this._dynamodbClient = dynamodbClient
     this._tableName = tableName
+    this._batchWriteItemLimit = batchWriteItemLimit
   }
 
   /**
@@ -30,8 +30,8 @@ export class DynamodbTagRepository {
     if (values.length === 0) {
       throw new Error('Values list is empty')
     }
-    if (values.length > BATCH_WRITE_ITEM_LIMIT) {
-      throw new Error(`Cannot store more than ${BATCH_WRITE_ITEM_LIMIT} tags per request`)
+    if (values.length > this._batchWriteItemLimit) {
+      throw new Error(`Cannot store more than ${this._batchWriteItemLimit} tags per request`)
     }
 
     const existingTagPaginator = paginateQuery({ client: this._dynamodbClient }, {
@@ -41,7 +41,7 @@ export class DynamodbTagRepository {
         '#tagId': attr.tagId,
       },
       ExpressionAttributeValues: {
-        ':tagId': { S: tagId(authorUserId, sticker.fileUniqueId) }
+        ':tagId': { S: tagId(authorUserId, sticker.file_unique_id) }
       },
     })
 
@@ -52,11 +52,11 @@ export class DynamodbTagRepository {
     }
 
     if (existingItems.length > 0) {
-      for (let i = 0; i < existingItems.length; i += BATCH_WRITE_ITEM_LIMIT) {
+      for (let i = 0; i < existingItems.length; i += this._batchWriteItemLimit) {
         await this._dynamodbClient.send(
           new BatchWriteItemCommand({
             RequestItems: {
-              [this._tableName]: existingItems.slice(i, i + BATCH_WRITE_ITEM_LIMIT).map(item => ({
+              [this._tableName]: existingItems.slice(i, i + this._batchWriteItemLimit).map(item => ({
                 DeleteRequest: {
                   Key: {
                     [attr.tagId]: item[attr.tagId],
@@ -70,38 +70,40 @@ export class DynamodbTagRepository {
       }
     }
 
-    for (let i = 0; i < values.length; i += BATCH_WRITE_ITEM_LIMIT) {
+    const requestItems = values.flatMap(value => {
+      const attributes = {
+        [attr.tagId]: { S: tagId(authorUserId, sticker.file_unique_id) },
+        [attr.authorUserId]: { S: authorUserId },
+        ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
+        [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
+        [attr.stickerFileId]: { S: sticker.file_id },
+        [attr.value]: { S: value },
+      }
+
+      return [{
+        PutRequest: {
+          Item: {
+            ...attributes,
+            [attr.queryId]: { S: queryId(value, authorUserId) },
+            [attr.valueHash]: { S: valueHash(value, authorUserId) },
+          }
+        }
+      }, {
+        PutRequest: {
+          Item: {
+            ...attributes,
+            [attr.queryId]: { S: queryId(value) },
+            [attr.valueHash]: { S: valueHash(value) },
+          }
+        }
+      }]
+    })
+
+    for (let i = 0; i < requestItems.length; i += this._batchWriteItemLimit) {
       await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           RequestItems: {
-            [this._tableName]: values.slice(i, i + BATCH_WRITE_ITEM_LIMIT).flatMap(value => {
-              const attributes = {
-                [attr.tagId]: { S: tagId(authorUserId, sticker.fileUniqueId) },
-                [attr.authorUserId]: { S: authorUserId },
-                [attr.stickerSetName]: { S: sticker.setName },
-                [attr.stickerFileUniqueId]: { S: sticker.fileUniqueId },
-                [attr.stickerFileId]: { S: sticker.fileId },
-                [attr.value]: { S: value },
-              }
-  
-              return [{
-                PutRequest: {
-                  Item: {
-                    ...attributes,
-                    [attr.queryId]: { S: queryId(value, authorUserId) },
-                    [attr.valueHash]: { S: valueHash(value, authorUserId) },
-                  }
-                }
-              }, {
-                PutRequest: {
-                  Item: {
-                    ...attributes,
-                    [attr.queryId]: { S: queryId(value) },
-                    [attr.valueHash]: { S: valueHash(value) },
-                  }
-                }
-              }]
-            })
+            [this._tableName]: requestItems.slice(i, i + this._batchWriteItemLimit)
           }
         })
       )
@@ -109,6 +111,8 @@ export class DynamodbTagRepository {
   }
 
   /**
+   * TODO: might be too slow when a lot of stickers are tagged in the set
+   * 
    * @param {{
    *   stickerSetName: string
    *   authorUserId?: string
@@ -183,9 +187,9 @@ export class DynamodbTagRepository {
   _toEntity(attributes) {
     return {
       sticker: {
-        setName: attributes[attr.stickerSetName].S,
-        fileUniqueId: attributes[attr.stickerFileUniqueId].S,
-        fileId: attributes[attr.stickerFileId].S,
+        set_name: attributes[attr.stickerSetName]?.S,
+        file_unique_id: attributes[attr.stickerFileUniqueId].S,
+        file_id: attributes[attr.stickerFileId].S,
       },
       authorUserId: attributes[attr.authorUserId].S,
       value: attributes[attr.value]?.S,

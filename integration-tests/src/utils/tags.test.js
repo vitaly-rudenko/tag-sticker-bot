@@ -14,52 +14,52 @@ describe('tags', () => {
         .toEqual([
           'hm',
           'hello world',
-          'world',
           'whats up',
-          'up',
           '123',
+          'world',
+          'up',
         ])
       
       expect(parseTagValues('Є_ї.\nПривіт     світе !       \nЯк справи?    \n123:!'))
         .toEqual([
           'єї',
           'привіт світе',
-          'світе',
           'як справи',
-          'справи',
           '123',
+          'світе',
+          'справи',
         ])
 
       expect(parseTagValues('Ыэ_ъё.\nПривет     мир !       \nКак дела?    \n123:!'))
         .toEqual([
           'ыэъё',
           'привет мир',
-          'мир',
           'как дела',
-          'дела',
           '123',
+          'мир',
+          'дела',
         ])
       
       expect(parseTagValues('Cute little tiny foxy,cute fox, little fox\ncute animal\nanimals are the cutest!'))
         .toEqual([
           'cute little tiny foxy',
-          'little tiny foxy',
-          'tiny foxy',
-          'foxy',
           'cute fox',
           'little fox',
           'cute animal',
           'animals are the cutest',
+          'little tiny foxy',
           'are the cutest',
+          'tiny foxy',
           'the cutest',
+          'foxy',
           'cutest'
         ])
 
       expect(parseTagValues('hello, hello world, hello there, hello worldy'))
         .toEqual([
           'hello there',
-          'there',
           'hello worldy',
+          'there',
           'worldy',
         ])
       

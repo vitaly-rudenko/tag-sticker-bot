@@ -12,17 +12,18 @@ export class TagRepositoryStickerFinder {
   async find({ query, limit, authorUserId = undefined }) {
     const tags = await this._tagRepository.search({ query, limit, authorUserId })
     
+    /** @type {import('./types.d.ts').Sticker[]} */
     const stickers = []
     const stickerFileUniqueIds = new Set()
 
     for (const tag of tags) {
-      if (stickerFileUniqueIds.has(tag.sticker.fileUniqueId)) continue
-      stickerFileUniqueIds.add(tag.sticker.fileUniqueId)
+      if (stickerFileUniqueIds.has(tag.sticker.file_unique_id)) continue
+      stickerFileUniqueIds.add(tag.sticker.file_unique_id)
 
       stickers.push({
-        setName: tag.sticker.setName,
-        fileId: tag.sticker.fileId,
-        fileUniqueId: tag.sticker.fileUniqueId,
+        set_name: tag.sticker.set_name,
+        file_id: tag.sticker.file_id,
+        file_unique_id: tag.sticker.file_unique_id,
       })
     }
 

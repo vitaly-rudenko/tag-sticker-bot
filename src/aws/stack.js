@@ -1,10 +1,10 @@
-import * as url from 'url'
-import * as path from 'path'
-import * as fs from 'fs'
-import * as cdk from 'aws-cdk-lib'
-import { telegramBotToken, environment, debugChatId, webhookSecretToken } from './env.js'
+import url from 'url'
+import path from 'path'
+import fs from 'fs'
+import cdk from 'aws-cdk-lib'
+
+import { telegramBotToken, environment, debugChatId, webhookSecretToken, dynamodbTagsTableBatchWriteItemLimit, inlineQueryCacheTimeS } from './stack-env.js'
 import { userSessionAttributes } from '../users/attributes.js'
-import { queuedStickerAttributes } from '../queue/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
 
@@ -26,27 +26,27 @@ export class TagStickerBotStack extends cdk.Stack {
 
     const userSessionsTable = this.createUserSessionsTable()
     const tagsTable = this.createTagsTable()
-    const queuedStickersTable = this.createQueuedStickersTable()
 
     const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
-      functionName: `${appName}-${environment}-rest-api`,
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'rest-api')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
+      logRetention: cdk.aws_logs.RetentionDays.ONE_WEEK,
       environment: {
         VERSION: version,
         ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
+        INLINE_QUERY_CACHE_TIME_S: inlineQueryCacheTimeS,
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
-        DYNAMODB_QUEUED_STICKERS_TABLE: queuedStickersTable.tableName,
+        DYNAMODB_TAGS_TABLE_WRITE_LIMIT: dynamodbTagsTableBatchWriteItemLimit,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
 
-    for (const table of [userSessionsTable, tagsTable, queuedStickersTable]) {
+    for (const table of [userSessionsTable, tagsTable]) {
       table.grantReadWriteData(restApiLambda)
     }
 
@@ -56,6 +56,8 @@ export class TagStickerBotStack extends cdk.Stack {
       restApiName: `${appName}-${environment}-rest-api`,
       deployOptions: {
         stageName: environment,
+        throttlingRateLimit: 5,
+        throttlingBurstLimit: 50,
       }
     })
 
@@ -67,24 +69,21 @@ export class TagStickerBotStack extends cdk.Stack {
     const webhookUrl = `${restApi.url}webhook`
     const debugUrl = `${restApi.url}debug`
 
-    const setWebhookLambda = new cdk.aws_lambda.Function(this, 'setWebhookLambda', {
-      functionName: `${appName}-${environment}-set-webhook`,
-      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'set-webhook')),
+    const initLambda = new cdk.aws_lambda.Function(this, 'initLambda', {
+      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'init')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
+      logRetention: cdk.aws_logs.RetentionDays.ONE_WEEK,
       environment: {
-        VERSION: version,
-        ENVIRONMENT: environment,
         TELEGRAM_BOT_TOKEN: telegramBotToken,
         WEBHOOK_URL: webhookUrl,
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
-        DEBUG_CHAT_ID: debugChatId,
       },
     })
 
-    new cdk.triggers.Trigger(this, 'setWebhookTrigger', {
-      handler: setWebhookLambda,
+    new cdk.triggers.Trigger(this, 'initTrigger', {
+      handler: initLambda,
       invocationType: cdk.triggers.InvocationType.REQUEST_RESPONSE,
       timeout: cdk.Duration.minutes(1),
     })
@@ -96,7 +95,6 @@ export class TagStickerBotStack extends cdk.Stack {
 
   createTagsTable() {
     const table = new cdk.aws_dynamodb.Table(this, 'tagsTable', {
-      tableName: `${appName}-${environment}-tags`,
       partitionKey: {
         name: tagAttributes.tagId,
         type: cdk.aws_dynamodb.AttributeType.STRING
@@ -106,13 +104,12 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
-      removalPolicy: isProduction
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-        contributorInsightsEnabled: true,
-      })
+      readCapacity: 3,
+      writeCapacity: 3,
+      removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      contributorInsightsEnabled: true,
+      deletionProtection: true,
+    })
 
     table.addGlobalSecondaryIndex({
       indexName: SEARCH_BY_VALUE_INDEX,
@@ -125,8 +122,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.ALL,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 3,
+      writeCapacity: 3,
     })
 
     table.addGlobalSecondaryIndex({
@@ -141,8 +138,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId],
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
     })
 
     return table
@@ -150,35 +147,15 @@ export class TagStickerBotStack extends cdk.Stack {
 
   createUserSessionsTable() {
     return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
-      tableName: `${appName}-${environment}-user-sessions`,
       partitionKey: {
         name: userSessionAttributes.userId,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: userSessionAttributes.expiresAt,
-    })
-  }
-
-  createQueuedStickersTable() {
-    return new cdk.aws_dynamodb.Table(this, 'queuedStickersTable', {
-      tableName: `${appName}-${environment}-queued-stickers`,
-      partitionKey: {
-        name: queuedStickerAttributes.userId,
-        type: cdk.aws_dynamodb.AttributeType.STRING
-      },
-      sortKey: {
-        name: queuedStickerAttributes.stickerFileUniqueId,
-        type: cdk.aws_dynamodb.AttributeType.STRING
-      },
-      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      timeToLiveAttribute: queuedStickerAttributes.expiresAt,
     })
   }
 }
