@@ -28,7 +28,6 @@ export class TagStickerBotStack extends cdk.Stack {
     const tagsTable = this.createTagsTable()
 
     const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
-      functionName: `${appName}-${environment}-rest-api`,
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'rest-api')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
@@ -53,7 +52,6 @@ export class TagStickerBotStack extends cdk.Stack {
     const lambdaIntegration = new cdk.aws_apigateway.LambdaIntegration(restApiLambda)
 
     const restApi = new cdk.aws_apigateway.RestApi(this, 'restApi', {
-      restApiName: `${appName}-${environment}-rest-api`,
       deployOptions: {
         stageName: environment,
       }
@@ -68,7 +66,6 @@ export class TagStickerBotStack extends cdk.Stack {
     const debugUrl = `${restApi.url}debug`
 
     const initLambda = new cdk.aws_lambda.Function(this, 'initLambda', {
-      functionName: `${appName}-${environment}-init`,
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'init')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
@@ -96,7 +93,6 @@ export class TagStickerBotStack extends cdk.Stack {
 
   createTagsTable() {
     const table = new cdk.aws_dynamodb.Table(this, 'tagsTable', {
-      tableName: `${appName}-${environment}-tags`,
       partitionKey: {
         name: tagAttributes.tagId,
         type: cdk.aws_dynamodb.AttributeType.STRING
@@ -108,11 +104,10 @@ export class TagStickerBotStack extends cdk.Stack {
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
       readCapacity: 3,
       writeCapacity: 3,
-      removalPolicy: isProduction
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-        contributorInsightsEnabled: true,
-      })
+      removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      contributorInsightsEnabled: true,
+      deletionProtection: true,
+    })
 
     table.addGlobalSecondaryIndex({
       indexName: SEARCH_BY_VALUE_INDEX,
@@ -150,7 +145,6 @@ export class TagStickerBotStack extends cdk.Stack {
 
   createUserSessionsTable() {
     return new cdk.aws_dynamodb.Table(this, 'userSessionsTable', {
-      tableName: `${appName}-${environment}-user-sessions`,
       partitionKey: {
         name: userSessionAttributes.userId,
         type: cdk.aws_dynamodb.AttributeType.STRING
