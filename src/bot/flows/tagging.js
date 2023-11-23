@@ -92,7 +92,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName })
     const stickerSetBitmap = stickersToBitmap(
       stickerSet.stickers,
-      s => !taggedStickerFileUniqueIds.includes(s.file_unique_id)
+      s => !taggedStickerFileUniqueIds.has(s.file_unique_id)
     )
 
     await proceedTagging(context, {
@@ -128,7 +128,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName, authorUserId: userId })
     const stickerSetBitmap = stickersToBitmap(
       stickerSet.stickers,
-      s => !taggedStickerFileUniqueIds.includes(s.file_unique_id)
+      s => !taggedStickerFileUniqueIds.has(s.file_unique_id)
     )
 
     await proceedTagging(context, {

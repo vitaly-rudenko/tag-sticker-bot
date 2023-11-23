@@ -1,9 +1,8 @@
 import { createBot } from './bot/createBot.js'
 import { DynamodbTagRepository } from './tags/DynamodbTagRepository.js'
-import { dynamodbTagsTable, dynamodbTagsTableBatchWriteItemLimit, dynamodbUserSessionsTable, telegramBotToken } from './env.js'
+import { dynamodbTagsTable, dynamodbUserSessionsTable, telegramBotToken } from './env.js'
 import { createDynamodbClient } from './utils/createDynamodbClient.js'
 import { DynamodbUserSessionRepository } from './users/DynamodbUserSessionRepository.js'
-import { TagRepositoryStickerFinder } from './TagRepositoryStickerFinder.js'
 
 async function start() {
   const dynamodbClient = createDynamodbClient()
@@ -16,16 +15,12 @@ async function start() {
   const tagRepository = new DynamodbTagRepository({
     dynamodbClient,
     tableName: dynamodbTagsTable,
-    batchWriteItemLimit: dynamodbTagsTableBatchWriteItemLimit,
   })
-
-  const stickerFinder = new TagRepositoryStickerFinder({ tagRepository })
 
   const bot = await createBot({
     telegramBotToken,
     userSessionRepository,
     tagRepository,
-    stickerFinder,
   })
 
   bot.launch().catch((error) => {

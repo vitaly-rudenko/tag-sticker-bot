@@ -1,5 +1,4 @@
 const {
-  DYNAMODB_TAGS_TABLE_WRITE_LIMIT,
   TELEGRAM_BOT_TOKEN,
   WEBHOOK_SECRET_TOKEN,
   INLINE_QUERY_CACHE_TIME_S,
@@ -7,7 +6,6 @@ const {
   DEBUG_CHAT_ID,
 } = process.env
 
-export const dynamodbTagsTableBatchWriteItemLimit = requireEnv(DYNAMODB_TAGS_TABLE_WRITE_LIMIT)
 export const telegramBotToken = requireEnv(TELEGRAM_BOT_TOKEN)
 export const webhookSecretToken = requireEnv(WEBHOOK_SECRET_TOKEN)
 export const inlineQueryCacheTimeS = requireEnv(INLINE_QUERY_CACHE_TIME_S)

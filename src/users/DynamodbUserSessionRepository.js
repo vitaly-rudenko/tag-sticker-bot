@@ -29,7 +29,7 @@ export class DynamodbUserSessionRepository {
       throw new Error('Sticker set and queue set do not match')
     }
 
-    await this._dynamodbClient.send(
+    const { ConsumedCapacity } = await this._dynamodbClient.send(
       new PutItemCommand({
         TableName: this._tableName,
         Item: {
@@ -52,21 +52,27 @@ export class DynamodbUserSessionRepository {
             [attr.queueIndex]: { N: String(context.queue.index) },
             [attr.queueSize]: { N: String(context.queue.size) },
           },
-        }
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#set:putItem', { ConsumedCapacity })
   }
 
   /** @returns {Promise<import('../types.d.ts').UserSessionContext>} */
   async get(userId) {
-    const { Item } = await this._dynamodbClient.send(
+    const { Item, ConsumedCapacity } = await this._dynamodbClient.send(
       new GetItemCommand({
         TableName: this._tableName,
         Key: {
           [attr.userId]: { S: userId }
-        }
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
 
     if (!Item) return {}
 
@@ -101,13 +107,16 @@ export class DynamodbUserSessionRepository {
   }
 
   async clear(userId) {
-    await this._dynamodbClient.send(
+    const { ConsumedCapacity } = await this._dynamodbClient.send(
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          [attr.userId]: { S: userId }
-        }
+          [attr.userId]: { S: userId },
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#clear:deleteItem', { ConsumedCapacity })
   }
 }

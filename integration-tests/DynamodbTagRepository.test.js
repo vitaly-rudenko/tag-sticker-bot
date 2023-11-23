@@ -23,7 +23,6 @@ describe('DynamodbTagRepository', () => {
     tagRepository = new DynamodbTagRepository({
       dynamodbClient: createDynamodbClient(),
       tableName: dynamodbTagsTable,
-      batchWriteItemLimit: 25,
     })
   })
 
@@ -159,15 +158,15 @@ describe('DynamodbTagRepository', () => {
 
     await expect(tagRepository.queryStatus({
       stickerSetName: set1,
-    })).resolves.toIncludeSameMembers([sticker1, sticker2])
+    })).resolves.toEqual(new Set([sticker1, sticker2]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: set2,
-    })).resolves.toIncludeSameMembers([sticker3, sticker4])
+    })).resolves.toEqual(new Set([sticker3, sticker4]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: generateId('set-3'),
-    })).resolves.toEqual([])
+    })).resolves.toEqual(new Set())
 
     // search
 
@@ -185,34 +184,34 @@ describe('DynamodbTagRepository', () => {
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello'
-    })).resolves.toIncludeSameMembers([tag1, tag2])
+    })).resolves.toIncludeSameMembers([tag1.sticker.file_id, tag2.sticker.file_id])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([tag3])
+    })).resolves.toIncludeSameMembers([tag3.sticker.file_id])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user1,
-    })).resolves.toIncludeSameMembers([tag1])
+    })).resolves.toIncludeSameMembers([tag1.sticker.file_id])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user2,
-    })).resolves.toIncludeSameMembers([tag2])
+    })).resolves.toIncludeSameMembers([tag2.sticker.file_id])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'reuse',
-    })).resolves.toIncludeSameMembers([tag4, tag5])
+    })).resolves.toIncludeSameMembers([tag4.sticker.file_id])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'set',
-    })).resolves.toIncludeSameMembers([tag6])
+    })).resolves.toIncludeSameMembers([tag6.sticker.file_id])
   })
 
   it('should handle high throughput for store()', async () => {

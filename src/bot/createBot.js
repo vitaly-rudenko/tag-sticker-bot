@@ -12,14 +12,12 @@ import { deleteMessages } from '../utils/deleteMessages.js'
  *   telegramBotToken: string
  *   userSessionRepository: import('../types.d.ts').UserSessionRepository,
  *   tagRepository: import('../types.d.ts').TagRepository,
- *   stickerFinder: import('../types.d.ts').StickerFinder,
  * }} input
  */
 export async function createBot({
   telegramBotToken,
   userSessionRepository,
   tagRepository,
-  stickerFinder,
 }) {
   const bot = new Telegraf(telegramBotToken)
 
@@ -54,7 +52,7 @@ export async function createBot({
 
   const {
     handleSearch,
-  } = useSearchFlow({ stickerFinder })
+  } = useSearchFlow({ tagRepository })
 
   bot.use(withUserId)
   bot.on('inline_query', handleSearch)

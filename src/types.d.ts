@@ -38,15 +38,11 @@ export interface TagRepository {
     query: string
     limit: number
     authorUserId?: string
-  }): Promise<Tag[]>
+  }): Promise<string[]>
   queryStatus(input: {
     stickerSetName: string
     authorUserId?: string
-  }): Promise<string[]>
-}
-
-export interface StickerFinder {
-  find(input: { query: string; authorUserId?: string; limit: number }): Promise<Sticker[]>
+  }): Promise<Set<string>>
 }
 
 export type proceedTagging = (context: Context, input: {

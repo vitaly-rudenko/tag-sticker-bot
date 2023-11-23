@@ -3,10 +3,10 @@ import path from 'path'
 import fs from 'fs'
 import cdk from 'aws-cdk-lib'
 
-import { telegramBotToken, environment, debugChatId, webhookSecretToken, dynamodbTagsTableBatchWriteItemLimit, inlineQueryCacheTimeS } from './stack-env.js'
+import { telegramBotToken, environment, debugChatId, webhookSecretToken, inlineQueryCacheTimeS } from './stack-env.js'
 import { userSessionAttributes } from '../users/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
-import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
+import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_AND_AUTHOR_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..', '..')
@@ -41,7 +41,6 @@ export class TagStickerBotStack extends cdk.Stack {
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
-        DYNAMODB_TAGS_TABLE_WRITE_LIMIT: dynamodbTagsTableBatchWriteItemLimit,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
@@ -100,12 +99,12 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: tagAttributes.valueHash,
+        name: tagAttributes.value,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 3,
-      writeCapacity: 3,
+      readCapacity: 1,
+      writeCapacity: 1,
       removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       contributorInsightsEnabled: true,
       deletionProtection: true,
@@ -114,16 +113,33 @@ export class TagStickerBotStack extends cdk.Stack {
     table.addGlobalSecondaryIndex({
       indexName: SEARCH_BY_VALUE_INDEX,
       partitionKey: {
-        name: tagAttributes.queryId,
+        name: tagAttributes.valuePartition,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       sortKey: {
         name: tagAttributes.value,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
-      projectionType: cdk.aws_dynamodb.ProjectionType.ALL,
-      readCapacity: 3,
-      writeCapacity: 3,
+      projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
+      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
+      readCapacity: 1,
+      writeCapacity: 1,
+    })
+
+    table.addGlobalSecondaryIndex({
+      indexName: SEARCH_BY_VALUE_AND_AUTHOR_INDEX,
+      partitionKey: {
+        name: tagAttributes.authorUserId,
+        type: cdk.aws_dynamodb.AttributeType.STRING
+      },
+      sortKey: {
+        name: tagAttributes.value,
+        type: cdk.aws_dynamodb.AttributeType.STRING
+      },
+      projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
+      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
+      readCapacity: 1,
+      writeCapacity: 1,
     })
 
     table.addGlobalSecondaryIndex({
@@ -133,13 +149,13 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: tagAttributes.queryId,
+        name: tagAttributes.authorUserId,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId],
-      readCapacity: 2,
-      writeCapacity: 2,
+      readCapacity: 1,
+      writeCapacity: 1,
     })
 
     return table
@@ -152,8 +168,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 2,
-      writeCapacity: 2,
+      readCapacity: 1,
+      writeCapacity: 1,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: userSessionAttributes.expiresAt,
     })

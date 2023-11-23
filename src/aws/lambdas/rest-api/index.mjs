@@ -1,8 +1,7 @@
 import { Telegraf } from 'telegraf'
 import safeCompare from 'safe-compare'
-import { TagRepositoryStickerFinder } from '../../../TagRepositoryStickerFinder.js'
 import { createBot } from '../../../bot/createBot.js'
-import { dynamodbUserSessionsTable, dynamodbTagsTable, telegramBotToken, debugChatId, dynamodbTagsTableBatchWriteItemLimit, webhookSecretToken } from '../../../env.js'
+import { dynamodbUserSessionsTable, dynamodbTagsTable, telegramBotToken, debugChatId, webhookSecretToken } from '../../../env.js'
 import { DynamodbTagRepository } from '../../../tags/DynamodbTagRepository.js'
 import { DynamodbUserSessionRepository } from '../../../users/DynamodbUserSessionRepository.js'
 import { createDynamodbClient } from '../../../utils/createDynamodbClient.js'
@@ -62,16 +61,12 @@ export async function handler(event, context) {
       const tagRepository = new DynamodbTagRepository({
         dynamodbClient,
         tableName: dynamodbTagsTable,
-        batchWriteItemLimit: dynamodbTagsTableBatchWriteItemLimit,
       })
-    
-      const stickerFinder = new TagRepositoryStickerFinder({ tagRepository })
     
       const bot = await createBot({
         telegramBotToken,
         userSessionRepository,
         tagRepository,
-        stickerFinder,
       })
 
       try {
