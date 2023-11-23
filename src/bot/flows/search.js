@@ -6,10 +6,10 @@ import { normalizeTagValue } from '../../utils/tags.js'
 
 /**
  * @param {{
- *   stickerFinder: import('../../types.d.ts').StickerFinder
+ *   tagRepository: import('../../types.d.ts').TagRepository
  * }} input
  */
-export function useSearchFlow({ stickerFinder }) {
+export function useSearchFlow({ tagRepository }) {
   /** @param {Context} context */
   async function handleSearch(context) {
     if (!context.inlineQuery?.query) return
@@ -24,17 +24,17 @@ export function useSearchFlow({ stickerFinder }) {
 
     if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
 
-    const stickers = await stickerFinder.find({
+    const stickersFileIds = await tagRepository.search({
       query,
       authorUserId,
       limit: INLINE_QUERY_RESULT_LIMIT,
     })
 
     await context.answerInlineQuery(
-      stickers.map((sticker, i) => ({
+      stickersFileIds.map((sticker_file_id, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id: sticker.file_id,
+        sticker_file_id,
       })),
       {
         cache_time: inlineQueryCacheTimeS,

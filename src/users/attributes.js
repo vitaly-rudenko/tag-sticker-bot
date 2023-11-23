@@ -4,9 +4,10 @@ export const userSessionAttributes = Object.freeze({
   stickerFileUniqueId: 'fuid',
   stickerFileId: 'fid',
   stickerMessageId: 'smid',
-  relevantMessageIds: 'rmids',
+  tagInstructionMessageId: 'timid',
   queueStickerSetBitmap: 'qmap',
-  queueIndex: 'qidx',
-  queueSize: 'qlen',
+  queueStickerSetBitmapLength: 'qmaplen',
+  queueStickerSetBitmapSize: 'qmapsize',
+  queuePosition: 'qpos',
   expiresAt: 'exp',
 })

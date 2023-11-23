@@ -1,5 +1,5 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb'
-import { bitmapToInt, intToBitmap } from '../utils/bitmap.js'
+import { encodeBitmap, decodeBitmap } from '../utils/bitmap.js'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 import { userSessionAttributes as attr } from './attributes.js'
 
@@ -29,14 +29,14 @@ export class DynamodbUserSessionRepository {
       throw new Error('Sticker set and queue set do not match')
     }
 
-    await this._dynamodbClient.send(
+    const { ConsumedCapacity } = await this._dynamodbClient.send(
       new PutItemCommand({
         TableName: this._tableName,
         Item: {
           [attr.userId]: { S: userId },
           [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) },
-          ...context.relevantMessageIds && {
-            [attr.relevantMessageIds]: { NS: context.relevantMessageIds.map(String) },
+          ...context.tagInstructionMessageId && {
+            [attr.tagInstructionMessageId]: { N: String(context.tagInstructionMessageId) },
           },
           ...context.stickerMessageId && {
             [attr.stickerMessageId]: { N: String(context.stickerMessageId) },
@@ -48,25 +48,32 @@ export class DynamodbUserSessionRepository {
           },
           ...context.queue && {
             [attr.stickerSetName]: { S: context.queue.stickerSetName },
-            [attr.queueStickerSetBitmap]: { S: bitmapToInt(context.queue.stickerSetBitmap) },
-            [attr.queueIndex]: { N: String(context.queue.index) },
-            [attr.queueSize]: { N: String(context.queue.size) },
+            [attr.queueStickerSetBitmap]: { S: encodeBitmap(context.queue.stickerSetBitmap.bitmap) },
+            [attr.queueStickerSetBitmapLength]: { N: String(context.queue.stickerSetBitmap.length) },
+            [attr.queueStickerSetBitmapSize]: { N: String(context.queue.stickerSetBitmap.size) },
+            [attr.queuePosition]: { N: String(context.queue.position) },
           },
-        }
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#set:putItem', { ConsumedCapacity })
   }
 
   /** @returns {Promise<import('../types.d.ts').UserSessionContext>} */
   async get(userId) {
-    const { Item } = await this._dynamodbClient.send(
+    const { Item, ConsumedCapacity } = await this._dynamodbClient.send(
       new GetItemCommand({
         TableName: this._tableName,
         Key: {
           [attr.userId]: { S: userId }
-        }
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
 
     if (!Item) return {}
 
@@ -74,10 +81,11 @@ export class DynamodbUserSessionRepository {
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
     const stickerFileId = Item[attr.stickerFileId]?.S
     const stickerMessageId = Item[attr.stickerMessageId]?.N
-    const relevantMessageIds = Item[attr.relevantMessageIds]?.NS
+    const tagInstructionMessageId = Item[attr.tagInstructionMessageId]?.N
     const queueStickerSetBitmap = Item[attr.queueStickerSetBitmap]?.S
-    const queueIndex = Item[attr.queueIndex]?.N
-    const queueSize = Item[attr.queueSize]?.N
+    const queueStickerSetBitmapLength = Item[attr.queueStickerSetBitmapLength]?.N
+    const queueStickerSetBitmapSize = Item[attr.queueStickerSetBitmapSize]?.N
+    const queuePosition = Item[attr.queuePosition]?.N
 
     return Item ? {
       ...stickerFileUniqueId && stickerFileId && {
@@ -88,26 +96,32 @@ export class DynamodbUserSessionRepository {
         }
       },
       ...stickerMessageId && { stickerMessageId: Number(stickerMessageId) },
-      ...relevantMessageIds && { relevantMessageIds: relevantMessageIds.map(Number) },
-      ...stickerSetName && queueStickerSetBitmap && queueIndex && queueSize && {
+      ...tagInstructionMessageId && { tagInstructionMessageId: Number(tagInstructionMessageId) },
+      ...stickerSetName && queueStickerSetBitmap && queueStickerSetBitmapLength && queuePosition && queueStickerSetBitmapSize && {
         queue: {
+          position: Number(queuePosition),
           stickerSetName: stickerSetName,
-          stickerSetBitmap: intToBitmap(queueStickerSetBitmap, Number(queueSize)),
-          index: Number(queueIndex),
-          size: Number(queueSize),
+          stickerSetBitmap: {
+            bitmap: decodeBitmap(queueStickerSetBitmap, Number(queueStickerSetBitmapLength)),
+            length: Number(queueStickerSetBitmapLength),
+            size: Number(queueStickerSetBitmapSize),
+          },
         }
       },
     } : {}
   }
 
   async clear(userId) {
-    await this._dynamodbClient.send(
+    const { ConsumedCapacity } = await this._dynamodbClient.send(
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
-          [attr.userId]: { S: userId }
-        }
+          [attr.userId]: { S: userId },
+        },
+        ReturnConsumedCapacity: 'TOTAL',
       })
     )
+
+    console.log('DynamodbUserSessionRepository#clear:deleteItem', { ConsumedCapacity })
   }
 }

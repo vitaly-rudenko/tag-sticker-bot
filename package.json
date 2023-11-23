@@ -1,12 +1,12 @@
 {
   "name": "tag-sticker-bot",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env.local src/app.js",
     "dev": "nodemon --exec 'npm start'",
-    "setup-local": "node --env-file=.env.local src/scripts/setup-local.js",
+    "setup-local": "node --env-file=.env.local src/scripts/setup-local-stack.js",
     "generate-secret-token": "node src/scripts/generate-secret-token.js",
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",

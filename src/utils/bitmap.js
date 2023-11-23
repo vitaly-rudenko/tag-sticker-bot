@@ -1,18 +1,19 @@
 const BITS = 32
 
-/**
- * @param {boolean[]} booleans
- * @returns {string}
- */
+/** @param {boolean[]} booleans */
 export function booleansToBitmap(booleans) {
-  return booleans.map(b => b ? 1 : 0).join('')
+  return {
+    bitmap: booleans.map(b => b ? 1 : 0).join(''),
+    length: booleans.length,
+    size: booleans.filter(Boolean).length,
+  }
 }
 
 /**
  * @param {string} bitmap
  * @returns {string}
  */
-export function bitmapToInt(bitmap) {
+export function encodeBitmap(bitmap) {
   return BigInt('0b' + bitmap).toString(36)
 }
 
@@ -24,7 +25,7 @@ const base = 36n
  * @param {number} length
  * @returns {string}
  */
-export function intToBitmap(int, length) {
+export function decodeBitmap(int, length) {
   return BigInt(
     [...int].reduce((acc, digit) => {
       const pos = BigInt(alphabet.indexOf(digit));
@@ -34,19 +35,22 @@ export function intToBitmap(int, length) {
 }
 
 /**
- * @param {string} bitmap 
- * @param {number} index 
- * @returns {boolean}
- */
-export function isTrue(bitmap, index) {
-  return bitmap[index] === '1'
-}
-
-/**
  * @param {string} bitmap
  * @param {number} position
- * @returns {number}
  */
-export function getNextTrueIndex(bitmap, position) {
-  return bitmap.indexOf('1', position)
+export function getBitmapIndex(bitmap, position) {
+  if (position < 1) {
+    throw new Error(`Invalid position: ${position}`)
+  }
+
+  for (let i = 0; i < bitmap.length; i++) {
+    if (bitmap[i] === '1') {
+      position--
+      if (position === 0) {
+        return i
+      }
+    }
+  }
+
+  throw new Error(`Invalid position: ${position}`)
 }

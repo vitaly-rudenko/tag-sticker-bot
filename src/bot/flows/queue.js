@@ -1,7 +1,7 @@
 import { Markup } from 'telegraf'
 import { deleteMessages } from '../../utils/deleteMessages.js'
-import { getNextTrueIndex } from '../../utils/bitmap.js'
-import { getStickerByIndex, sortStickers } from '../../utils/stickers.js'
+import { getBitmapIndex } from '../../utils/bitmap.js'
+import { sortStickers } from '../../utils/stickers.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
@@ -69,45 +69,57 @@ export function useQueueFlow({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId } = await userSessionRepository.get(userId)
     
     await Promise.all([
       userSessionRepository.clear(userId),
-      deleteMessages(telegram, context.chat.id, [relevantMessageIds])
+      deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     ])
 
-    await context.reply('👌 Queue has been cleared.')
+    await context.reply('🕒 Done! It may take up to 10 minutes to see the changes.')
   }
 
-  /** @param {Context} context */
-  async function skipQueue(context) {
+  async function stepQueue(context) {
+    const steps = Number(context.match[1])
+    if (!Number.isInteger(steps) || steps === 0) return
+
     if (!context.chat) return
-    if (context.updateType === 'callback_query') context.answerCbQuery('Sticker has been skipped').catch(() => {})
+    if (context.updateType === 'callback_query') context.answerCbQuery('Going back').catch(() => {})
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds, queue } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId, queue } = await userSessionRepository.get(userId)
     
-    await deleteMessages(telegram, context.chat.id, [relevantMessageIds])
+    await deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     
     if (!queue) return
-    await proceedTagging(context, { userId, queue })
+    await proceedTagging(context, {
+      userId,
+      queue: {
+        ...queue,
+        position: queue.position + steps - 1,
+      }
+    })
   }
 
   /** @type {import('../../types.d.ts').proceedTagging} */
   async function proceedTagging(context, { userId, queue, sticker }) {
-    if (!sticker && (!queue || queue.index === -1)) {
+    if (!sticker && (!queue || queue.position > queue.stickerSetBitmap.size)) {
       await userSessionRepository.clear(userId)
       if (queue) {
-        await context.reply("✅ You're all done! It may take up to 10 minutes to see the changes.")
+        await context.reply("🕒 Done! It may take up to 10 minutes to see the changes.")
       }
       return
     }
 
-    const nextQueueIndex = queue ? getNextTrueIndex(queue.stickerSetBitmap, queue.index + 1) : -1
-    const isQueueEmpty = nextQueueIndex === -1
+    if (!sticker && queue) {
+      const index = getBitmapIndex(queue.stickerSetBitmap.bitmap, queue.position)
+      const stickerSet = await telegram.getStickerSet(queue.stickerSetName)
+      const stickers = sortStickers(stickerSet.stickers)
+      
+      sticker = stickers[index]
+    }
 
-    if (!sticker && queue) sticker = await getStickerByIndex(telegram, queue.stickerSetName, queue.index)
     if (!sticker) {
       await context.reply("❌ Invalid sticker.")
       return 
@@ -118,16 +130,28 @@ export function useQueueFlow({
       {
         reply_markup: Markup.inlineKeyboard(
           [
-            ...!isQueueEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
-            Markup.button.callback(isQueueEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
+            
+            ...queue && queue.position < queue.stickerSetBitmap.size ? [
+              Markup.button.callback(
+                `➡️ Skip (${queue.position}/${queue.stickerSetBitmap.size})`,
+                'queue:step:1'
+              )
+            ] : [],
+            ...queue && queue.position > 1 ? [
+              Markup.button.callback(
+                `⬅️ Undo`,
+                'queue:step:-1'
+              )
+            ] : [],
+            Markup.button.callback(queue ? '❌ Stop' : '❌ Cancel', 'queue:clear'),
           ].filter(Boolean),
-          { columns: 2 },
+          { wrap: (_, i) => i === 1 },
         ).reply_markup,
       }
     )
  
     const { message_id } = await context.reply(
-      '👇 Send tags separated by comma \\(keep them short, for example: *__cute cat, funny cat__*\\)\\.',
+      '✏️ Send tags separated by comma\\. Keep them short, for example: *__cute cat, funny cat__*\\.',
       { parse_mode: 'MarkdownV2' }
     )
 
@@ -138,13 +162,12 @@ export function useQueueFlow({
         file_unique_id: sticker.file_unique_id,
       },
       stickerMessageId,
-      relevantMessageIds: [message_id],
+      tagInstructionMessageId: message_id,
       ...queue && {
         queue: {
           stickerSetBitmap: queue.stickerSetBitmap,
           stickerSetName: queue.stickerSetName,
-          index: nextQueueIndex,
-          size: queue.size,
+          position: queue.position + 1,
         }
       }
     })
@@ -154,7 +177,7 @@ export function useQueueFlow({
     handleSticker,
     handleChooseUntagged,
     clearQueue,
-    skipQueue,
+    stepQueue,
     proceedTagging,
   }
 }

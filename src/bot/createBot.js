@@ -12,14 +12,12 @@ import { deleteMessages } from '../utils/deleteMessages.js'
  *   telegramBotToken: string
  *   userSessionRepository: import('../types.d.ts').UserSessionRepository,
  *   tagRepository: import('../types.d.ts').TagRepository,
- *   stickerFinder: import('../types.d.ts').StickerFinder,
  * }} input
  */
 export async function createBot({
   telegramBotToken,
   userSessionRepository,
   tagRepository,
-  stickerFinder,
 }) {
   const bot = new Telegraf(telegramBotToken)
 
@@ -31,7 +29,7 @@ export async function createBot({
   const {
     handleSticker,
     handleChooseUntagged,
-    skipQueue,
+    stepQueue,
     clearQueue,
     proceedTagging,
   } = useQueueFlow({
@@ -54,7 +52,7 @@ export async function createBot({
 
   const {
     handleSearch,
-  } = useSearchFlow({ stickerFinder })
+  } = useSearchFlow({ tagRepository })
 
   bot.use(withUserId)
   bot.on('inline_query', handleSearch)
@@ -70,7 +68,7 @@ export async function createBot({
   bot.start(start)
   bot.command('version', version)
 
-  bot.action('queue:skip', skipQueue)
+  bot.action(/^queue:step:(.+)$/, stepQueue)
   bot.action('queue:clear', clearQueue)
   bot.action('sticker:tag-single', tagSingle)
   bot.action('sticker:choose-untagged', handleChooseUntagged)
@@ -84,9 +82,9 @@ export async function createBot({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId } = await userSessionRepository.get(userId)
 
-    await deleteMessages(bot.telegram, context.chat.id, [relevantMessageIds])
+    await deleteMessages(bot.telegram, context.chat.id, [tagInstructionMessageId])
     await context.reply('👌 Action cancelled.')
   })
 
