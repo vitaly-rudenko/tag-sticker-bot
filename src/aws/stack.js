@@ -103,11 +103,11 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
       removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
       contributorInsightsEnabled: true,
-      deletionProtection: true,
+      deletionProtection: isProduction,
     })
 
     table.addGlobalSecondaryIndex({
@@ -122,8 +122,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
     })
 
     table.addGlobalSecondaryIndex({
@@ -138,8 +138,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
     })
 
     table.addGlobalSecondaryIndex({
@@ -154,8 +154,8 @@ export class TagStickerBotStack extends cdk.Stack {
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
       nonKeyAttributes: [tagAttributes.stickerFileUniqueId],
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
     })
 
     return table
@@ -168,8 +168,8 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1,
-      writeCapacity: 1,
+      readCapacity: 2,
+      writeCapacity: 2,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       timeToLiveAttribute: userSessionAttributes.expiresAt,
     })
