@@ -79,10 +79,12 @@ export function useQueueFlow({
     await context.reply('👌 Queue has been cleared.')
   }
 
-  /** @param {Context} context */
-  async function skipQueue(context) {
+  async function stepQueue(context) {
+    const steps = Number(context.match[1])
+    if (!Number.isInteger(steps) || steps === 0) return
+
     if (!context.chat) return
-    if (context.updateType === 'callback_query') context.answerCbQuery('Sticker has been skipped').catch(() => {})
+    if (context.updateType === 'callback_query') context.answerCbQuery('Going back').catch(() => {})
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
@@ -91,7 +93,13 @@ export function useQueueFlow({
     await deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     
     if (!queue) return
-    await proceedTagging(context, { userId, queue })
+    await proceedTagging(context, {
+      userId,
+      queue: {
+        ...queue,
+        position: queue.position + steps - 1,
+      }
+    })
   }
 
   /** @type {import('../../types.d.ts').proceedTagging} */
@@ -122,15 +130,22 @@ export function useQueueFlow({
       {
         reply_markup: Markup.inlineKeyboard(
           [
+            
             ...queue && queue.position < queue.stickerSetBitmap.size ? [
               Markup.button.callback(
                 `➡️ Skip (${queue.position}/${queue.stickerSetBitmap.size})`,
-                'queue:skip'
+                'queue:step:1'
+              )
+            ] : [],
+            ...queue && queue.position > 1 ? [
+              Markup.button.callback(
+                `⬅️ Undo`,
+                'queue:step:-1'
               )
             ] : [],
             Markup.button.callback('❌ Stop', 'queue:clear'),
           ].filter(Boolean),
-          { columns: 2 },
+          { wrap: (_, i) => i === 1 },
         ).reply_markup,
       }
     )
@@ -162,7 +177,7 @@ export function useQueueFlow({
     handleSticker,
     handleChooseUntagged,
     clearQueue,
-    skipQueue,
+    stepQueue,
     proceedTagging,
   }
 }

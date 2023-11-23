@@ -29,7 +29,7 @@ export async function createBot({
   const {
     handleSticker,
     handleChooseUntagged,
-    skipQueue,
+    stepQueue,
     clearQueue,
     proceedTagging,
   } = useQueueFlow({
@@ -68,7 +68,7 @@ export async function createBot({
   bot.start(start)
   bot.command('version', version)
 
-  bot.action('queue:skip', skipQueue)
+  bot.action(/^queue:step:(.+)$/, stepQueue)
   bot.action('queue:clear', clearQueue)
   bot.action('sticker:tag-single', tagSingle)
   bot.action('sticker:choose-untagged', handleChooseUntagged)
