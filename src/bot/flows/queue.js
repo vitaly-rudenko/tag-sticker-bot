@@ -76,7 +76,7 @@ export function useQueueFlow({
       deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     ])
 
-    await context.reply('👌 Queue has been cleared.')
+    await context.reply('🕒 Done! It may take up to 10 minutes to see the changes.')
   }
 
   async function stepQueue(context) {
@@ -107,7 +107,7 @@ export function useQueueFlow({
     if (!sticker && (!queue || queue.position > queue.stickerSetBitmap.size)) {
       await userSessionRepository.clear(userId)
       if (queue) {
-        await context.reply("✅ You're all done! It may take up to 10 minutes to see the changes.")
+        await context.reply("🕒 Done! It may take up to 10 minutes to see the changes.")
       }
       return
     }
@@ -143,7 +143,7 @@ export function useQueueFlow({
                 'queue:step:-1'
               )
             ] : [],
-            Markup.button.callback('❌ Stop', 'queue:clear'),
+            Markup.button.callback(queue ? '❌ Stop' : '❌ Cancel', 'queue:clear'),
           ].filter(Boolean),
           { wrap: (_, i) => i === 1 },
         ).reply_markup,
