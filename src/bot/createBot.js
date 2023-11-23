@@ -82,9 +82,9 @@ export async function createBot({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId } = await userSessionRepository.get(userId)
 
-    await deleteMessages(bot.telegram, context.chat.id, [relevantMessageIds])
+    await deleteMessages(bot.telegram, context.chat.id, [tagInstructionMessageId])
     await context.reply('👌 Action cancelled.')
   })
 

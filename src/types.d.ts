@@ -11,15 +11,18 @@ export type Tag = {
 export type UserSessionContext = {
   sticker?: Sticker
   stickerMessageId?: number
-  relevantMessageIds?: number[]
+  tagInstructionMessageId?: number
   queue?: Queue
 }
 
 export type Queue = {
+  position: number
   stickerSetName: string
-  stickerSetBitmap: string
-  index: number
-  size: number
+  stickerSetBitmap: {
+    bitmap: string
+    length: number
+    size: number
+  }
 }
 
 export interface UserSessionRepository {

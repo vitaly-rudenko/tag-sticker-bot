@@ -1,7 +1,7 @@
 import { Markup } from 'telegraf'
 import { deleteMessages } from '../../utils/deleteMessages.js'
-import { getNextTrueIndex } from '../../utils/bitmap.js'
-import { getStickerByIndex, sortStickers } from '../../utils/stickers.js'
+import { getBitmapIndex } from '../../utils/bitmap.js'
+import { sortStickers } from '../../utils/stickers.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
@@ -69,11 +69,11 @@ export function useQueueFlow({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId } = await userSessionRepository.get(userId)
     
     await Promise.all([
       userSessionRepository.clear(userId),
-      deleteMessages(telegram, context.chat.id, [relevantMessageIds])
+      deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     ])
 
     await context.reply('👌 Queue has been cleared.')
@@ -86,9 +86,9 @@ export function useQueueFlow({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { relevantMessageIds, queue } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId, queue } = await userSessionRepository.get(userId)
     
-    await deleteMessages(telegram, context.chat.id, [relevantMessageIds])
+    await deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
     
     if (!queue) return
     await proceedTagging(context, { userId, queue })
@@ -96,7 +96,7 @@ export function useQueueFlow({
 
   /** @type {import('../../types.d.ts').proceedTagging} */
   async function proceedTagging(context, { userId, queue, sticker }) {
-    if (!sticker && (!queue || queue.index === -1)) {
+    if (!sticker && (!queue || queue.position > queue.stickerSetBitmap.size)) {
       await userSessionRepository.clear(userId)
       if (queue) {
         await context.reply("✅ You're all done! It may take up to 10 minutes to see the changes.")
@@ -104,10 +104,14 @@ export function useQueueFlow({
       return
     }
 
-    const nextQueueIndex = queue ? getNextTrueIndex(queue.stickerSetBitmap, queue.index + 1) : -1
-    const isQueueEmpty = nextQueueIndex === -1
+    if (!sticker && queue) {
+      const index = getBitmapIndex(queue.stickerSetBitmap.bitmap, queue.position)
+      const stickerSet = await telegram.getStickerSet(queue.stickerSetName)
+      const stickers = sortStickers(stickerSet.stickers)
+      
+      sticker = stickers[index]
+    }
 
-    if (!sticker && queue) sticker = await getStickerByIndex(telegram, queue.stickerSetName, queue.index)
     if (!sticker) {
       await context.reply("❌ Invalid sticker.")
       return 
@@ -118,8 +122,13 @@ export function useQueueFlow({
       {
         reply_markup: Markup.inlineKeyboard(
           [
-            ...!isQueueEmpty ? [Markup.button.callback('➡️ Skip', 'queue:skip')] : [],
-            Markup.button.callback(isQueueEmpty ? '❌ Cancel' : '❌ Stop', 'queue:clear'),
+            ...queue && queue.position < queue.stickerSetBitmap.size ? [
+              Markup.button.callback(
+                `➡️ Skip (${queue.position}/${queue.stickerSetBitmap.size})`,
+                'queue:skip'
+              )
+            ] : [],
+            Markup.button.callback('❌ Stop', 'queue:clear'),
           ].filter(Boolean),
           { columns: 2 },
         ).reply_markup,
@@ -127,7 +136,7 @@ export function useQueueFlow({
     )
  
     const { message_id } = await context.reply(
-      '👇 Send tags separated by comma \\(keep them short, for example: *__cute cat, funny cat__*\\)\\.',
+      '✏️ Send tags separated by comma\\. Keep them short, for example: *__cute cat, funny cat__*\\.',
       { parse_mode: 'MarkdownV2' }
     )
 
@@ -138,13 +147,12 @@ export function useQueueFlow({
         file_unique_id: sticker.file_unique_id,
       },
       stickerMessageId,
-      relevantMessageIds: [message_id],
+      tagInstructionMessageId: message_id,
       ...queue && {
         queue: {
           stickerSetBitmap: queue.stickerSetBitmap,
           stickerSetName: queue.stickerSetName,
-          index: nextQueueIndex,
-          size: queue.size,
+          position: queue.position + 1,
         }
       }
     })
