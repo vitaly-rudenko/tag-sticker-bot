@@ -2,12 +2,6 @@ import type { Telegram, Context } from 'telegraf'
 
 export type Sticker = Pick<Awaited<ReturnType<Telegram['getStickerSet']>>['stickers'][number], 'set_name' | 'file_id' | 'file_unique_id'>
 
-export type Tag = {
-  sticker: Sticker
-  authorUserId: string
-  value: string
-}
-
 export type UserSessionContext = {
   sticker?: Sticker
   stickerMessageId?: number

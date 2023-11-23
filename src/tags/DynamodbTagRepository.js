@@ -83,6 +83,7 @@ export class DynamodbTagRepository {
                       [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
                       [attr.stickerFileId]: { S: sticker.file_id },
                       [attr.value]: { S: value },
+                      [attr.createdAt]: { N: String(Math.trunc(Date.now() / 1000)) },
                     }
                   }
                 })),
@@ -210,18 +211,5 @@ export class DynamodbTagRepository {
     }
 
     return stickerFileIds
-  }
-
-  /** @returns {import('../types.d.ts').Tag} */
-  _toEntity(attributes) {
-    return {
-      sticker: {
-        set_name: attributes[attr.stickerSetName]?.S,
-        file_unique_id: attributes[attr.stickerFileUniqueId].S,
-        file_id: attributes[attr.stickerFileId].S,
-      },
-      authorUserId: attributes[attr.authorUserId].S,
-      value: attributes[attr.value]?.S,
-    }
   }
 }
