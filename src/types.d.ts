@@ -8,6 +8,7 @@ export type MinimalStickerWithSet = Pick<Sticker, 'set_name' | 'file_id' | 'file
 export type MinimalSticker = Pick<Sticker, 'file_id' | 'file_unique_id'>
 
 export type UserSessionContext = {
+  phase?: string
   sticker?: Sticker
   stickerMessageId?: number
   tagInstructionMessageId?: number

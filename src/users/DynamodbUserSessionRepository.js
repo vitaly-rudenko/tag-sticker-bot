@@ -35,6 +35,9 @@ export class DynamodbUserSessionRepository {
         Item: {
           [attr.userId]: { S: userId },
           [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) },
+          ...context.phase && {
+            [attr.phase]: { S: context.phase },
+          },
           ...context.tagInstructionMessageId && {
             [attr.tagInstructionMessageId]: { N: String(context.tagInstructionMessageId) },
           },
@@ -79,6 +82,7 @@ export class DynamodbUserSessionRepository {
 
     if (!Item) return {}
 
+    const phase = Item[attr.phase]?.S
     const stickerSetName = Item[attr.stickerSetName]?.S
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
     const stickerFileId = Item[attr.stickerFileId]?.S
@@ -92,6 +96,7 @@ export class DynamodbUserSessionRepository {
     const queuePosition = Item[attr.queuePosition]?.N
 
     return Item ? {
+      ...phase && { phase },
       ...stickerFileUniqueId && stickerFileId && stickerFormat && {
         sticker: {
           set_name: stickerSetName,

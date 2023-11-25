@@ -11,5 +11,6 @@ export const userSessionAttributes = Object.freeze({
   queueStickerSetBitmapLength: 'qmaplen',
   queueStickerSetBitmapSize: 'qmapsize',
   queuePosition: 'qpos',
+  phase: 'p',
   expiresAt: 'exp',
 })
