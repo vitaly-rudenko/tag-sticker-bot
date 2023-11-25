@@ -14,12 +14,16 @@ export function useCommonFlow({ bot }) {
     bot.botInfo ??= await bot.telegram.getMe()
 
     await context.reply([
-      '👋 Hi, just send a sticker to tag\\.',
+      '👋 Hi, just send a sticker to tag or mark as favorite\\.',
       '',
+      '*– TAGGING*',
       '📝 Tags may contain whitespace and numbers, for example: *__funny cat__*\\.',
       `🔍 After tagging a sticker, type "\`@${escapeMd(bot.botInfo.username)} cat\`" to quickly find it\\.`,
+      `💡 To search by your own tags, add *\\!* to the query: "\`@${escapeMd(bot.botInfo.username)} !cat\`"`,
       '',
-      `💡 To search by your own tags, add *\\!* to the query: "\`@${escapeMd(bot.botInfo.username)} !cat\`"`
+      '*– FAVORITES*',
+      '❤️ You can also mark a sticker as your favorite\\.',
+      `🔍 Quickly get your favorite stickers by typing "\`@${escapeMd(bot.botInfo.username)}\` "\\.`,
     ].join('\n'), { parse_mode: 'MarkdownV2' })
   }
 
