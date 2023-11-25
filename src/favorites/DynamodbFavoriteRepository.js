@@ -1,4 +1,4 @@
-import { DeleteItemCommand, GetItemCommand, PutItemCommand, QueryCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
+import { DeleteItemCommand, GetItemCommand, PutItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { favoriteAttributes as attr } from './attributes.js'
 
 export class DynamodbFavoriteRepository {
