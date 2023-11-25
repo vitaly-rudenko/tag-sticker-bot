@@ -5,6 +5,7 @@ import { useQueueFlow } from './flows/queue.js'
 import { useSearchFlow } from './flows/search.js'
 import { useTaggingFlow } from './flows/tagging.js'
 import { useCommonFlow } from './flows/common.js'
+import { useFavoritesFlow } from './flows/favorites.js'
 import { deleteMessages } from '../utils/deleteMessages.js'
 
 /**
@@ -12,12 +13,14 @@ import { deleteMessages } from '../utils/deleteMessages.js'
  *   telegramBotToken: string
  *   userSessionRepository: import('../types.d.ts').UserSessionRepository,
  *   tagRepository: import('../types.d.ts').TagRepository,
+ *   favoriteRepository: import('../types.d.ts').FavoriteRepository,
  * }} input
  */
 export async function createBot({
   telegramBotToken,
   userSessionRepository,
   tagRepository,
+  favoriteRepository,
 }) {
   const bot = new Telegraf(telegramBotToken)
 
@@ -35,6 +38,7 @@ export async function createBot({
   } = useQueueFlow({
     telegram: bot.telegram,
     userSessionRepository,
+    favoriteRepository,
   })
 
   const {
@@ -52,7 +56,19 @@ export async function createBot({
 
   const {
     handleSearch,
-  } = useSearchFlow({ tagRepository })
+  } = useSearchFlow({
+    tagRepository,
+    favoriteRepository,
+  })
+
+  const {
+    favorite,
+    unfavorite,
+  } = useFavoritesFlow({
+    telegram: bot.telegram,
+    favoriteRepository,
+    userSessionRepository,
+  })
 
   bot.use(withUserId)
   bot.on('inline_query', handleSearch)
@@ -75,6 +91,8 @@ export async function createBot({
   bot.action('sticker:tag-untagged', tagUntagged)
   bot.action('sticker:tag-untagged-by-me', tagUntaggedByMe)
   bot.action('sticker:tag-all', tagAll)
+  bot.action('sticker:favorite', favorite)
+  bot.action('sticker:unfavorite', unfavorite)
   
   bot.action('action:ignore', (context) => context.answerCbQuery().catch(() => {}))
   bot.action('action:cancel', async (context) => {

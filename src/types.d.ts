@@ -47,3 +47,22 @@ export type proceedTagging = (context: Context, input: {
   queue?: Queue
   sticker?: Sticker
 }) => Promise<void>
+
+export interface FavoriteRepository {
+  mark(input: {
+    userId: string
+    sticker: Sticker
+  }): Promise<void>
+  unmark(input: {
+    userId: string
+    stickerFileUniqueId: string
+  }): Promise<void>
+  query(input: {
+    userId: string
+    limit: number
+  }): Promise<Sticker[]>
+  isMarked(input: {
+    userId: string
+    stickerFileUniqueId: string
+  }): Promise<boolean>
+}

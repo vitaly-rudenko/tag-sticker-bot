@@ -8,22 +8,26 @@ import { sortStickers } from '../../utils/stickers.js'
 /**
  * @param {{
  *   telegram: import('telegraf').Telegram,
+ *   favoriteRepository: import('../../types.d.ts').FavoriteRepository
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  * }} input
  */
 export function useQueueFlow({
   telegram,
+  favoriteRepository,
   userSessionRepository,
 }) {
   /** @param {Context} context */
   async function handleSticker(context) {
     if (!context.message || !('sticker' in context.message)) return
 
+    const { userId } = context.state
+
     const stickerFileUniqueId = context.message.sticker.file_unique_id
     const stickerFileId = context.message.sticker.file_id
     const stickerSetName = context.message.sticker.set_name
 
-    await userSessionRepository.set(context.state.userId, {
+    await userSessionRepository.set(userId, {
       sticker: {
         file_unique_id: stickerFileUniqueId,
         file_id: stickerFileId,
@@ -32,6 +36,8 @@ export function useQueueFlow({
       stickerMessageId: context.message.message_id,
     })
 
+    const isFavorite = await favoriteRepository.isMarked({ userId, stickerFileUniqueId })
+
     await context.reply([
       '👇 What do you want to do?',
     ].join('\n'), {
@@ -39,6 +45,9 @@ export function useQueueFlow({
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('📎 Tag this sticker', 'sticker:tag-single'),
         ...stickerSetName ? [Markup.button.callback('🖇 Tag all stickers in the set', 'sticker:choose-untagged')]: [],
+        ...isFavorite
+          ? [Markup.button.callback('💔 Remove from favorites', 'sticker:unfavorite')]
+          : [Markup.button.callback('❤️ Add to favorites', 'sticker:favorite')],
         Markup.button.callback('❌ Cancel', 'action:cancel'),
       ], { columns: 1 }).reply_markup,
     })
@@ -105,10 +114,10 @@ export function useQueueFlow({
   /** @type {import('../../types.d.ts').proceedTagging} */
   async function proceedTagging(context, { userId, queue, sticker }) {
     if (!sticker && (!queue || queue.position > queue.stickerSetBitmap.size)) {
-      await userSessionRepository.clear(userId)
-      if (queue) {
-        await context.reply("🕒 Done! It may take up to 10 minutes to see the changes.")
-      }
+      await Promise.all([
+        userSessionRepository.clear(userId),
+        queue && context.reply("🕒 Done! It may take up to 10 minutes to see the changes."),
+      ])
       return
     }
 

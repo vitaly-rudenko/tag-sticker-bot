@@ -1,11 +1,12 @@
 import { Telegraf } from 'telegraf'
 import safeCompare from 'safe-compare'
 import { createBot } from '../../../bot/createBot.js'
-import { dynamodbUserSessionsTable, dynamodbTagsTable, telegramBotToken, debugChatId, webhookSecretToken } from '../../../env.js'
+import { dynamodbUserSessionsTable, dynamodbTagsTable, telegramBotToken, debugChatId, webhookSecretToken, dynamodbFavoritesTable } from '../../../env.js'
 import { DynamodbTagRepository } from '../../../tags/DynamodbTagRepository.js'
 import { DynamodbUserSessionRepository } from '../../../users/DynamodbUserSessionRepository.js'
 import { createDynamodbClient } from '../../../utils/createDynamodbClient.js'
 import { TelegramErrorLogger } from '../../../bot/TelegramErrorLogger.js'
+import { DynamodbFavoriteRepository } from '../../../favorites/DynamodbFavoriteRepository.js'
 
 const WEBHOOK_SECRET_TOKEN_HEADER = 'X-Telegram-Bot-Api-Secret-Token'
 
@@ -62,10 +63,16 @@ export async function handler(event, context) {
         dynamodbClient,
         tableName: dynamodbTagsTable,
       })
+
+      const favoriteRepository = new DynamodbFavoriteRepository({
+        dynamodbClient,
+        tableName: dynamodbFavoritesTable,
+      })
     
       const bot = await createBot({
         telegramBotToken,
         userSessionRepository,
+        favoriteRepository,
         tagRepository,
       })
 

@@ -1,5 +1,5 @@
 import { BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
-import { tagAttributes as attr, tagId, DEFAULT_AUTHOR_USER_ID, valuePartition } from './attributes.js'
+import { tagAttributes as attr, tagId, valuePartition } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_AND_AUTHOR_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
 
 export class DynamodbTagRepository {
