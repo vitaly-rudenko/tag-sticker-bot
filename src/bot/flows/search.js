@@ -32,7 +32,7 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
         userId,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
-    } else if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) {
+    } else if (query.length >= MIN_QUERY_LENGTH && query.length <= MAX_QUERY_LENGTH) {
       searchResults = await tagRepository.search({
         query,
         authorUserId,
