@@ -25,15 +25,15 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
 
     const isFavoriteQuery = query.length === 0
 
-    /** @type {string[]} */
-    let stickerFileIds = []
+    /** @type {import('../../types.d.ts').MinimalSticker[]} */
+    let searchResults = []
     if (isFavoriteQuery) {
-      stickerFileIds = (await favoriteRepository.query({
+      searchResults = await favoriteRepository.query({
         userId,
         limit: INLINE_QUERY_RESULT_LIMIT,
-      })).map(s => s.file_id)
+      })
     } else if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) {
-      stickerFileIds = await tagRepository.search({
+      searchResults = await tagRepository.search({
         query,
         authorUserId,
         limit: INLINE_QUERY_RESULT_LIMIT,
@@ -43,17 +43,17 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
     }
 
     await context.answerInlineQuery(
-      stickerFileIds.map((sticker_file_id, i) => ({
+      searchResults.map((sticker, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id,
+        sticker_file_id: sticker.file_id,
       })),
       {
         cache_time: inlineQueryCacheTimeS,
         is_personal: isFavoriteQuery || Boolean(authorUserId),
         button: {
           text: isFavoriteQuery
-            ? stickerFileIds.length === 0
+            ? searchResults.length === 0
               ? "You don't have any favorite stickers yet. Click here to add"
               : "Click here to add or remove your favorite stickers"
             : "Can't find a sticker? Click here to contribute",

@@ -64,10 +64,11 @@ export class DynamodbFavoriteRepository {
    * @param {{
    *   userId: string
    *   limit: number
+   *   fromStickerFileUniqueId?: string
    * }} input
    * @returns {Promise<import('../types.d.ts').Sticker[]>}
    */
-  async query({ userId, limit }) {
+  async query({ userId, limit, fromStickerFileUniqueId }) {
       /** @type {import('../types.d.ts').Sticker[]} */
     const stickers = []
 
@@ -81,6 +82,12 @@ export class DynamodbFavoriteRepository {
         ':userId': { S: userId },
       },
       ReturnConsumedCapacity: 'TOTAL',
+      ...fromStickerFileUniqueId && {
+        ExclusiveStartKey: {
+          [attr.userId]: { S: userId },
+          [attr.stickerFileUniqueId]: { S: fromStickerFileUniqueId },
+        }
+      }
     })
 
     for await (const { ConsumedCapacity, ScannedCount, Items } of favoritePaginator) {

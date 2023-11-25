@@ -22,7 +22,7 @@ export class DynamodbTagRepository {
   /**
    * @param {{
    *   authorUserId: string
-   *   sticker: import('../types.d.ts').MinimalSticker
+   *   sticker: import('../types.d.ts').MinimalStickerWithSet
    *   values: string[]
    * }} input
    */
@@ -144,7 +144,7 @@ export class DynamodbTagRepository {
    *   limit: number
    *   authorUserId?: string
    * }} input
-   * @returns {Promise<string[]>} Array of stickerFileIds
+   * @returns {Promise<import('../types.d.ts').MinimalSticker[]>}
    */
   async search({ query, limit, authorUserId }) {
     if (typeof query !== 'string' || !query) {
@@ -175,8 +175,7 @@ export class DynamodbTagRepository {
       ProjectionExpression: '#stickerFileId, #stickerFileUniqueId',
     })
     
-    /** @type {string[]} */
-    const stickerFileIds = []
+    const stickers = []
     const stickerFileUniqueIds = new Set()
 
     for await (const { Items, ConsumedCapacity, ScannedCount } of tagPaginator) {
@@ -197,7 +196,7 @@ export class DynamodbTagRepository {
           continue
         }
 
-        stickerFileIds.push(stickerFileId)
+        stickers.push({ file_id: stickerFileId, file_unique_id: stickerFileUniqueId })
         stickerFileUniqueIds.add(stickerFileUniqueId)
 
         if (stickerFileUniqueIds.size === limit) {
@@ -210,6 +209,6 @@ export class DynamodbTagRepository {
       }
     }
 
-    return stickerFileIds
+    return stickers
   }
 }

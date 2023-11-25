@@ -184,34 +184,37 @@ describe('DynamodbTagRepository', () => {
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello'
-    })).resolves.toIncludeSameMembers([tag1.sticker.file_id, tag2.sticker.file_id])
+    })).resolves.toIncludeSameMembers([
+      { file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id },
+      { file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id },
+    ])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([tag3.sticker.file_id])
+    })).resolves.toIncludeSameMembers([{ file_id: tag3.sticker.file_id, file_unique_id: tag3.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user1,
-    })).resolves.toIncludeSameMembers([tag1.sticker.file_id])
+    })).resolves.toIncludeSameMembers([{ file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user2,
-    })).resolves.toIncludeSameMembers([tag2.sticker.file_id])
+    })).resolves.toIncludeSameMembers([{ file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'reuse',
-    })).resolves.toIncludeSameMembers([tag4.sticker.file_id])
+    })).resolves.toIncludeSameMembers([{ file_id: tag4.sticker.file_id, file_unique_id: tag4.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'set',
-    })).resolves.toIncludeSameMembers([tag6.sticker.file_id])
+    })).resolves.toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
   })
 
   it('should handle high throughput for store()', async () => {
