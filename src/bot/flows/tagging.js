@@ -23,8 +23,8 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     if (text.startsWith('/')) return next()
 
     const { userId } = context.state
-    const { queue, sticker, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
-    if (!sticker) return
+    const { phase, queue, sticker, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
+    if (phase !== 'tagging' || !sticker) return
 
     if (text.length < MIN_QUERY_LENGTH)
       return context.reply(`❌ Input is too short, please try again`)

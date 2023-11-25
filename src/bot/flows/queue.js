@@ -166,6 +166,7 @@ export function useQueueFlow({
     )
 
     await userSessionRepository.set(userId, {
+      phase: 'tagging',
       sticker: {
         set_name: sticker.set_name,
         file_id: sticker.file_id,
