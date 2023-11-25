@@ -6,6 +6,7 @@ const {
   LOCALSTACK_ENDPOINT,
   DYNAMODB_TAGS_TABLE,
   DYNAMODB_USER_SESSIONS_TABLE,
+  DYNAMODB_FAVORITES_TABLE,
   DEBUG_CHAT_ID,
 } = process.env
 
@@ -16,6 +17,7 @@ export const webhookSecretToken = WEBHOOK_SECRET_TOKEN
 export const inlineQueryCacheTimeS = Number(requireEnv(INLINE_QUERY_CACHE_TIME_S))
 export const dynamodbTagsTable = requireEnv(DYNAMODB_TAGS_TABLE)
 export const dynamodbUserSessionsTable = requireEnv(DYNAMODB_USER_SESSIONS_TABLE)
+export const dynamodbFavoritesTable = requireEnv(DYNAMODB_FAVORITES_TABLE)
 export const debugChatId = DEBUG_CHAT_ID
 
 /**

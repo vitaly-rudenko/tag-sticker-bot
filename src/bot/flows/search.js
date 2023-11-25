@@ -7,12 +7,13 @@ import { normalizeTagValue } from '../../utils/tags.js'
 /**
  * @param {{
  *   tagRepository: import('../../types.d.ts').TagRepository
+ *   favoriteRepository: import('../../types.d.ts').FavoriteRepository
  * }} input
  */
-export function useSearchFlow({ tagRepository }) {
+export function useSearchFlow({ tagRepository, favoriteRepository }) {
   /** @param {Context} context */
   async function handleSearch(context) {
-    if (!context.inlineQuery?.query) return
+    if (context.inlineQuery?.query === undefined) return
 
     const { userId } = context.state
     const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
@@ -22,25 +23,40 @@ export function useSearchFlow({ tagRepository }) {
         : context.inlineQuery.query
     )
 
-    if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) return
+    const isFavoriteQuery = query.length === 0
 
-    const stickersFileIds = await tagRepository.search({
-      query,
-      authorUserId,
-      limit: INLINE_QUERY_RESULT_LIMIT,
-    })
+    /** @type {import('../../types.d.ts').MinimalSticker[]} */
+    let searchResults = []
+    if (isFavoriteQuery) {
+      searchResults = await favoriteRepository.query({
+        userId,
+        limit: INLINE_QUERY_RESULT_LIMIT,
+      })
+    } else if (query.length < MIN_QUERY_LENGTH || query.length > MAX_QUERY_LENGTH) {
+      searchResults = await tagRepository.search({
+        query,
+        authorUserId,
+        limit: INLINE_QUERY_RESULT_LIMIT,
+      })
+    } else {
+      return
+    }
 
     await context.answerInlineQuery(
-      stickersFileIds.map((sticker_file_id, i) => ({
+      searchResults.map((sticker, i) => ({
         id: String(i),
         type: 'sticker',
-        sticker_file_id,
+        sticker_file_id: sticker.file_id,
       })),
       {
         cache_time: inlineQueryCacheTimeS,
-        is_personal: Boolean(authorUserId),
+        is_personal: isFavoriteQuery || Boolean(authorUserId),
         button: {
-          text: "Can't find a sticker? Click here to contribute",
+          text: isFavoriteQuery
+            ? searchResults.length === 0
+              ? "You don't have any favorite stickers yet. Click here to add"
+              : "Click here to add or remove your favorite stickers"
+            : "Can't find a sticker? Click here to contribute",
           start_parameter: 'stub', // for some reason is required
         }
       }

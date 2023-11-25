@@ -7,6 +7,7 @@ import { telegramBotToken, environment, debugChatId, webhookSecretToken, inlineQ
 import { userSessionAttributes } from '../users/attributes.js'
 import { tagAttributes } from '../tags/attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_AND_AUTHOR_INDEX, SEARCH_BY_VALUE_INDEX } from '../tags/indexes.js'
+import { favoriteAttributes } from '../favorites/attributes.js'
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const root = path.join(__dirname, '..', '..')
@@ -26,6 +27,7 @@ export class TagStickerBotStack extends cdk.Stack {
 
     const userSessionsTable = this.createUserSessionsTable()
     const tagsTable = this.createTagsTable()
+    const favoritesTable = this.createFavoritesTable()
 
     const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
       code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'rest-api')),
@@ -41,11 +43,12 @@ export class TagStickerBotStack extends cdk.Stack {
         WEBHOOK_SECRET_TOKEN: webhookSecretToken,
         DYNAMODB_USER_SESSIONS_TABLE: userSessionsTable.tableName,
         DYNAMODB_TAGS_TABLE: tagsTable.tableName,
+        DYNAMODB_FAVORITES_TABLE: favoritesTable.tableName,
         DEBUG_CHAT_ID: debugChatId,
       },
     })
 
-    for (const table of [userSessionsTable, tagsTable]) {
+    for (const table of [userSessionsTable, tagsTable, favoritesTable]) {
       table.grantReadWriteData(restApiLambda)
     }
 
@@ -159,6 +162,25 @@ export class TagStickerBotStack extends cdk.Stack {
     })
 
     return table
+  }
+
+  createFavoritesTable() {
+    return new cdk.aws_dynamodb.Table(this, 'favoritesTable', {
+      partitionKey: {
+        name: favoriteAttributes.userId,
+        type: cdk.aws_dynamodb.AttributeType.STRING
+      },
+      sortKey: {
+        name: favoriteAttributes.stickerFileUniqueId,
+        type: cdk.aws_dynamodb.AttributeType.STRING
+      },
+      billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
+      readCapacity: 2,
+      writeCapacity: 2,
+      removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
+      contributorInsightsEnabled: true,
+      deletionProtection: isProduction,
+    })
   }
 
   createUserSessionsTable() {

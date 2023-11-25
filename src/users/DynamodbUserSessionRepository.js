@@ -43,8 +43,10 @@ export class DynamodbUserSessionRepository {
           },
           ...context.sticker && {
             ...context.sticker.set_name && { [attr.stickerSetName]: { S: context.sticker.set_name } },
+            ...context.sticker.emoji && { [attr.stickerEmoji]: { S: context.sticker.emoji } },
             [attr.stickerFileUniqueId]: { S: context.sticker.file_unique_id },
             [attr.stickerFileId]: { S: context.sticker.file_id },
+            [attr.stickerFormat]: { N: context.sticker.is_animated ? '1' : context.sticker.is_video ? '2' : '0' },
           },
           ...context.queue && {
             [attr.stickerSetName]: { S: context.queue.stickerSetName },
@@ -81,6 +83,8 @@ export class DynamodbUserSessionRepository {
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
     const stickerFileId = Item[attr.stickerFileId]?.S
     const stickerMessageId = Item[attr.stickerMessageId]?.N
+    const stickerFormat = Item[attr.stickerFormat]?.N
+    const stickerEmoji = Item[attr.stickerEmoji]?.S
     const tagInstructionMessageId = Item[attr.tagInstructionMessageId]?.N
     const queueStickerSetBitmap = Item[attr.queueStickerSetBitmap]?.S
     const queueStickerSetBitmapLength = Item[attr.queueStickerSetBitmapLength]?.N
@@ -88,11 +92,14 @@ export class DynamodbUserSessionRepository {
     const queuePosition = Item[attr.queuePosition]?.N
 
     return Item ? {
-      ...stickerFileUniqueId && stickerFileId && {
+      ...stickerFileUniqueId && stickerFileId && stickerFormat && {
         sticker: {
           set_name: stickerSetName,
           file_unique_id: stickerFileUniqueId,
           file_id: stickerFileId,
+          is_animated: stickerFormat === '1',
+          is_video: stickerFormat === '2',
+          emoji: stickerEmoji,
         }
       },
       ...stickerMessageId && { stickerMessageId: Number(stickerMessageId) },

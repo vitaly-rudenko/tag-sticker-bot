@@ -1,4 +1,4 @@
-import { dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
+import { dynamodbFavoritesTable, dynamodbTagsTable, dynamodbUserSessionsTable } from '../env.js'
 import { CreateTableCommand, DeleteTableCommand, UpdateTimeToLiveCommand } from '@aws-sdk/client-dynamodb'
 import { createDynamodbClient } from '../utils/createDynamodbClient.js'
 import { userSessionAttributes } from '../users/attributes.js'
@@ -126,5 +126,31 @@ await dynamodbClient.send(
         WriteCapacityUnits: 1,
       }
     }]
+  })
+)
+
+await dynamodbClient.send(new DeleteTableCommand({ TableName: dynamodbFavoritesTable })).catch(() => {})
+await dynamodbClient.send(
+  new CreateTableCommand({
+    TableName: dynamodbFavoritesTable,
+    KeySchema: [{
+      AttributeName: userSessionAttributes.userId,
+      KeyType: 'HASH'
+    }, {
+      AttributeName: userSessionAttributes.stickerFileUniqueId,
+      KeyType: 'RANGE'
+    }],
+    AttributeDefinitions: [{
+      AttributeName: userSessionAttributes.userId,
+      AttributeType: 'S'
+    }, {
+      AttributeName: userSessionAttributes.stickerFileUniqueId,
+      AttributeType: 'S'
+    }],
+    BillingMode: 'PROVISIONED',
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 1,
+      WriteCapacityUnits: 1,
+    },
   })
 )

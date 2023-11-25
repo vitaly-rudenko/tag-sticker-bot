@@ -11,8 +11,6 @@ export const tagAttributes = Object.freeze({
   createdAt: 'c',
 })
 
-export const DEFAULT_AUTHOR_USER_ID = '#'
-
 /**
  * @param {string} authorUserId
  * @param {string} stickerFileUniqueId

@@ -2,7 +2,7 @@ import { booleansToBitmap } from './bitmap.js'
 
 /**
  * @param {T[]} stickers
- * @template {{ file_unique_id: string }} T
+ * @template {import('../types.d.ts').MinimalSticker} T
  */
 export function sortStickers(stickers) {
   return stickers.toSorted((a, b) => {
@@ -13,8 +13,8 @@ export function sortStickers(stickers) {
 }
 
 /**
- * @param {import('../types.d.ts').Sticker[]} stickers
- * @param {(sticker: import('../types.d.ts').Sticker) => boolean} mapper
+ * @param {import('../types.d.ts').MinimalStickerWithSet[]} stickers
+ * @param {(sticker: import('../types.d.ts').MinimalStickerWithSet) => boolean} mapper
  */
 export function stickersToBitmap(stickers, mapper) {
   return booleansToBitmap(sortStickers(stickers).map(mapper))
