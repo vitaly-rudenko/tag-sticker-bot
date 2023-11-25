@@ -13,8 +13,8 @@ export function sortStickers(stickers) {
 }
 
 /**
- * @param {import('../types.d.ts').Sticker[]} stickers
- * @param {(sticker: import('../types.d.ts').Sticker) => boolean} mapper
+ * @param {import('../types.d.ts').MinimalSticker[]} stickers
+ * @param {(sticker: import('../types.d.ts').MinimalSticker) => boolean} mapper
  */
 export function stickersToBitmap(stickers, mapper) {
   return booleansToBitmap(sortStickers(stickers).map(mapper))

@@ -22,18 +22,19 @@ export function useQueueFlow({
     if (!context.message || !('sticker' in context.message)) return
 
     const { userId } = context.state
-
     const stickerFileUniqueId = context.message.sticker.file_unique_id
-    const stickerFileId = context.message.sticker.file_id
     const stickerSetName = context.message.sticker.set_name
 
     await userSessionRepository.set(userId, {
+      stickerMessageId: context.message.message_id,
       sticker: {
         file_unique_id: stickerFileUniqueId,
-        file_id: stickerFileId,
         set_name: stickerSetName,
+        file_id: context.message.sticker.file_id,
+        is_animated: context.message.sticker.is_animated,
+        is_video: context.message.sticker.is_video,
+        emoji: context.message.sticker.emoji,
       },
-      stickerMessageId: context.message.message_id,
     })
 
     const isFavorite = await favoriteRepository.isMarked({ userId, stickerFileUniqueId })
@@ -169,6 +170,8 @@ export function useQueueFlow({
         set_name: sticker.set_name,
         file_id: sticker.file_id,
         file_unique_id: sticker.file_unique_id,
+        is_animated: sticker.is_animated,
+        is_video: sticker.is_video,
       },
       stickerMessageId,
       tagInstructionMessageId: message_id,

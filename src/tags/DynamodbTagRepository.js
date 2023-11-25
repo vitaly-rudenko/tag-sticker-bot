@@ -22,7 +22,7 @@ export class DynamodbTagRepository {
   /**
    * @param {{
    *   authorUserId: string
-   *   sticker: import('../types.d.ts').Sticker
+   *   sticker: import('../types.d.ts').MinimalSticker
    *   values: string[]
    * }} input
    */

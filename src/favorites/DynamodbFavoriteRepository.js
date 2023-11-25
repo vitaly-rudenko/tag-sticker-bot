@@ -28,7 +28,9 @@ export class DynamodbFavoriteRepository {
           [attr.userId]: { S: userId },
           [attr.stickerFileId]: { S: sticker.file_id },
           [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
+          [attr.stickerFormat]: { N: sticker.is_animated ? '1' : sticker.is_video ? '2' : '0' },
           ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
+          ...sticker.emoji && { [attr.stickerEmoji]: { S: sticker.emoji } },
         },
         ReturnConsumedCapacity: 'TOTAL',
       })
@@ -88,14 +90,19 @@ export class DynamodbFavoriteRepository {
       for (const item of Items) {
         const stickerFileId = item[attr.stickerFileId]?.S
         const stickerFileUniqueId = item[attr.stickerFileUniqueId]?.S
-        if (!stickerFileUniqueId || !stickerFileId) continue
+        const stickerFormat = item[attr.stickerFormat]?.N
+        if (!stickerFileUniqueId || !stickerFileId || !stickerFormat) continue
         
         const stickerSetName = item[attr.stickerSetName]?.S
+        const stickerEmoji = item[attr.stickerEmoji]?.S
 
         stickers.push({
           ...stickerSetName && { set_name: stickerSetName },
+          ...stickerEmoji && { emoji: stickerEmoji },
           file_unique_id: stickerFileUniqueId,
           file_id: stickerFileId,
+          is_animated: stickerFormat === '1',
+          is_video: stickerFormat === '2',
         })
 
         if (stickers.length === limit) break

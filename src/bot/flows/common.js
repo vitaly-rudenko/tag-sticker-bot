@@ -9,7 +9,6 @@ import { escapeMd } from '../../utils/escapeMd.js'
  * }} input
  */
 export function useCommonFlow({ bot }) {
-
   /** @param {Context} context */
   async function start(context) {
     bot.botInfo ??= await bot.telegram.getMe()

@@ -3,6 +3,8 @@ export const userSessionAttributes = Object.freeze({
   stickerSetName: 'set',
   stickerFileUniqueId: 'fuid',
   stickerFileId: 'fid',
+  stickerFormat: 'fmt',
+  stickerEmoji: 'emj',
   stickerMessageId: 'smid',
   tagInstructionMessageId: 'timid',
   queueStickerSetBitmap: 'qmap',

@@ -1,6 +1,14 @@
 import type { Telegram, Context } from 'telegraf'
 
-export type Sticker = Pick<Awaited<ReturnType<Telegram['getStickerSet']>>['stickers'][number], 'set_name' | 'file_id' | 'file_unique_id'>
+export type MinimalSticker = Pick<
+  Awaited<ReturnType<Telegram['getStickerSet']>>['stickers'][number],
+  'set_name' | 'file_id' | 'file_unique_id'
+>
+
+export type Sticker = Pick<
+  Awaited<ReturnType<Telegram['getStickerSet']>>['stickers'][number],
+  'set_name' | 'file_id' | 'file_unique_id' | 'is_animated' | 'is_video' | 'emoji'
+>
 
 export type UserSessionContext = {
   sticker?: Sticker
@@ -28,7 +36,7 @@ export interface UserSessionRepository {
 export interface TagRepository {
   store(input: {
     authorUserId: string
-    sticker: Sticker
+    sticker: MinimalSticker
     values: string[]
   }): Promise<void>
   search(input: {
