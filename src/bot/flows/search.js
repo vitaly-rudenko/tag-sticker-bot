@@ -38,9 +38,9 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
         authorUserId,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
+    } else {
+      return
     }
-
-    if (stickerFileIds.length === 0) return
 
     await context.answerInlineQuery(
       stickerFileIds.map((sticker_file_id, i) => ({
@@ -53,7 +53,9 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
         is_personal: isFavoriteQuery || Boolean(authorUserId),
         button: {
           text: isFavoriteQuery
-            ? "Click here to add or remove your favorite stickers"
+            ? stickerFileIds.length === 0
+              ? "You don't have any favorite stickers yet. Click here to add"
+              : "Click here to add or remove your favorite stickers"
             : "Can't find a sticker? Click here to contribute",
           start_parameter: 'stub', // for some reason is required
         }
