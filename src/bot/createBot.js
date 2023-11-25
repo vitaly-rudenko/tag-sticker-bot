@@ -7,6 +7,7 @@ import { useTaggingFlow } from './flows/tagging.js'
 import { useCommonFlow } from './flows/common.js'
 import { useFavoritesFlow } from './flows/favorites.js'
 import { deleteMessages } from '../utils/deleteMessages.js'
+import { escapeMd } from '../utils/escapeMd.js'
 
 /**
  * @param {{
@@ -83,6 +84,75 @@ export async function createBot({
 
   bot.start(start)
   bot.command('version', version)
+
+  bot.command('create_sticker_sets', async (context) => {
+    bot.botInfo ??= await bot.telegram.getMe()
+
+    const { userId } = context.state
+
+    const favorites = await favoriteRepository.query({ userId: context.state.userId, limit: 200 })
+    if (favorites.length === 0) {
+      await context.reply("❌ You don't have any favorite stickers yet.")
+      return
+    }
+
+    const formats = {
+      static: favorites.filter(s => !s.is_animated && !s.is_video),
+      animated: favorites.filter(s => s.is_animated),
+      video: favorites.filter(s => s.is_video),
+    }
+
+    /** @type {{ format: string, url: string }[]} */
+    const stickerSets = []
+
+    for (const [format, stickers] of Object.entries(formats)) {
+      if (stickers.length === 0) continue
+
+      const name = `${format}_${userId}_by_${bot.botInfo.username}`
+      const url = `https://t.me/addstickers/${name}`
+
+      await bot.telegram.deleteStickerSet(name).catch(() => {})
+
+      /** @type {import('telegraf').Types.ExtraAddStickerToSet['sticker'][]} */
+      const stickersToAdd = []
+      for (const sticker of stickers) {
+        const file = await bot.telegram.uploadStickerFile(
+          userId,
+          { url: (await bot.telegram.getFileLink(sticker.file_id)).toString() },
+          // @ts-ignore
+          format,
+        )
+
+        stickersToAdd.push({
+          emoji_list: [sticker.emoji || '❤️'],
+          sticker: file.file_id,
+        })
+      }
+
+      try {
+        await context.createNewStickerSet(
+          name,
+          format === 'static' ? `❤️` : `❤️ – ${format}`,
+          {
+            // @ts-ignore
+            sticker_format: format,
+            stickers: stickersToAdd,
+          }
+        )
+  
+        stickerSets.push({ format, url })
+      } catch (error) {
+        console.log(error)
+      }
+    }
+
+    const formatName = { static: 'regular', animated: 'animated', video: 'video' }
+
+    await context.reply([
+      `✅ Created these sticker sets from your favorite stickers: ${stickerSets.map(({ format, url }) => `[${formatName[format]}](${escapeMd(url)})`).join(', ')}\\.`,
+      '🕒 It may take a few minutes to see the changes\\.'
+    ].join('\n'), { parse_mode: 'MarkdownV2' })
+  })
 
   bot.action(/^queue:step:(.+)$/, stepQueue)
   bot.action('queue:clear', clearQueue)
