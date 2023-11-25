@@ -109,7 +109,6 @@ export class TagStickerBotStack extends cdk.Stack {
       readCapacity: 2,
       writeCapacity: 2,
       removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      contributorInsightsEnabled: true,
       deletionProtection: isProduction,
     })
 
@@ -178,7 +177,6 @@ export class TagStickerBotStack extends cdk.Stack {
       readCapacity: 2,
       writeCapacity: 2,
       removalPolicy: isProduction ? cdk.RemovalPolicy.RETAIN : cdk.RemovalPolicy.DESTROY,
-      contributorInsightsEnabled: true,
       deletionProtection: isProduction,
     })
   }
