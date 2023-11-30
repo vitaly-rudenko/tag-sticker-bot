@@ -11,7 +11,8 @@ import { DynamodbFavoriteRepository } from '../../../favorites/DynamodbFavoriteR
 const WEBHOOK_SECRET_TOKEN_HEADER = 'X-Telegram-Bot-Api-Secret-Token'
 
 // https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway.html#apigateway-example-event
-export async function handler(event, context) {
+/** @param {{ path: string, httpMethod: string, headers: Record<string, string>, body: string }} event */
+export async function handler(event) {
   try {
     if (event.path === '/health' && event.httpMethod === 'GET') {
       return {
@@ -79,7 +80,7 @@ export async function handler(event, context) {
       try {
         await bot.handleUpdate(update)
       } catch (error) {
-        if (debugChatId) {
+        if (debugChatId && error instanceof Error) {
           new TelegramErrorLogger({ telegram: bot.telegram, debugChatId })
             .log(error, 'Could not handle bot update', update)
         }

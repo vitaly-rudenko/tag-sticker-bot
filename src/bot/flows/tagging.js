@@ -15,7 +15,7 @@ import { parseTagValues } from '../../utils/tags.js'
  * }} input
  */
 export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proceedTagging }) {
-  /** @param {Context} context */
+  /** @param {Context} context @param {Function} next */
   async function handleTag(context, next) {
     if (!context.chat || !context.message || !('text' in context.message)) return
     

@@ -66,7 +66,10 @@ export class DynamodbUserSessionRepository {
     console.log('DynamodbUserSessionRepository#set:putItem', { ConsumedCapacity })
   }
 
-  /** @returns {Promise<import('../types.d.ts').UserSessionContext>} */
+  /**
+   * @param {string} userId
+   * @returns {Promise<import('../types.d.ts').UserSessionContext>}
+   */
   async get(userId) {
     const { Item, ConsumedCapacity } = await this._dynamodbClient.send(
       new GetItemCommand({
@@ -123,6 +126,7 @@ export class DynamodbUserSessionRepository {
     } : {}
   }
 
+  /** @param {string} userId */
   async clear(userId) {
     const { ConsumedCapacity } = await this._dynamodbClient.send(
       new DeleteItemCommand({

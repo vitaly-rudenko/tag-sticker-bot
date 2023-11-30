@@ -1,4 +1,4 @@
-import { BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
+import { AttributeValue, BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { tagAttributes as attr, tagId, valuePartition } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_AND_AUTHOR_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
 
@@ -46,6 +46,7 @@ export class DynamodbTagRepository {
       ProjectionExpression: '#tagId, #value',
     })
 
+    /** @type {Record<string, AttributeValue>[]} */
     const existingItems = []
     for await (const { Items, ConsumedCapacity, ScannedCount } of existingTagPaginator) {
       console.log('DynamodbTagRepository#store:query', { ConsumedCapacity, ScannedCount })
