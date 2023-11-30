@@ -82,7 +82,11 @@ export async function handler(event) {
       } catch (error) {
         if (debugChatId && error instanceof Error) {
           new TelegramErrorLogger({ telegram: bot.telegram, debugChatId })
-            .log(error, 'Could not handle bot update', update)
+            .log(
+              error instanceof Error ? error : new Error(`Unexpected error: ${error}`),
+              'Could not handle bot update',
+              update
+            )
         }
         
         throw error
