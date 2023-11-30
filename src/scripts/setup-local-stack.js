@@ -82,6 +82,7 @@ await dynamodbClient.send(
         NonKeyAttributes: [
           tagAttributes.stickerFileUniqueId,
           tagAttributes.stickerFileId,
+          tagAttributes.stickerSetName,
         ],
       },
       ProvisionedThroughput: {
@@ -102,6 +103,7 @@ await dynamodbClient.send(
         NonKeyAttributes: [
           tagAttributes.stickerFileUniqueId,
           tagAttributes.stickerFileId,
+          tagAttributes.stickerSetName,
         ],
       },
       ProvisionedThroughput: {
