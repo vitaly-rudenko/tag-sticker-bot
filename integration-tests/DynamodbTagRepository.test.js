@@ -173,48 +173,48 @@ describe('DynamodbTagRepository', () => {
     await expect(tagRepository.search({
       limit: 100,
       query: 'hey'
-    })).resolves.toEqual([])
+    })).resolves.toEqual({ stickers: [], stickerSetNames: new Set() })
 
     await expect(tagRepository.search({
       limit: 100,
       query: 'it is',
       authorUserId: user1,
-    })).resolves.toEqual([])
+    })).resolves.toEqual({ stickers: [], stickerSetNames: new Set() })
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'hello'
-    })).resolves.toIncludeSameMembers([
+    })).stickers).toIncludeSameMembers([
       { file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id },
       { file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id },
     ])
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([{ file_id: tag3.sticker.file_id, file_unique_id: tag3.sticker.file_unique_id }])
+    })).stickers).toIncludeSameMembers([{ file_id: tag3.sticker.file_id, file_unique_id: tag3.sticker.file_unique_id }])
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user1,
-    })).resolves.toIncludeSameMembers([{ file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id }])
+    })).stickers).toIncludeSameMembers([{ file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id }])
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'hello',
       authorUserId: user2,
-    })).resolves.toIncludeSameMembers([{ file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id }])
+    })).stickers).toIncludeSameMembers([{ file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id }])
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'reuse',
-    })).resolves.toIncludeSameMembers([{ file_id: tag4.sticker.file_id, file_unique_id: tag4.sticker.file_unique_id }])
+    })).stickers).toIncludeSameMembers([{ file_id: tag4.sticker.file_id, file_unique_id: tag4.sticker.file_unique_id }])
 
-    await expect(tagRepository.search({
+    await expect((await tagRepository.search({
       limit: 100,
       query: 'set',
-    })).resolves.toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
+    })).stickers).toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
   })
 
   it('should handle high throughput for store()', async () => {
