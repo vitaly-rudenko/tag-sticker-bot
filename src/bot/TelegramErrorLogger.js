@@ -10,6 +10,11 @@ export class TelegramErrorLogger {
     this._telegram = telegram
   }
 
+  /**
+   * @param {Error} error 
+   * @param {string} message 
+   * @param {any} context 
+   */
   log(error, message = 'Unexpected error', context = {}) {
     this._telegram.sendMessage(
       this._debugChatId,

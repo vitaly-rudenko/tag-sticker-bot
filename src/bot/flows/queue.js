@@ -89,7 +89,10 @@ export function useQueueFlow({
     await context.reply('🕒 Done! It may take up to 10 minutes to see the changes.')
   }
 
+  /** @param {Context} context */
   async function stepQueue(context) {
+    if (!('match' in context) || !Array.isArray(context.match)) return
+
     const steps = Number(context.match[1])
     if (!Number.isInteger(steps) || steps === 0) return
 
