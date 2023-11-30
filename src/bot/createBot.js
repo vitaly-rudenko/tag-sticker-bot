@@ -48,7 +48,7 @@ export async function createBot({
     tagUntaggedByMe,
     handleTag,
   } = useTaggingFlow({
-    bot,
+    telegram: bot.telegram,
     tagRepository,
     userSessionRepository,
     proceedTagging,
@@ -57,6 +57,7 @@ export async function createBot({
   const {
     handleSearch,
   } = useSearchFlow({
+    telegram: bot.telegram,
     tagRepository,
     favoriteRepository,
   })

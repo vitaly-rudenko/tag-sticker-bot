@@ -5,6 +5,8 @@ import { userSessionAttributes as attr } from './attributes.js'
 
 const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
+/** @typedef {import('../types.d.ts').UserSessionRepository} UserSessionRepository */
+/** @implements {UserSessionRepository} */
 export class DynamodbUserSessionRepository {
   /**
    * @param {{

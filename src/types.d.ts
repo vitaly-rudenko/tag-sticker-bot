@@ -31,6 +31,8 @@ export interface UserSessionRepository {
   clear(userId: string): Promise<void>
 }
 
+export type SearchResults = { stickers: MinimalSticker[], stickerSetNames: Set<string> }
+
 export interface TagRepository {
   store(input: {
     authorUserId: string
@@ -41,7 +43,7 @@ export interface TagRepository {
     query: string
     limit: number
     authorUserId?: string
-  }): Promise<MinimalSticker[]>
+  }): Promise<SearchResults>
   queryStatus(input: {
     stickerSetName: string
     authorUserId?: string
@@ -63,11 +65,11 @@ export interface FavoriteRepository {
     userId: string
     stickerFileUniqueId: string
   }): Promise<void>
-  query(input: {
+  search(input: {
     userId: string
     limit: number
     fromStickerFileUniqueId?: string
-  }): Promise<MinimalSticker[]>
+  }): Promise<SearchResults>
   isMarked(input: {
     userId: string
     stickerFileUniqueId: string

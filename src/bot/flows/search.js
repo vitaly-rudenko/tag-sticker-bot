@@ -1,16 +1,18 @@
 import { INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
-import { inlineQueryCacheTimeS } from '../../env.js'
+import { expandSearchResults } from '../../utils/expandSearchResults.js'
 import { normalizeTagValue } from '../../utils/tags.js'
+import { inlineQueryCacheTimeS } from '../../env.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
 /**
  * @param {{
+ *   telegram: import('telegraf').Telegram
  *   tagRepository: import('../../types.d.ts').TagRepository
  *   favoriteRepository: import('../../types.d.ts').FavoriteRepository
  * }} input
  */
-export function useSearchFlow({ tagRepository, favoriteRepository }) {
+export function useSearchFlow({ telegram, tagRepository, favoriteRepository }) {
   /** @param {Context} context */
   async function handleSearch(context) {
     if (context.inlineQuery?.query === undefined) return
@@ -25,10 +27,10 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
 
     const isFavoriteQuery = query.length === 0
 
-    /** @type {import('../../types.d.ts').MinimalSticker[]} */
-    let searchResults = []
+    /** @type {import('../../types.d.ts').SearchResults} */
+    let searchResults
     if (isFavoriteQuery) {
-      searchResults = await favoriteRepository.query({
+      searchResults = await favoriteRepository.search({
         userId,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
@@ -42,8 +44,10 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
       return
     }
 
+    const stickers = await expandSearchResults({ telegram, searchResults, limit: INLINE_QUERY_RESULT_LIMIT })
+
     await context.answerInlineQuery(
-      searchResults.map((sticker, i) => ({
+      stickers.map((sticker, i) => ({
         id: String(i),
         type: 'sticker',
         sticker_file_id: sticker.file_id,
@@ -53,7 +57,7 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
         is_personal: isFavoriteQuery || Boolean(authorUserId),
         button: {
           text: isFavoriteQuery
-            ? searchResults.length === 0
+            ? stickers.length === 0
               ? "You don't have any favorite stickers yet. Click here to add"
               : "Click here to add or remove your favorite stickers"
             : "Can't find a sticker? Click here to contribute",

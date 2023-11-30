@@ -8,13 +8,13 @@ import { parseTagValues } from '../../utils/tags.js'
 
 /**
  * @param {{
+ *   telegram: import('telegraf').Telegram
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  *   tagRepository: import('../../types.d.ts').TagRepository
  *   proceedTagging: import('../../types.d.ts').proceedTagging,
- *   bot: import('telegraf').Telegraf
  * }} input
  */
-export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proceedTagging }) {
+export function useTaggingFlow({ telegram, userSessionRepository, tagRepository, proceedTagging }) {
   /** @param {Context} context @param {Function} next */
   async function handleTag(context, next) {
     if (!context.chat || !context.message || !('text' in context.message)) return
@@ -42,8 +42,8 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     await tagRepository.store({ sticker, authorUserId: userId, values })
 
     await Promise.allSettled([
-      bot.telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined),
-      deleteMessages(bot.telegram, context.chat.id, [tagInstructionMessageId]),
+      telegram.editMessageReplyMarkup(context.chat.id, stickerMessageId, undefined, undefined),
+      deleteMessages(telegram, context.chat.id, [tagInstructionMessageId]),
     ])
 
     await context.reply([
@@ -64,7 +64,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     const { sticker, stickerMessageId, tagInstructionMessageId } = session
     if (!sticker) return
 
-    await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
+    await deleteMessages(telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
 
     await proceedTagging(context, { userId, sticker })
   }
@@ -79,7 +79,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     const { sticker, stickerMessageId, tagInstructionMessageId } = session
     if (!sticker) return
 
-    await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
+    await deleteMessages(telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
 
     const stickerSetName = sticker.set_name
     if (!stickerSetName) {
@@ -87,7 +87,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
       return
     }
 
-    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
+    const stickerSet = await telegram.getStickerSet(stickerSetName)
     const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName })
     const stickerSetBitmap = stickersToBitmap(
       stickerSet.stickers,
@@ -114,7 +114,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     const { sticker, stickerMessageId, tagInstructionMessageId } = session
     if (!sticker) return
 
-    await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
+    await deleteMessages(telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
 
     const stickerSetName = sticker.set_name
     if (!stickerSetName) {
@@ -122,7 +122,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
       return
     }
 
-    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
+    const stickerSet = await telegram.getStickerSet(stickerSetName)
     const taggedStickerFileUniqueIds = await tagRepository.queryStatus({ stickerSetName, authorUserId: userId })
     const stickerSetBitmap = stickersToBitmap(
       stickerSet.stickers,
@@ -155,9 +155,9 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
       return
     }
 
-    const stickerSet = await bot.telegram.getStickerSet(stickerSetName)
+    const stickerSet = await telegram.getStickerSet(stickerSetName)
 
-    await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
+    await deleteMessages(telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
 
     await proceedTagging(context, {
       userId,

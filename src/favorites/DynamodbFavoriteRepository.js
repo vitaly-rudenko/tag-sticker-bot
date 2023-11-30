@@ -1,6 +1,8 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { favoriteAttributes as attr } from './attributes.js'
 
+/** @typedef {import('../types.d.ts').FavoriteRepository} FavoriteRepository */
+/** @implements {FavoriteRepository} */
 export class DynamodbFavoriteRepository {
   /**
    * @param {{
@@ -66,10 +68,10 @@ export class DynamodbFavoriteRepository {
    *   limit: number
    *   fromStickerFileUniqueId?: string
    * }} input
-   * @returns {Promise<import('../types.d.ts').Sticker[]>}
+   * @returns {Promise<import('../types.d.ts').SearchResults>}
    */
-  async query({ userId, limit, fromStickerFileUniqueId }) {
-      /** @type {import('../types.d.ts').Sticker[]} */
+  async search({ userId, limit, fromStickerFileUniqueId }) {
+    /** @type {import('../types.d.ts').MinimalSticker[]} */
     const stickers = []
 
     const favoritePaginator = paginateQuery({ client: this._dynamodbClient, pageSize: this._queryPageSize }, {
@@ -91,7 +93,7 @@ export class DynamodbFavoriteRepository {
     })
 
     for await (const { ConsumedCapacity, ScannedCount, Items } of favoritePaginator) {
-      console.log('DynamodbFavoriteRepository#query', { ConsumedCapacity, ScannedCount })
+      console.log('DynamodbFavoriteRepository#search', { ConsumedCapacity, ScannedCount })
 
       if (!Items) continue
       for (const item of Items) {
@@ -108,8 +110,6 @@ export class DynamodbFavoriteRepository {
           ...stickerEmoji && { emoji: stickerEmoji },
           file_unique_id: stickerFileUniqueId,
           file_id: stickerFileId,
-          is_animated: stickerFormat === '1',
-          is_video: stickerFormat === '2',
         })
 
         if (stickers.length === limit) break
@@ -118,7 +118,7 @@ export class DynamodbFavoriteRepository {
       if (stickers.length === limit) break
     }
 
-    return stickers
+    return { stickers, stickerSetNames: new Set() }
   }
 
   /**
