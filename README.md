@@ -13,9 +13,10 @@ Features:
 - ❤️ Mark stickers as favorites for quick access
 
 ## Stack & tools
-- Node.JS, DynamoDB
+- Node.JS, AWS DynamoDB
 - AWS CDK, Telegraf
 - Rollup, Jest
+- Telegram Bot API
 
 ## Commands
 - `npm run setup-local` – set up local DynamoDB tables
