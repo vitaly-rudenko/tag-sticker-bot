@@ -18,12 +18,12 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
   /** @param {Context} context @param {Function} next */
   async function handleTag(context, next) {
     if (!context.chat || !context.message || !('text' in context.message)) return
-    
+
     const text = context.message.text
     if (text.startsWith('/')) return next()
 
     const { userId } = context.state
-    const { phase, queue, sticker, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
+    const { phase, queue, privateTagging, sticker, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
     if (phase !== 'tagging' || !sticker) return
 
     if (text.length < MIN_QUERY_LENGTH)
@@ -51,7 +51,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
       ...!queue ? ["🕒 It may take up to 10 minutes to see the changes\\."] : []
     ].join('\n'), { parse_mode: 'MarkdownV2' })
 
-    await proceedTagging(context, { userId, queue })
+    await proceedTagging(context, { userId, queue, privateTagging })
   }
 
   /** @param {Context} context */
@@ -60,13 +60,12 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const session = await userSessionRepository.get(userId)
-    const { sticker, stickerMessageId, tagInstructionMessageId } = session
+    const { sticker, stickerMessageId, tagInstructionMessageId, privateTagging } = await userSessionRepository.get(userId)
     if (!sticker) return
 
     await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
 
-    await proceedTagging(context, { userId, sticker })
+    await proceedTagging(context, { userId, sticker, privateTagging })
   }
 
   /** @param {Context} context */
@@ -75,8 +74,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const session = await userSessionRepository.get(userId)
-    const { sticker, stickerMessageId, tagInstructionMessageId } = session
+    const { sticker, privateTagging, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
     if (!sticker) return
 
     await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
@@ -96,6 +94,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
 
     await proceedTagging(context, {
       userId,
+      privateTagging,
       queue: {
         stickerSetName,
         stickerSetBitmap,
@@ -110,8 +109,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const session = await userSessionRepository.get(userId)
-    const { sticker, stickerMessageId, tagInstructionMessageId } = session
+    const { sticker, privateTagging, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
     if (!sticker) return
 
     await deleteMessages(bot.telegram, context.chat.id, [stickerMessageId, tagInstructionMessageId])
@@ -131,6 +129,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
 
     await proceedTagging(context, {
       userId,
+      privateTagging,
       queue: {
         stickerSetName,
         stickerSetBitmap,
@@ -145,8 +144,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const session = await userSessionRepository.get(userId)
-    const { sticker, stickerMessageId, tagInstructionMessageId } = session
+    const { sticker, privateTagging, stickerMessageId, tagInstructionMessageId } = await userSessionRepository.get(userId)
     if (!sticker) return
 
     const stickerSetName = sticker.set_name
@@ -161,6 +159,7 @@ export function useTaggingFlow({ userSessionRepository, tagRepository, bot, proc
 
     await proceedTagging(context, {
       userId,
+      privateTagging,
       queue: {
         stickerSetName,
         stickerSetBitmap: stickersToBitmap(stickerSet.stickers, () => true),

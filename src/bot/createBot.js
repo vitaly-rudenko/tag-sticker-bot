@@ -34,6 +34,7 @@ export async function createBot({
     handleChooseUntagged,
     stepQueue,
     clearQueue,
+    toggleScope,
     proceedTagging,
   } = useQueueFlow({
     telegram: bot.telegram,
@@ -93,7 +94,8 @@ export async function createBot({
   bot.action('sticker:tag-all', tagAll)
   bot.action('sticker:favorite', favorite)
   bot.action('sticker:unfavorite', unfavorite)
-  
+  bot.action('scope:toggle', toggleScope)
+
   bot.action('action:ignore', (context) => context.answerCbQuery().catch(() => {}))
   bot.action('action:cancel', async (context) => {
     if (!context.chat) return
