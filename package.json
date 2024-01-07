@@ -1,6 +1,6 @@
 {
   "name": "tag-sticker-bot",
-  "version": "1.6.1",
+  "version": "1.7.1",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -21,6 +21,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.454.0",
     "markdown-escapes": "^2.0.1",
+    "pino": "^8.17.2",
     "safe-compare": "^1.1.4",
     "telegraf": "^4.15.0"
   },

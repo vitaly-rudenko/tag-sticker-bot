@@ -1,13 +1,14 @@
-import { AttributeValue, BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
+import { BatchWriteItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { tagAttributes as attr, tagId, valuePartition } from './attributes.js'
 import { QUERY_STATUS_INDEX, SEARCH_BY_VALUE_AND_AUTHOR_INDEX, SEARCH_BY_VALUE_INDEX } from './indexes.js'
+import { logger } from '../logger.js'
 
 export class DynamodbTagRepository {
   /**
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
-   * }} options 
+   * }} options
    */
   constructor({ dynamodbClient, tableName }) {
     this._dynamodbClient = dynamodbClient
@@ -22,11 +23,12 @@ export class DynamodbTagRepository {
   /**
    * @param {{
    *   authorUserId: string
+   *   isPrivate: boolean
    *   sticker: import('../types.d.ts').MinimalStickerWithSet
    *   values: string[]
    * }} input
    */
-  async store({ authorUserId, sticker, values }) {
+  async store({ authorUserId, isPrivate, sticker, values }) {
     if (values.length === 0)
       throw new Error('Values list is empty')
     if (values.length > this._maxTagsPerSticker)
@@ -46,10 +48,10 @@ export class DynamodbTagRepository {
       ProjectionExpression: '#tagId, #value',
     })
 
-    /** @type {Record<string, AttributeValue>[]} */
+    /** @type {Record<string, import('@aws-sdk/client-dynamodb').AttributeValue>[]} */
     const existingItems = []
     for await (const { Items, ConsumedCapacity, ScannedCount } of existingTagPaginator) {
-      console.log('DynamodbTagRepository#store:query', { ConsumedCapacity, ScannedCount })
+      logger.debug({ ConsumedCapacity, ScannedCount }, 'DynamodbTagRepository#store:query')
       if (!Items) continue
       existingItems.push(...Items)
     }
@@ -78,7 +80,8 @@ export class DynamodbTagRepository {
                   PutRequest: {
                     Item: {
                       [attr.tagId]: { S: tagId(authorUserId, sticker.file_unique_id) },
-                      [attr.valuePartition]: { S: valuePartition(value) },
+                      [attr.valuePartition]: { S: valuePartition({ value, privateAuthorUserId: isPrivate ? authorUserId : undefined }) },
+                      [attr.isPrivate]: { BOOL: isPrivate },
                       [attr.authorUserId]: { S: authorUserId },
                       ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
                       [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
@@ -93,45 +96,51 @@ export class DynamodbTagRepository {
         })
       )
 
-      console.log('DynamodbTagRepository#store:batchWrite', { ConsumedCapacity, UnprocessedItems })
+      logger.debug({ ConsumedCapacity, UnprocessedItems }, 'DynamodbTagRepository#store:batchWrite')
     }
   }
 
   /**
    * TODO: might be too slow when a lot of stickers are tagged in the set
-   * 
+   *
    * @param {{
    *   stickerSetName: string
-   *   authorUserId?: string
+   *   authorUserId: string
+   *   ownedOnly: boolean
    * }} input
    * @returns {Promise<Set<string>>} Array of tagged stickerFileUniqueId
    */
-  async queryStatus({ stickerSetName, authorUserId }) {
+  async queryStatus({ stickerSetName, authorUserId, ownedOnly }) {
     const tagPaginator = paginateQuery({ client: this._dynamodbClient, pageSize: this._queryStatusQueryPageSize }, {
       TableName: this._tableName,
       IndexName: QUERY_STATUS_INDEX,
-      KeyConditionExpression: authorUserId
+      KeyConditionExpression: ownedOnly
         ? '#stickerSetName = :stickerSetName AND #authorUserId = :authorUserId'
         : '#stickerSetName = :stickerSetName',
       ExpressionAttributeNames: {
         '#stickerSetName': attr.stickerSetName,
         '#stickerFileUniqueId': attr.stickerFileUniqueId,
-        ...authorUserId && { '#authorUserId': attr.authorUserId },
+        '#authorUserId': attr.authorUserId,
+        '#isPrivate': attr.isPrivate,
       },
       ExpressionAttributeValues: {
         ':stickerSetName': { S: stickerSetName },
-        ...authorUserId && { ':authorUserId': { S: authorUserId } },
+        ...ownedOnly && { ':authorUserId': { S: authorUserId } },
       },
       ReturnConsumedCapacity: 'TOTAL',
-      ProjectionExpression: '#stickerFileUniqueId',
+      ProjectionExpression: '#stickerFileUniqueId, #isPrivate, #authorUserId',
     })
 
     const stickerFileUniqueIds = new Set()
     for await (const { Items, ConsumedCapacity, ScannedCount } of tagPaginator) {
-      console.log('DynamodbTagRepository#queryStatus:query', { ConsumedCapacity, ScannedCount })
+      logger.debug({ ConsumedCapacity, ScannedCount }, 'DynamodbTagRepository#queryStatus:query')
 
       if (!Items) continue
       for (const item of Items) {
+        if (!ownedOnly && item[attr.isPrivate]?.BOOL && item[attr.authorUserId].S !== authorUserId) {
+          continue
+        }
+
         stickerFileUniqueIds.add(item[attr.stickerFileUniqueId].S)
       }
     }
@@ -143,15 +152,52 @@ export class DynamodbTagRepository {
    * @param {{
    *   query: string
    *   limit: number
-   *   authorUserId?: string
+   *   authorUserId: string
+   *   ownedOnly: boolean
    * }} input
-   * @returns {Promise<import('../types.d.ts').MinimalSticker[]>}
+   * @returns {Promise<{
+   *   searchResults: import('../types.d.ts').MinimalSticker[]
+   *   includesOwnedStickers: boolean
+   * }>}
    */
-  async search({ query, limit, authorUserId }) {
+  async search({ query, limit, authorUserId, ownedOnly }) {
     if (typeof query !== 'string' || !query) {
       throw new Error('Query must be a non-empty string')
     }
 
+    // always search in owned tags first
+    const { stickerFileUniqueIds, stickers: ownedStickers } = await this._search({ query, limit, authorUserId })
+    const remainingLimit = limit - ownedStickers.length
+
+    // search in public tags if necessary
+    if (!ownedOnly && remainingLimit > 0) {
+      const { stickers: publicStickers } = await this._search({
+        query,
+        limit: remainingLimit,
+        excludeStickerFileUniqueIds: stickerFileUniqueIds
+      })
+
+      return {
+        searchResults: ownedStickers.concat(publicStickers),
+        includesOwnedStickers: ownedStickers.length > 0
+      }
+    } else {
+      return {
+        searchResults: ownedStickers,
+        includesOwnedStickers: ownedStickers.length > 0
+      }
+    }
+  }
+
+  /**
+   * @param {{
+   *   query: string
+   *   limit: number
+   *   authorUserId?: string
+   *   excludeStickerFileUniqueIds?: Set<string>
+   * }} input
+   */
+  async _search({ query, limit, authorUserId, excludeStickerFileUniqueIds }) {
     const tagPaginator = paginateQuery({ client: this._dynamodbClient, pageSize: this._searchQueryPageSize }, {
       IndexName: authorUserId ? SEARCH_BY_VALUE_AND_AUTHOR_INDEX : SEARCH_BY_VALUE_INDEX,
       TableName: this._tableName,
@@ -170,17 +216,17 @@ export class DynamodbTagRepository {
         ':query': { S: query },
         ...authorUserId
           ? { ':authorUserId': { S: authorUserId } }
-          : { ':valuePartition': { S: valuePartition(query) } },
+          : { ':valuePartition': { S: valuePartition({ value: query }) } },
       },
       ReturnConsumedCapacity: 'TOTAL',
       ProjectionExpression: '#stickerFileId, #stickerFileUniqueId',
     })
-    
+
     const stickers = []
     const stickerFileUniqueIds = new Set()
 
     for await (const { Items, ConsumedCapacity, ScannedCount } of tagPaginator) {
-      console.log('DynamodbTagRepository#search:query', { ConsumedCapacity, ScannedCount })
+      logger.debug({ ConsumedCapacity, ScannedCount }, 'DynamodbTagRepository#search:query')
 
       if (!Items) {
         continue
@@ -188,10 +234,10 @@ export class DynamodbTagRepository {
 
       for (const item of Items) {
         const stickerFileUniqueId = item[attr.stickerFileUniqueId]?.S
-        if (!stickerFileUniqueId || stickerFileUniqueIds.has(stickerFileUniqueId)) {
-          continue
-        }
-        
+        if (!stickerFileUniqueId) continue
+        if (stickerFileUniqueIds.has(stickerFileUniqueId)) continue
+        if (excludeStickerFileUniqueIds?.has(stickerFileUniqueId)) continue
+
         const stickerFileId = item[attr.stickerFileId]?.S
         if (!stickerFileId) {
           continue
@@ -210,6 +256,6 @@ export class DynamodbTagRepository {
       }
     }
 
-    return stickers
+    return { stickerFileUniqueIds, stickers }
   }
 }

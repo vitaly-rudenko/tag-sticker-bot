@@ -8,6 +8,7 @@ export const tagAttributes = Object.freeze({
   stickerFileUniqueId: 'fuid',
   stickerFileId: 'fid',
   stickerSetName: 'set',
+  isPrivate: 'pr',
   createdAt: 'c',
 })
 
@@ -19,7 +20,16 @@ export function tagId(authorUserId, stickerFileUniqueId) {
   return `${authorUserId}#${stickerFileUniqueId}`
 }
 
-/** @param {string} value */
-export function valuePartition(value) {
-  return value.slice(0, MIN_QUERY_LENGTH)
+/**
+ * Different value for private tags because they need to be excluded from the public search.
+ *
+ * @param {{
+ *   value: string
+ *   privateAuthorUserId?: string
+ * }} input
+ */
+export function valuePartition({ value, privateAuthorUserId }) {
+  return privateAuthorUserId
+    ? `#${privateAuthorUserId}`
+    : value.slice(0, MIN_QUERY_LENGTH)
 }

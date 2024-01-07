@@ -16,9 +16,9 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
     if (context.inlineQuery?.query === undefined) return
 
     const { userId } = context.state
-    const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
+    const ownedOnly = context.inlineQuery.query.startsWith('!')
     const query = normalizeTagValue(
-      authorUserId
+      ownedOnly
         ? context.inlineQuery.query.slice(1)
         : context.inlineQuery.query
     )
@@ -27,17 +27,19 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
 
     /** @type {import('../../types.d.ts').MinimalSticker[]} */
     let searchResults = []
+    let includesOwnedStickers = false
     if (isFavoriteQuery) {
       searchResults = await favoriteRepository.query({
         userId,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
     } else if (query.length >= MIN_QUERY_LENGTH && query.length <= MAX_QUERY_LENGTH) {
-      searchResults = await tagRepository.search({
+      ({ searchResults, includesOwnedStickers } = await tagRepository.search({
         query,
-        authorUserId,
+        authorUserId: userId,
+        ownedOnly,
         limit: INLINE_QUERY_RESULT_LIMIT,
-      })
+      }))
     } else {
       return
     }
@@ -50,7 +52,7 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
       })),
       {
         cache_time: inlineQueryCacheTimeS,
-        is_personal: isFavoriteQuery || Boolean(authorUserId),
+        is_personal: isFavoriteQuery || includesOwnedStickers,
         button: {
           text: isFavoriteQuery
             ? searchResults.length === 0

@@ -1,12 +1,13 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { favoriteAttributes as attr } from './attributes.js'
+import { logger } from '../logger.js'
 
 export class DynamodbFavoriteRepository {
   /**
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
-   * }} options 
+   * }} options
    */
   constructor({ dynamodbClient, tableName }) {
     this._dynamodbClient = dynamodbClient
@@ -36,7 +37,7 @@ export class DynamodbFavoriteRepository {
       })
     )
 
-    console.log('DynamodbFavoriteRepository#mark', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbFavoriteRepository#mark')
   }
 
   /**
@@ -57,7 +58,7 @@ export class DynamodbFavoriteRepository {
       })
     )
 
-    console.log('DynamodbFavoriteRepository#unmark', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbFavoriteRepository#unmark')
   }
 
   /**
@@ -91,7 +92,7 @@ export class DynamodbFavoriteRepository {
     })
 
     for await (const { ConsumedCapacity, ScannedCount, Items } of favoritePaginator) {
-      console.log('DynamodbFavoriteRepository#query', { ConsumedCapacity, ScannedCount })
+      logger.debug({ ConsumedCapacity, ScannedCount }, 'DynamodbFavoriteRepository#query')
 
       if (!Items) continue
       for (const item of Items) {
@@ -99,7 +100,7 @@ export class DynamodbFavoriteRepository {
         const stickerFileUniqueId = item[attr.stickerFileUniqueId]?.S
         const stickerFormat = item[attr.stickerFormat]?.N
         if (!stickerFileUniqueId || !stickerFileId || !stickerFormat) continue
-        
+
         const stickerSetName = item[attr.stickerSetName]?.S
         const stickerEmoji = item[attr.stickerEmoji]?.S
 
@@ -142,8 +143,8 @@ export class DynamodbFavoriteRepository {
         },
       })
     )
-  
-    console.log('DynamodbFavoriteRepository#isMarked', { ConsumedCapacity })
+
+    logger.debug({ ConsumedCapacity }, 'DynamodbFavoriteRepository#isMarked')
 
     return Boolean(Item)
   }

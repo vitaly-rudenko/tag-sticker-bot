@@ -119,7 +119,10 @@ await dynamodbClient.send(
       }],
       Projection: {
         ProjectionType: 'INCLUDE',
-        NonKeyAttributes: [tagAttributes.stickerFileUniqueId],
+        NonKeyAttributes: [
+          tagAttributes.stickerFileUniqueId,
+          tagAttributes.isPrivate,
+        ],
       },
       ProvisionedThroughput: {
         ReadCapacityUnits: 1,

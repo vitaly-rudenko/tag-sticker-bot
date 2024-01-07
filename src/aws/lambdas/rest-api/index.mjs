@@ -7,6 +7,7 @@ import { DynamodbUserSessionRepository } from '../../../users/DynamodbUserSessio
 import { createDynamodbClient } from '../../../utils/createDynamodbClient.js'
 import { TelegramErrorLogger } from '../../../bot/TelegramErrorLogger.js'
 import { DynamodbFavoriteRepository } from '../../../favorites/DynamodbFavoriteRepository.js'
+import { logger } from '../../../logger.js'
 
 const WEBHOOK_SECRET_TOKEN_HEADER = 'X-Telegram-Bot-Api-Secret-Token'
 
@@ -23,10 +24,10 @@ export async function handler(event) {
         body: JSON.stringify({ status: 'ok' }),
       }
     }
-  
+
     if (event.path === '/debug' && event.httpMethod === 'GET') {
       const bot = new Telegraf(telegramBotToken)
-  
+
       return {
         statusCode: 200,
         headers: {
@@ -38,7 +39,7 @@ export async function handler(event) {
         }),
       }
     }
-  
+
     if (event.path === '/webhook' && event.httpMethod === 'POST') {
       if (!webhookSecretToken) {
         throw new Error('Webhook secret token is not provided')
@@ -54,12 +55,12 @@ export async function handler(event) {
       const update = JSON.parse(event.body)
 
       const dynamodbClient = createDynamodbClient()
-  
+
       const userSessionRepository = new DynamodbUserSessionRepository({
         dynamodbClient,
         tableName: dynamodbUserSessionsTable,
       })
-    
+
       const tagRepository = new DynamodbTagRepository({
         dynamodbClient,
         tableName: dynamodbTagsTable,
@@ -69,7 +70,7 @@ export async function handler(event) {
         dynamodbClient,
         tableName: dynamodbFavoritesTable,
       })
-    
+
       const bot = await createBot({
         telegramBotToken,
         userSessionRepository,
@@ -88,20 +89,20 @@ export async function handler(event) {
               update
             )
         }
-        
+
         throw error
       }
-  
+
       return {
         statusCode: 200,
       }
     }
-  
+
     return {
       statusCode: 404,
     }
   } catch (error) {
-    console.error(error)
+    logger.error({ error })
     return {
       statusCode: 500,
     }

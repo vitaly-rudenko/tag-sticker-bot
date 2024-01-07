@@ -2,6 +2,7 @@ import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/clie
 import { encodeBitmap, decodeBitmap } from '../utils/bitmap.js'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 import { userSessionAttributes as attr } from './attributes.js'
+import { logger } from '../logger.js'
 
 const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
@@ -10,7 +11,7 @@ export class DynamodbUserSessionRepository {
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
-   * }} options 
+   * }} options
    */
   constructor({ dynamodbClient, tableName }) {
     this._dynamodbClient = dynamodbClient
@@ -34,6 +35,7 @@ export class DynamodbUserSessionRepository {
         TableName: this._tableName,
         Item: {
           [attr.userId]: { S: userId },
+          [attr.isPrivate]: { BOOL: context.isPrivate },
           [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) },
           ...context.phase && {
             [attr.phase]: { S: context.phase },
@@ -63,7 +65,7 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#set:putItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#set:putItem')
   }
 
   /**
@@ -81,10 +83,11 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#get:getItem')
 
-    if (!Item) return {}
+    if (!Item) return { isPrivate: false }
 
+    const isPrivate = Item[attr.isPrivate]?.BOOL
     const phase = Item[attr.phase]?.S
     const stickerSetName = Item[attr.stickerSetName]?.S
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
@@ -98,7 +101,8 @@ export class DynamodbUserSessionRepository {
     const queueStickerSetBitmapSize = Item[attr.queueStickerSetBitmapSize]?.N
     const queuePosition = Item[attr.queuePosition]?.N
 
-    return Item ? {
+    return {
+      isPrivate: isPrivate ?? false,
       ...phase && { phase },
       ...stickerFileUniqueId && stickerFileId && stickerFormat && {
         sticker: {
@@ -123,7 +127,7 @@ export class DynamodbUserSessionRepository {
           },
         }
       },
-    } : {}
+    }
   }
 
   /** @param {string} userId */
@@ -138,6 +142,6 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#clear:deleteItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#clear:deleteItem')
   }
 }

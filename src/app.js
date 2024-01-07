@@ -4,6 +4,7 @@ import { dynamodbFavoritesTable, dynamodbTagsTable, dynamodbUserSessionsTable, t
 import { createDynamodbClient } from './utils/createDynamodbClient.js'
 import { DynamodbUserSessionRepository } from './users/DynamodbUserSessionRepository.js'
 import { DynamodbFavoriteRepository } from './favorites/DynamodbFavoriteRepository.js'
+import { logger } from './logger.js'
 
 async function start() {
   const dynamodbClient = createDynamodbClient()
@@ -31,14 +32,14 @@ async function start() {
   })
 
   bot.launch().catch((error) => {
-    console.error(error)
+    logger.error({ error })
     process.exit(1)
   })
 }
 
 start()
-  .then(() => console.log('Started!'))
+  .then(() => logger.info('Started!'))
   .catch((error) => {
-    console.error(error)
+    logger.error({ error })
     process.exit(1)
   })

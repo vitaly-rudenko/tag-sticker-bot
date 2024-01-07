@@ -8,6 +8,7 @@ This bot enables users to tag stickers, perform quick searches, and mark favorit
 
 Features:
 - 📝 Tag stickers (up to 10 tags per sticker)
+- 🔒 Create private tags for stickers that only you can search
 - 🔍 Search stickers by your tags or all tags (inline query)
 - 🖇 Quickly tag all stickers in a sticker set
 - ❤️ Mark stickers as favorites for quick access
