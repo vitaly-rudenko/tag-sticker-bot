@@ -19,8 +19,8 @@ const isProduction = environment === 'prod'
 
 export class TagStickerBotStack extends cdk.Stack {
   /**
-   * @param {cdk.App} app 
-   * @param {string} id 
+   * @param {cdk.App} app
+   * @param {string} id
    */
   constructor(app, id) {
     super(app, id)
@@ -155,7 +155,7 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
-      nonKeyAttributes: [tagAttributes.stickerFileUniqueId],
+      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.isPrivate],
       readCapacity: 2,
       writeCapacity: 2,
     })

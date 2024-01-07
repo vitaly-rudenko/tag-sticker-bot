@@ -170,28 +170,31 @@ export function useQueueFlow({
       return
     }
 
+    const queueButtons = [
+      ...queue && queue.position > 1 ? [
+        Markup.button.callback(
+          `⬅️ Undo`,
+          'queue:step:-1'
+        )
+      ] : [],
+      ...queue && queue.position < queue.stickerSetBitmap.size ? [
+        Markup.button.callback(
+          `➡️ Skip`,
+          'queue:step:1'
+        )
+      ] : [],
+    ]
+
     const { message_id: stickerMessageId } = await context.replyWithSticker(
       sticker.file_id,
       {
         reply_markup: Markup.inlineKeyboard(
           [
-
-            ...queue && queue.position < queue.stickerSetBitmap.size ? [
-              Markup.button.callback(
-                `➡️ Skip (${queue.position}/${queue.stickerSetBitmap.size})`,
-                'queue:step:1'
-              )
-            ] : [],
-            ...queue && queue.position > 1 ? [
-              Markup.button.callback(
-                `⬅️ Undo`,
-                'queue:step:-1'
-              )
-            ] : [],
-            Markup.button.callback(queue ? '❌ Stop' : '❌ Cancel', 'queue:clear'),
-            Markup.button.callback(isPrivate ? '🔒 Private' : '🔓 Public', 'scope:toggle'),
+            ...queueButtons,
+            Markup.button.callback(queue ? `❌ Stop (${queue.position}/${queue.stickerSetBitmap.size})` : '❌ Cancel', 'queue:clear'),
+            Markup.button.callback(isPrivate ? '🔒 Visibility: private' : '🔓 Visibility: public', 'scope:toggle'),
           ].filter(Boolean),
-          { wrap: (_, i) => i === 1 },
+          { wrap: (_, i) => i >= queueButtons.length },
         ).reply_markup,
       }
     )
