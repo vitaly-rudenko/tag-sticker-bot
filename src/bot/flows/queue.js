@@ -136,7 +136,7 @@ export function useQueueFlow({
 
     await proceedTagging(context, {
       userId,
-      isPrivate: !newIsPrivate,
+      isPrivate: newIsPrivate,
       ...queue && {
         queue: {
           ...queue,
