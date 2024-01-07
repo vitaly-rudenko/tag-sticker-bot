@@ -28,135 +28,72 @@ describe('DynamodbTagRepository', () => {
     const user2 = generateId('user-2')
     const set1 = generateId('set-1')
     const set2 = generateId('set-2')
-    const sticker1 = generateId('sticker-1')
-    const sticker2 = generateId('sticker-2')
-    const sticker3 = generateId('sticker-3')
-    const sticker4 = generateId('sticker-4')
-    const sticker5 = generateId('sticker-5')
+    const stickerId1 = generateId('sticker-1')
+    const stickerId2 = generateId('sticker-2')
+    const stickerId3 = generateId('sticker-3')
+    const stickerId4 = generateId('sticker-4')
+    const stickerId5 = generateId('sticker-5')
 
-    const tag1 = {
-      sticker: {
-        set_name: set1,
-        file_unique_id: sticker1,
-        file_id: generateId('sticker'),
-      },
+    const sticker1 = { file_unique_id: stickerId1, file_id: generateId('file-id') }
+    const sticker2 = { file_unique_id: stickerId2, file_id: generateId('file-id') }
+    const sticker3 = { file_unique_id: stickerId3, file_id: generateId('file-id') }
+    const sticker4 = { file_unique_id: stickerId4, file_id: generateId('file-id') }
+    const sticker5 = { file_unique_id: stickerId5, file_id: generateId('file-id') }
+
+    await tagRepository.store({
+      isPrivate: false,
+      sticker: withSetName(sticker1, set1),
       authorUserId: user1,
-      value: 'hello world',
-    }
-
-    const tag2 = {
-      sticker: {
-        set_name: set1,
-        file_unique_id: sticker2,
-        file_id: generateId('sticker'),
-      },
-      authorUserId: user2,
-      value: 'hello there',
-    }
-
-    const tag3 = {
-      sticker: {
-        set_name: set2,
-        file_unique_id: sticker3,
-        file_id: generateId('sticker'),
-      },
-      authorUserId: user2,
-      value: 'there it is',
-    }
-
-    const tag4 = {
-      sticker: {
-        set_name: set2,
-        file_unique_id: sticker4,
-        file_id: generateId('sticker'),
-      },
-      authorUserId: user1,
-      value: 'reuse 1',
-    }
-
-    const tag5 = {
-      sticker: {
-        set_name: set2,
-        file_unique_id: sticker4,
-        file_id: generateId('sticker'),
-      },
-      authorUserId: user2,
-      value: 'reuse 2',
-    }
-
-    const tag6 = {
-      sticker: {
-        file_unique_id: sticker5,
-        file_id: generateId('sticker'),
-      },
-      authorUserId: user2,
-      value: 'setless sticker',
-    }
-
-    // store
-
-    await tagRepository.store({
-      isPrivate: false,
-      authorUserId: tag1.authorUserId,
-      sticker: tag1.sticker,
-      values: [tag1.value],
+      values: ['hello world'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      authorUserId: tag2.authorUserId,
-      sticker: tag2.sticker,
-      values: [tag2.value],
+      sticker: withSetName(sticker2, set1),
+      authorUserId: user2,
+      values: ['hello there'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      authorUserId: tag3.authorUserId,
-      sticker: tag3.sticker,
-      values: [tag3.value],
+      sticker: withSetName(sticker3, set2),
+      authorUserId: user2,
+      values: ['there it is'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: {
-        set_name: set2,
-        file_unique_id: sticker4,
-        file_id: generateId('sticker'),
-      },
+      sticker: withSetName(sticker4, set2),
       authorUserId: user1,
       values: ['reuse 1 to be overwritten'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: {
-        set_name: set2,
-        file_unique_id: sticker4,
-        file_id: generateId('sticker'),
-      },
+      sticker: withSetName(sticker4, set2),
       authorUserId: user2,
       values: ['reuse 2 to be overwritten'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      authorUserId: tag4.authorUserId,
-      sticker: tag4.sticker,
-      values: [tag4.value],
+      sticker: withSetName(sticker4, set2),
+      authorUserId: user1,
+      values: ['reuse 1'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      authorUserId: tag5.authorUserId,
-      sticker: tag5.sticker,
-      values: [tag5.value],
+      sticker: withSetName(sticker4, set2),
+      authorUserId: user2,
+      values: ['reuse 2'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      authorUserId: tag6.authorUserId,
-      sticker: tag6.sticker,
-      values: [tag6.value],
+      sticker: sticker5,
+      authorUserId: user2,
+      values: ['setless sticker'],
     })
 
     // query
@@ -165,13 +102,13 @@ describe('DynamodbTagRepository', () => {
       ownedOnly: false,
       authorUserId: user1,
       stickerSetName: set1,
-    })).resolves.toEqual(new Set([sticker1, sticker2]))
+    })).resolves.toEqual(new Set([stickerId1, stickerId2]))
 
     await expect(tagRepository.queryStatus({
       ownedOnly: false,
       authorUserId: user1,
       stickerSetName: set2,
-    })).resolves.toEqual(new Set([sticker3, sticker4]))
+    })).resolves.toEqual(new Set([stickerId3, stickerId4]))
 
     await expect(tagRepository.queryStatus({
       ownedOnly: false,
@@ -186,59 +123,80 @@ describe('DynamodbTagRepository', () => {
       ownedOnly: false,
       limit: 100,
       query: 'hey'
-    })).resolves.toEqual([])
+    })).resolves.toEqual({
+      searchResults: [],
+      includesOwnedStickers: false
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: false,
       limit: 100,
       query: 'it is',
-    })).resolves.toEqual([])
+    })).resolves.toEqual({
+      searchResults: [],
+      includesOwnedStickers: false
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: false,
       limit: 100,
       query: 'hello'
-    })).resolves.toIncludeSameMembers([
-      { file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id },
-      { file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id },
-    ])
+    })).resolves.toEqual({
+      searchResults: [sticker1, sticker2],
+      includesOwnedStickers: true,
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: false,
       limit: 100,
       query: 'there'
-    })).resolves.toIncludeSameMembers([{ file_id: tag3.sticker.file_id, file_unique_id: tag3.sticker.file_unique_id }])
+    })).resolves.toEqual({
+      searchResults: [sticker3],
+      includesOwnedStickers: false,
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: true,
       limit: 100,
       query: 'hello',
-    })).resolves.toIncludeSameMembers([{ file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id }])
+    })).resolves.toEqual({
+      searchResults: [sticker1],
+      includesOwnedStickers: true,
+    })
 
     await expect(tagRepository.search({
       authorUserId: user2,
       ownedOnly: true,
       limit: 100,
       query: 'hello',
-    })).resolves.toIncludeSameMembers([{ file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id }])
+    })).resolves.toEqual({
+      searchResults: [sticker2],
+      includesOwnedStickers: true,
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: false,
       limit: 100,
       query: 'reuse',
-    })).resolves.toIncludeSameMembers([{ file_id: tag4.sticker.file_id, file_unique_id: tag4.sticker.file_unique_id }])
+    })).resolves.toEqual({
+      searchResults: [sticker4],
+      includesOwnedStickers: true,
+    })
 
     await expect(tagRepository.search({
       authorUserId: user1,
       ownedOnly: false,
       limit: 100,
       query: 'set',
-    })).resolves.toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
+    })).resolves.toEqual({
+      searchResults: [sticker5],
+      includesOwnedStickers: false,
+    })
   })
 
   it('should handle private tags', async () => {
@@ -286,47 +244,65 @@ describe('DynamodbTagRepository', () => {
 
     // search
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: false,
       authorUserId: userId1,
       limit: 100,
-    })).resolves.toIncludeSameMembers([sticker1, sticker2, sticker3])
+    })).resolves.toEqual({
+      searchResults: [sticker1, sticker2, sticker3],
+      includesOwnedStickers: true
+    })
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: false,
       authorUserId: userId2,
       limit: 100,
-    })).resolves.toIncludeSameMembers([sticker2, sticker3, sticker4])
+    })).resolves.toEqual({
+      searchResults: [sticker3, sticker4, sticker2],
+      includesOwnedStickers: true
+    })
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: true,
       authorUserId: userId1,
       limit: 100,
-    })).resolves.toIncludeSameMembers([sticker1, sticker2])
+    })).resolves.toEqual({
+      searchResults: [sticker1, sticker2],
+      includesOwnedStickers: true
+    })
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: true,
       authorUserId: userId2,
       limit: 100,
-    })).resolves.toIncludeSameMembers([sticker3, sticker4])
+    })).resolves.toEqual({
+      searchResults: [sticker3, sticker4],
+      includesOwnedStickers: true
+    })
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: false,
       authorUserId: userId3,
       limit: 100,
-    })).resolves.toIncludeSameMembers([sticker2, sticker3])
+    })).resolves.toEqual({
+      searchResults: [sticker2, sticker3],
+      includesOwnedStickers: false
+    })
 
-    await expect(tagRepository.search({
+    expect(tagRepository.search({
       query: 'sticker',
       ownedOnly: true,
       authorUserId: userId3,
       limit: 100,
-    })).resolves.toEqual([])
+    })).resolves.toEqual({
+      searchResults: [],
+      includesOwnedStickers: false
+    })
 
     // query
 

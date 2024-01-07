@@ -44,7 +44,10 @@ export interface TagRepository {
     limit: number
     authorUserId: string
     ownedOnly: boolean
-  }): Promise<MinimalSticker[]>
+  }): Promise<{
+    includesOwnedStickers: boolean
+    searchResults: MinimalSticker[]
+  }>
   queryStatus(input: {
     stickerSetName: string
     authorUserId: string

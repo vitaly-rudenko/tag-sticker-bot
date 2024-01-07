@@ -155,7 +155,10 @@ export class DynamodbTagRepository {
    *   authorUserId: string
    *   ownedOnly: boolean
    * }} input
-   * @returns {Promise<import('../types.d.ts').MinimalSticker[]>}
+   * @returns {Promise<{
+   *   searchResults: import('../types.d.ts').MinimalSticker[]
+   *   includesOwnedStickers: boolean
+   * }>}
    */
   async search({ query, limit, authorUserId, ownedOnly }) {
     if (typeof query !== 'string' || !query) {
@@ -163,8 +166,8 @@ export class DynamodbTagRepository {
     }
 
     // always search in owned tags first
-    const { stickerFileUniqueIds, stickers } = await this._search({ query, limit, authorUserId })
-    const remainingLimit = limit - stickers.length
+    const { stickerFileUniqueIds, stickers: ownedStickers } = await this._search({ query, limit, authorUserId })
+    const remainingLimit = limit - ownedStickers.length
 
     // search in public tags if necessary
     if (!ownedOnly && remainingLimit > 0) {
@@ -174,10 +177,16 @@ export class DynamodbTagRepository {
         excludeStickerFileUniqueIds: stickerFileUniqueIds
       })
 
-      stickers.push(...publicStickers)
+      return {
+        searchResults: ownedStickers.concat(publicStickers),
+        includesOwnedStickers: ownedStickers.length > 0
+      }
+    } else {
+      return {
+        searchResults: ownedStickers,
+        includesOwnedStickers: ownedStickers.length > 0
+      }
     }
-
-    return stickers
   }
 
   /**
@@ -225,13 +234,9 @@ export class DynamodbTagRepository {
 
       for (const item of Items) {
         const stickerFileUniqueId = item[attr.stickerFileUniqueId]?.S
-        if (
-          !stickerFileUniqueId ||
-          stickerFileUniqueIds.has(stickerFileUniqueId) ||
-          excludeStickerFileUniqueIds?.has(stickerFileUniqueId)
-        ) {
-          continue
-        }
+        if (!stickerFileUniqueId) continue
+        if (stickerFileUniqueIds.has(stickerFileUniqueId)) continue
+        if (excludeStickerFileUniqueIds?.has(stickerFileUniqueId)) continue
 
         const stickerFileId = item[attr.stickerFileId]?.S
         if (!stickerFileId) {
