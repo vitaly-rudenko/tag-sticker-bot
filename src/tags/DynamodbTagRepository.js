@@ -22,11 +22,12 @@ export class DynamodbTagRepository {
   /**
    * @param {{
    *   authorUserId: string
+   *   isPrivate: boolean
    *   sticker: import('../types.d.ts').MinimalStickerWithSet
    *   values: string[]
    * }} input
    */
-  async store({ authorUserId, sticker, values }) {
+  async store({ authorUserId, isPrivate, sticker, values }) {
     if (values.length === 0)
       throw new Error('Values list is empty')
     if (values.length > this._maxTagsPerSticker)
@@ -78,7 +79,7 @@ export class DynamodbTagRepository {
                   PutRequest: {
                     Item: {
                       [attr.tagId]: { S: tagId(authorUserId, sticker.file_unique_id) },
-                      [attr.valuePartition]: { S: valuePartition(value) },
+                      [attr.isPrivate]: { BOOL: isPrivate },
                       [attr.authorUserId]: { S: authorUserId },
                       ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
                       [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
