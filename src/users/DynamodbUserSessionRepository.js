@@ -34,7 +34,7 @@ export class DynamodbUserSessionRepository {
         TableName: this._tableName,
         Item: {
           [attr.userId]: { S: userId },
-          [attr.privateTagging]: { BOOL: context.privateTagging },
+          [attr.isPrivate]: { BOOL: context.isPrivate },
           [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) },
           ...context.phase && {
             [attr.phase]: { S: context.phase },
@@ -84,9 +84,9 @@ export class DynamodbUserSessionRepository {
 
     console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
 
-    if (!Item) return { privateTagging: false }
+    if (!Item) return { isPrivate: false }
 
-    const privateTagging = Item[attr.privateTagging]?.BOOL
+    const isPrivate = Item[attr.isPrivate]?.BOOL
     const phase = Item[attr.phase]?.S
     const stickerSetName = Item[attr.stickerSetName]?.S
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
@@ -101,7 +101,7 @@ export class DynamodbUserSessionRepository {
     const queuePosition = Item[attr.queuePosition]?.N
 
     return {
-      privateTagging: privateTagging ?? false,
+      isPrivate: isPrivate ?? false,
       ...phase && { phase },
       ...stickerFileUniqueId && stickerFileId && stickerFormat && {
         sticker: {

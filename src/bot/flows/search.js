@@ -16,9 +16,9 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
     if (context.inlineQuery?.query === undefined) return
 
     const { userId } = context.state
-    const authorUserId = context.inlineQuery.query.startsWith('!') ? userId : undefined
+    const ownedOnly = context.inlineQuery.query.startsWith('!')
     const query = normalizeTagValue(
-      authorUserId
+      ownedOnly
         ? context.inlineQuery.query.slice(1)
         : context.inlineQuery.query
     )
@@ -35,7 +35,8 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
     } else if (query.length >= MIN_QUERY_LENGTH && query.length <= MAX_QUERY_LENGTH) {
       searchResults = await tagRepository.search({
         query,
-        authorUserId,
+        authorUserId: userId,
+        ownedOnly,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
     } else {
@@ -50,7 +51,7 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
       })),
       {
         cache_time: inlineQueryCacheTimeS,
-        is_personal: isFavoriteQuery || Boolean(authorUserId),
+        is_personal: isFavoriteQuery || ownedOnly,
         button: {
           text: isFavoriteQuery
             ? searchResults.length === 0

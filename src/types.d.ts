@@ -8,7 +8,7 @@ export type MinimalStickerWithSet = Pick<Sticker, 'set_name' | 'file_id' | 'file
 export type MinimalSticker = Pick<Sticker, 'file_id' | 'file_unique_id'>
 
 export type UserSessionContext = {
-  privateTagging: boolean
+  isPrivate: boolean
   phase?: string
   sticker?: Sticker
   stickerMessageId?: number
@@ -37,21 +37,24 @@ export interface TagRepository {
     authorUserId: string
     sticker: MinimalStickerWithSet
     values: string[]
+    isPrivate: boolean
   }): Promise<void>
   search(input: {
     query: string
     limit: number
-    authorUserId?: string
+    authorUserId: string
+    ownedOnly: boolean
   }): Promise<MinimalSticker[]>
   queryStatus(input: {
     stickerSetName: string
-    authorUserId?: string
+    authorUserId: string
+    ownedOnly: boolean
   }): Promise<Set<string>>
 }
 
 export type proceedTagging = (context: Context, input: {
   userId: string
-  privateTagging: boolean
+  isPrivate: boolean
   queue?: Queue
   sticker?: Sticker
 }) => Promise<void>

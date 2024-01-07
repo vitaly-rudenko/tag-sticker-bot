@@ -26,7 +26,7 @@ export function useQueueFlow({
     const stickerSetName = context.message.sticker.set_name
 
     await userSessionRepository.set(userId, {
-      privateTagging: false,
+      isPrivate: false,
       stickerMessageId: context.message.message_id,
       sticker: {
         file_unique_id: stickerFileUniqueId,
@@ -102,14 +102,14 @@ export function useQueueFlow({
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { tagInstructionMessageId, queue, privateTagging } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId, queue, isPrivate } = await userSessionRepository.get(userId)
 
     await deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
 
     if (!queue) return
     await proceedTagging(context, {
       userId,
-      privateTagging,
+      isPrivate,
       queue: {
         ...queue,
         position: queue.position + steps - 1,
@@ -123,10 +123,10 @@ export function useQueueFlow({
     context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { tagInstructionMessageId, queue, privateTagging, sticker } = await userSessionRepository.get(userId)
+    const { tagInstructionMessageId, queue, isPrivate, sticker } = await userSessionRepository.get(userId)
     if (context.updateType === 'callback_query') {
       context.answerCbQuery(
-        privateTagging
+        isPrivate
           ? '🔓 Your tags for this sticker are now public'
           : '🔒 Your tags for this sticker are now private'
       ).catch(() => {})
@@ -136,7 +136,7 @@ export function useQueueFlow({
 
     await proceedTagging(context, {
       userId,
-      privateTagging: !privateTagging,
+      isPrivate: !isPrivate,
       ...queue && {
         queue: {
           ...queue,
@@ -148,7 +148,7 @@ export function useQueueFlow({
   }
 
   /** @type {import('../../types.d.ts').proceedTagging} */
-  async function proceedTagging(context, { userId, privateTagging, queue, sticker }) {
+  async function proceedTagging(context, { userId, isPrivate, queue, sticker }) {
     if (!sticker && (!queue || queue.position > queue.stickerSetBitmap.size)) {
       await Promise.all([
         userSessionRepository.clear(userId),
@@ -189,7 +189,7 @@ export function useQueueFlow({
               )
             ] : [],
             Markup.button.callback(queue ? '❌ Stop' : '❌ Cancel', 'queue:clear'),
-            Markup.button.callback(privateTagging ? '🔒 Private' : '🔓 Public', 'scope:toggle'),
+            Markup.button.callback(isPrivate ? '🔒 Private' : '🔓 Public', 'scope:toggle'),
           ].filter(Boolean),
           { wrap: (_, i) => i === 1 },
         ).reply_markup,
@@ -212,7 +212,7 @@ export function useQueueFlow({
       },
       stickerMessageId,
       tagInstructionMessageId: message_id,
-      privateTagging,
+      isPrivate,
       ...queue && {
         queue: {
           stickerSetBitmap: queue.stickerSetBitmap,
