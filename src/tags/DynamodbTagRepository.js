@@ -120,14 +120,15 @@ export class DynamodbTagRepository {
       ExpressionAttributeNames: {
         '#stickerSetName': attr.stickerSetName,
         '#stickerFileUniqueId': attr.stickerFileUniqueId,
-        ...ownedOnly && { '#authorUserId': attr.authorUserId },
+        '#authorUserId': attr.authorUserId,
+        '#isPrivate': attr.isPrivate,
       },
       ExpressionAttributeValues: {
         ':stickerSetName': { S: stickerSetName },
         ...ownedOnly && { ':authorUserId': { S: authorUserId } },
       },
       ReturnConsumedCapacity: 'TOTAL',
-      ProjectionExpression: '#stickerFileUniqueId',
+      ProjectionExpression: '#stickerFileUniqueId, #isPrivate, #authorUserId',
     })
 
     const stickerFileUniqueIds = new Set()
