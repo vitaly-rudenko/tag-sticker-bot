@@ -343,6 +343,64 @@ describe('DynamodbTagRepository', () => {
     })).resolves.toEqual(new Set([]))
   })
 
+  it('should properly replace tags with different scopes', async () => {
+    const userId1 = generateId('user-1')
+    const userId2 = generateId('user-2')
+    const stickerId1 = generateId('sticker-1')
+
+    const sticker = { file_id: generateId('file-id'), file_unique_id: stickerId1 }
+    const value = generateId('value')
+
+    await tagRepository.store({
+      authorUserId: userId1,
+      isPrivate: false,
+      sticker,
+      values: [value],
+    })
+
+    await tagRepository.store({
+      authorUserId: userId1,
+      isPrivate: true,
+      sticker,
+      values: [value],
+    })
+
+    await expect(tagRepository.search({
+      query: value,
+      authorUserId: userId1,
+      limit: 100,
+      ownedOnly: false
+    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: true })
+
+    await expect(tagRepository.search({
+      query: value,
+      authorUserId: userId2,
+      limit: 100,
+      ownedOnly: false
+    })).resolves.toEqual({ searchResults: [], includesOwnedStickers: false })
+
+    await tagRepository.store({
+      authorUserId: userId1,
+      isPrivate: false,
+      sticker,
+      values: [value],
+    })
+
+    await expect(tagRepository.search({
+      query: value,
+      authorUserId: userId1,
+      limit: 100,
+      ownedOnly: false
+    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: true })
+
+    await expect(tagRepository.search({
+      query: value,
+      authorUserId: userId2,
+      limit: 100,
+      ownedOnly: false
+    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: false })
+  })
+
   it('should handle high throughput for store()', async () => {
     const authorUserId = generateId('user')
     const sticker = {

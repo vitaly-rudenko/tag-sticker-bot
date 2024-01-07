@@ -48,7 +48,6 @@ export class DynamodbTagRepository {
       ProjectionExpression: '#tagId, #value',
     })
 
-    /** @type {Record<string, import('@aws-sdk/client-dynamodb').AttributeValue>[]} */
     const existingItems = []
     for await (const { Items, ConsumedCapacity, ScannedCount } of existingTagPaginator) {
       logger.debug({ ConsumedCapacity, ScannedCount }, 'DynamodbTagRepository#store:query')
@@ -56,19 +55,18 @@ export class DynamodbTagRepository {
       existingItems.push(...Items)
     }
 
-    const filteredValues = values.filter(value => !existingItems.some(item => value === item[attr.value]?.S))
-    const filteredExistingItems = existingItems.filter(item => {
+    const itemsToDelete = existingItems.filter(item => {
       const value = item[attr.value]?.S
-      return value && !values.includes(value)
+      return !value || !values.includes(value)
     })
 
-    for (let i = 0; i < Math.max(filteredValues.length, filteredExistingItems.length); i += this._storeWriteItemLimit) {
+    for (let i = 0; i < Math.max(values.length, itemsToDelete.length); i += this._storeWriteItemLimit) {
       const { ConsumedCapacity, UnprocessedItems } = await this._dynamodbClient.send(
         new BatchWriteItemCommand({
           ReturnConsumedCapacity: 'TOTAL',
             RequestItems: {
               [this._tableName]: [
-                ...filteredExistingItems.slice(i, i + this._storeWriteItemLimit).map(item => ({
+                ...itemsToDelete.slice(i, i + this._storeWriteItemLimit).map(item => ({
                   DeleteRequest: {
                     Key: {
                       [attr.tagId]: item[attr.tagId],
@@ -76,7 +74,7 @@ export class DynamodbTagRepository {
                     }
                   }
                 })),
-                ...filteredValues.slice(i, i + this._storeWriteItemLimit).map(value => ({
+                ...values.slice(i, i + this._storeWriteItemLimit).map(value => ({
                   PutRequest: {
                     Item: {
                       [attr.tagId]: { S: tagId(authorUserId, sticker.file_unique_id) },

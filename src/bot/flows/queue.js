@@ -124,19 +124,19 @@ export function useQueueFlow({
 
     const { userId } = context.state
     const { tagInstructionMessageId, queue, isPrivate, sticker } = await userSessionRepository.get(userId)
-    if (context.updateType === 'callback_query') {
-      context.answerCbQuery(
-        isPrivate
-          ? '🔓 Your tags for this sticker are now public'
-          : '🔒 Your tags for this sticker are now private'
-      ).catch(() => {})
-    }
+    const newIsPrivate = !isPrivate
+
+    context.answerCbQuery(
+      newIsPrivate
+        ? '🔒 Your tags for this sticker are now private'
+        : '🔓 Your tags for this sticker are now public'
+    ).catch(() => {})
 
     await deleteMessages(telegram, context.chat.id, [tagInstructionMessageId])
 
     await proceedTagging(context, {
       userId,
-      isPrivate: !isPrivate,
+      isPrivate: !newIsPrivate,
       ...queue && {
         queue: {
           ...queue,
