@@ -1,5 +1,6 @@
 import { Telegraf } from 'telegraf'
 import { telegramBotToken, webhookSecretToken, webhookUrl } from './init-env.mjs'
+import { logger } from '../../../logger.js'
 
 export async function handler() {
   try {
@@ -19,7 +20,7 @@ export async function handler() {
 
     return { statusCode: 200 }
   } catch (error) {
-    console.error(error)
+    logger.error({ error })
     return { statusCode: 500 }
   }
 }

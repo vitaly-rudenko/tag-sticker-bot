@@ -2,6 +2,7 @@ import { DeleteItemCommand, GetItemCommand, PutItemCommand } from '@aws-sdk/clie
 import { encodeBitmap, decodeBitmap } from '../utils/bitmap.js'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 import { userSessionAttributes as attr } from './attributes.js'
+import { logger } from '../logger.js'
 
 const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
@@ -64,7 +65,7 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#set:putItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#set:putItem')
   }
 
   /**
@@ -82,7 +83,7 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#get:getItem')
 
     if (!Item) return { isPrivate: false }
 
@@ -141,6 +142,6 @@ export class DynamodbUserSessionRepository {
       })
     )
 
-    console.log('DynamodbUserSessionRepository#clear:deleteItem', { ConsumedCapacity })
+    logger.debug({ ConsumedCapacity }, 'DynamodbUserSessionRepository#clear:deleteItem')
   }
 }
