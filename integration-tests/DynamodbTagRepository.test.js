@@ -8,11 +8,8 @@ function generateId(name) {
   return `${name}-${randomBytes(8).toString('hex')}`
 }
 
-function defaultTag(tag) {
-  return {
-    ...tag,
-    authorUserId: '#',
-  }
+function withSetName(sticker, setName) {
+  return { ...sticker, set_name: setName }
 }
 
 describe('DynamodbTagRepository', () => {
@@ -242,6 +239,132 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'set',
     })).resolves.toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
+  })
+
+  it('should handle private tags', async () => {
+    const userId1 = generateId('user-1')
+    const userId2 = generateId('user-2')
+    const userId3 = generateId('user-3')
+    const setName = generateId('set')
+    const stickerId1 = generateId('sticker-1')
+    const stickerId2 = generateId('sticker-2')
+    const stickerId3 = generateId('sticker-3')
+    const stickerId4 = generateId('sticker-4')
+
+    const sticker1 = { file_id: generateId('file-id'), file_unique_id: stickerId1 }
+    const sticker2 = { file_id: generateId('file-id'), file_unique_id: stickerId2 }
+    const sticker3 = { file_id: generateId('file-id'), file_unique_id: stickerId3 }
+    const sticker4 = { file_id: generateId('file-id'), file_unique_id: stickerId4 }
+
+    await tagRepository.store({
+      sticker: withSetName(sticker1, setName),
+      authorUserId: userId1,
+      isPrivate: true,
+      values: ['sticker-1'],
+    })
+
+    await tagRepository.store({
+      sticker: withSetName(sticker2, setName),
+      authorUserId: userId1,
+      isPrivate: false,
+      values: ['sticker-2'],
+    })
+
+    await tagRepository.store({
+      sticker: withSetName(sticker3, setName),
+      authorUserId: userId2,
+      isPrivate: false,
+      values: ['sticker-3'],
+    })
+
+    await tagRepository.store({
+      sticker: withSetName(sticker4, setName),
+      authorUserId: userId2,
+      isPrivate: true,
+      values: ['sticker-4'],
+    })
+
+    // search
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: false,
+      authorUserId: userId1,
+      limit: 100,
+    })).resolves.toIncludeSameMembers([sticker1, sticker2, sticker3])
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: false,
+      authorUserId: userId2,
+      limit: 100,
+    })).resolves.toIncludeSameMembers([sticker2, sticker3, sticker4])
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: true,
+      authorUserId: userId1,
+      limit: 100,
+    })).resolves.toIncludeSameMembers([sticker1, sticker2])
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: true,
+      authorUserId: userId2,
+      limit: 100,
+    })).resolves.toIncludeSameMembers([sticker3, sticker4])
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: false,
+      authorUserId: userId3,
+      limit: 100,
+    })).resolves.toIncludeSameMembers([sticker2, sticker3])
+
+    await expect(tagRepository.search({
+      query: 'sticker',
+      ownedOnly: true,
+      authorUserId: userId3,
+      limit: 100,
+    })).resolves.toEqual([])
+
+    // query
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId1,
+      ownedOnly: false,
+    })).resolves.toEqual(new Set([stickerId1, stickerId2, stickerId3]))
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId1,
+      ownedOnly: true,
+    })).resolves.toEqual(new Set([stickerId1, stickerId2]))
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId2,
+      ownedOnly: false,
+    })).resolves.toEqual(new Set([stickerId2, stickerId3, stickerId4]))
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId2,
+      ownedOnly: true,
+    })).resolves.toEqual(new Set([stickerId3, stickerId4]))
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId3,
+      ownedOnly: false,
+    })).resolves.toEqual(new Set([stickerId2, stickerId3]))
+
+    await expect(tagRepository.queryStatus({
+      stickerSetName: setName,
+      authorUserId: userId3,
+      ownedOnly: true,
+    })).resolves.toEqual(new Set([]))
   })
 
   it('should handle high throughput for store()', async () => {
