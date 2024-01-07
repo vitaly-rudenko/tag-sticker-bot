@@ -99,24 +99,28 @@ describe('DynamodbTagRepository', () => {
     // store
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag1.authorUserId,
       sticker: tag1.sticker,
       values: [tag1.value],
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag2.authorUserId,
       sticker: tag2.sticker,
       values: [tag2.value],
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag3.authorUserId,
       sticker: tag3.sticker,
       values: [tag3.value],
     })
 
     await tagRepository.store({
+      isPrivate: false,
       sticker: {
         set_name: set2,
         file_unique_id: sticker4,
@@ -127,6 +131,7 @@ describe('DynamodbTagRepository', () => {
     })
 
     await tagRepository.store({
+      isPrivate: false,
       sticker: {
         set_name: set2,
         file_unique_id: sticker4,
@@ -137,18 +142,21 @@ describe('DynamodbTagRepository', () => {
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag4.authorUserId,
       sticker: tag4.sticker,
       values: [tag4.value],
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag5.authorUserId,
       sticker: tag5.sticker,
       values: [tag5.value],
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId: tag6.authorUserId,
       sticker: tag6.sticker,
       values: [tag6.value],
@@ -157,31 +165,42 @@ describe('DynamodbTagRepository', () => {
     // query
 
     await expect(tagRepository.queryStatus({
+      ownedOnly: false,
+      authorUserId: user1,
       stickerSetName: set1,
     })).resolves.toEqual(new Set([sticker1, sticker2]))
 
     await expect(tagRepository.queryStatus({
+      ownedOnly: false,
+      authorUserId: user1,
       stickerSetName: set2,
     })).resolves.toEqual(new Set([sticker3, sticker4]))
 
     await expect(tagRepository.queryStatus({
+      ownedOnly: false,
+      authorUserId: user1,
       stickerSetName: generateId('set-3'),
     })).resolves.toEqual(new Set())
 
     // search
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'hey'
     })).resolves.toEqual([])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'it is',
-      authorUserId: user1,
     })).resolves.toEqual([])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'hello'
     })).resolves.toIncludeSameMembers([
@@ -190,28 +209,36 @@ describe('DynamodbTagRepository', () => {
     ])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'there'
     })).resolves.toIncludeSameMembers([{ file_id: tag3.sticker.file_id, file_unique_id: tag3.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: true,
       limit: 100,
       query: 'hello',
-      authorUserId: user1,
     })).resolves.toIncludeSameMembers([{ file_id: tag1.sticker.file_id, file_unique_id: tag1.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
+      authorUserId: user2,
+      ownedOnly: true,
       limit: 100,
       query: 'hello',
-      authorUserId: user2,
     })).resolves.toIncludeSameMembers([{ file_id: tag2.sticker.file_id, file_unique_id: tag2.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'reuse',
     })).resolves.toIncludeSameMembers([{ file_id: tag4.sticker.file_id, file_unique_id: tag4.sticker.file_unique_id }])
 
     await expect(tagRepository.search({
+      authorUserId: user1,
+      ownedOnly: false,
       limit: 100,
       query: 'set',
     })).resolves.toIncludeSameMembers([{ file_id: tag6.sticker.file_id, file_unique_id: tag6.sticker.file_unique_id }])
@@ -226,12 +253,14 @@ describe('DynamodbTagRepository', () => {
     }
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId,
       sticker,
       values: Array.from(new Array(25), () => generateId('value')),
     })
 
     await tagRepository.store({
+      isPrivate: false,
       authorUserId,
       sticker,
       values: Array.from(new Array(25), () => generateId('value')),
