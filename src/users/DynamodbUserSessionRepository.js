@@ -10,7 +10,7 @@ export class DynamodbUserSessionRepository {
    * @param {{
    *   dynamodbClient: import('@aws-sdk/client-dynamodb').DynamoDBClient,
    *   tableName: string
-   * }} options 
+   * }} options
    */
   constructor({ dynamodbClient, tableName }) {
     this._dynamodbClient = dynamodbClient
@@ -34,6 +34,7 @@ export class DynamodbUserSessionRepository {
         TableName: this._tableName,
         Item: {
           [attr.userId]: { S: userId },
+          [attr.privateTagging]: { BOOL: context.privateTagging },
           [attr.expiresAt]: { N: String(calculateExpiresAt(EXPIRATION_TIME_S)) },
           ...context.phase && {
             [attr.phase]: { S: context.phase },
@@ -83,8 +84,9 @@ export class DynamodbUserSessionRepository {
 
     console.log('DynamodbUserSessionRepository#get:getItem', { ConsumedCapacity })
 
-    if (!Item) return {}
+    if (!Item) return { privateTagging: false }
 
+    const privateTagging = Item[attr.privateTagging]?.BOOL
     const phase = Item[attr.phase]?.S
     const stickerSetName = Item[attr.stickerSetName]?.S
     const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
@@ -98,7 +100,8 @@ export class DynamodbUserSessionRepository {
     const queueStickerSetBitmapSize = Item[attr.queueStickerSetBitmapSize]?.N
     const queuePosition = Item[attr.queuePosition]?.N
 
-    return Item ? {
+    return {
+      privateTagging: privateTagging ?? false,
       ...phase && { phase },
       ...stickerFileUniqueId && stickerFileId && stickerFormat && {
         sticker: {
@@ -123,7 +126,7 @@ export class DynamodbUserSessionRepository {
           },
         }
       },
-    } : {}
+    }
   }
 
   /** @param {string} userId */

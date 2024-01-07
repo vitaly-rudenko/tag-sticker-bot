@@ -8,6 +8,7 @@ export type MinimalStickerWithSet = Pick<Sticker, 'set_name' | 'file_id' | 'file
 export type MinimalSticker = Pick<Sticker, 'file_id' | 'file_unique_id'>
 
 export type UserSessionContext = {
+  privateTagging: boolean
   phase?: string
   sticker?: Sticker
   stickerMessageId?: number
@@ -50,6 +51,7 @@ export interface TagRepository {
 
 export type proceedTagging = (context: Context, input: {
   userId: string
+  privateTagging: boolean
   queue?: Queue
   sticker?: Sticker
 }) => Promise<void>

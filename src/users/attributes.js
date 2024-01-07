@@ -1,5 +1,6 @@
 export const userSessionAttributes = Object.freeze({
   userId: 'u',
+  privateTagging: 'pt',
   stickerSetName: 'set',
   stickerFileUniqueId: 'fuid',
   stickerFileId: 'fid',
