@@ -38,7 +38,7 @@ async function start() {
 }
 
 start()
-  .then(() => logger.info('Started!'))
+  .then(() => logger.info({}, 'Started!'))
   .catch((error) => {
     logger.error({ error })
     process.exit(1)

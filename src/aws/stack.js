@@ -16,6 +16,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 
 const appName = 'tsb'
 const version = packageJson.version
 const isProduction = environment === 'prod'
+const dist = path.join(root, 'dist', isProduction ? 'prod' : 'dev')
 
 export class TagStickerBotStack extends cdk.Stack {
   /**
@@ -30,7 +31,7 @@ export class TagStickerBotStack extends cdk.Stack {
     const favoritesTable = this.createFavoritesTable()
 
     const restApiLambda = new cdk.aws_lambda.Function(this, 'restApiLambda', {
-      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'rest-api')),
+      code: cdk.aws_lambda.Code.fromAsset(path.join(dist, 'rest-api')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),
@@ -72,7 +73,7 @@ export class TagStickerBotStack extends cdk.Stack {
     const debugUrl = `${restApi.url}debug`
 
     const initLambda = new cdk.aws_lambda.Function(this, 'initLambda', {
-      code: cdk.aws_lambda.Code.fromAsset(path.join(root, 'dist', 'init')),
+      code: cdk.aws_lambda.Code.fromAsset(path.join(dist, 'init')),
       handler: 'index.handler',
       runtime: cdk.aws_lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.minutes(1),

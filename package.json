@@ -1,6 +1,6 @@
 {
   "name": "tag-sticker-bot",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -11,17 +11,16 @@
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
-    "build-lambdas": "rimraf dist && rollup -c",
-    "deploy:dev": "npm run build-lambdas && node --env-file=.env.dev ./node_modules/.bin/cdk deploy",
+    "build": "rimraf dist && rollup -c",
+    "deploy:dev": "npm run build && node --env-file=.env.dev ./node_modules/.bin/cdk deploy",
     "undeploy:dev": "node --env-file=.env.dev ./node_modules/.bin/cdk destroy",
-    "deploy:prod": "npm run build-lambdas && node --env-file=.env.prod ./node_modules/.bin/cdk deploy"
+    "deploy:prod": "npm run build && node --env-file=.env.prod ./node_modules/.bin/cdk deploy"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.454.0",
+    "@aws-sdk/client-dynamodb": "^3.485.0",
     "markdown-escapes": "^2.0.1",
-    "pino": "^8.17.2",
     "safe-compare": "^1.1.4",
     "telegraf": "^4.15.0"
   },
@@ -29,6 +28,7 @@
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-json": "^6.0.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
     "@types/jest": "^29.5.8",
     "@types/safe-compare": "^1.1.2",
     "aws-cdk": "^2.110.0",
