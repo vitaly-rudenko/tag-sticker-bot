@@ -5,19 +5,20 @@ export const tagAttributes = Object.freeze({
   valuePartition: '_vp',
   authorUserId: 'u',
   value: 'v',
-  stickerFileUniqueId: 'fuid',
-  stickerFileId: 'fid',
+  fileUniqueId: 'fuid',
+  fileId: 'fid',
   stickerSetName: 'set',
+  animationMimeType: 'mime',
   isPrivate: 'pr',
   createdAt: 'c',
 })
 
 /**
  * @param {string} authorUserId
- * @param {string} stickerFileUniqueId
+ * @param {string} fileUniqueId
  */
-export function tagId(authorUserId, stickerFileUniqueId) {
-  return `${authorUserId}#${stickerFileUniqueId}`
+export function tagId(authorUserId, fileUniqueId) {
+  return `${authorUserId}#${fileUniqueId}`
 }
 
 /**

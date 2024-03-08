@@ -25,16 +25,16 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
 
     const isFavoriteQuery = query.length === 0
 
-    /** @type {import('../../types.d.ts').MinimalSticker[]} */
+    /** @type {import('../../types.d.ts').File[]} */
     let searchResults = []
-    let includesOwnedStickers = false
+    let includesOwnedFiles = false
     if (isFavoriteQuery) {
       searchResults = await favoriteRepository.query({
         userId,
         limit: INLINE_QUERY_RESULT_LIMIT,
       })
     } else if (query.length >= MIN_QUERY_LENGTH && query.length <= MAX_QUERY_LENGTH) {
-      ({ searchResults, includesOwnedStickers } = await tagRepository.search({
+      ({ searchResults, includesOwnedFiles } = await tagRepository.search({
         query,
         authorUserId: userId,
         ownedOnly,
@@ -45,20 +45,38 @@ export function useSearchFlow({ tagRepository, favoriteRepository }) {
     }
 
     await context.answerInlineQuery(
-      searchResults.map((sticker, i) => ({
-        id: String(i),
-        type: 'sticker',
-        sticker_file_id: sticker.file_id,
-      })),
+      searchResults.map((file, i) => {
+        if (file.mime_type === 'video/mp4') {
+          return {
+            id: String(i),
+            type: 'mpeg4_gif',
+            mpeg4_file_id: file.file_id,
+          }
+        }
+
+        if (file.mime_type === 'image/gif') {
+          return {
+            id: String(i),
+            type: 'gif',
+            gif_file_id: file.file_id,
+          }
+        }
+
+        return {
+          type: 'sticker',
+          id: String(i),
+          sticker_file_id: file.file_id,
+        }
+      }),
       {
         cache_time: inlineQueryCacheTimeS,
-        is_personal: isFavoriteQuery || includesOwnedStickers,
+        is_personal: isFavoriteQuery || includesOwnedFiles,
         button: {
           text: isFavoriteQuery
             ? searchResults.length === 0
-              ? "You don't have any favorite stickers yet. Click here to add"
-              : "Click here to add or remove your favorite stickers"
-            : "Can't find a sticker? Click here to contribute",
+              ? "You don't have any favorite stickers or GIFs yet. Click here to add"
+              : "Click here to add or remove your favorite stickers or GIFs"
+            : "Can't find a sticker or GIF? Click here to contribute",
           start_parameter: 'stub', // for some reason is required
         }
       }

@@ -80,8 +80,9 @@ await dynamodbClient.send(
       Projection: {
         ProjectionType: 'INCLUDE',
         NonKeyAttributes: [
-          tagAttributes.stickerFileUniqueId,
-          tagAttributes.stickerFileId,
+          tagAttributes.fileUniqueId,
+          tagAttributes.fileId,
+          tagAttributes.animationMimeType,
         ],
       },
       ProvisionedThroughput: {
@@ -100,8 +101,9 @@ await dynamodbClient.send(
       Projection: {
         ProjectionType: 'INCLUDE',
         NonKeyAttributes: [
-          tagAttributes.stickerFileUniqueId,
-          tagAttributes.stickerFileId,
+          tagAttributes.fileUniqueId,
+          tagAttributes.fileId,
+          tagAttributes.animationMimeType,
         ],
       },
       ProvisionedThroughput: {
@@ -120,7 +122,7 @@ await dynamodbClient.send(
       Projection: {
         ProjectionType: 'INCLUDE',
         NonKeyAttributes: [
-          tagAttributes.stickerFileUniqueId,
+          tagAttributes.fileUniqueId,
           tagAttributes.isPrivate,
         ],
       },
@@ -140,14 +142,14 @@ await dynamodbClient.send(
       AttributeName: userSessionAttributes.userId,
       KeyType: 'HASH'
     }, {
-      AttributeName: userSessionAttributes.stickerFileUniqueId,
+      AttributeName: userSessionAttributes.fileUniqueId,
       KeyType: 'RANGE'
     }],
     AttributeDefinitions: [{
       AttributeName: userSessionAttributes.userId,
       AttributeType: 'S'
     }, {
-      AttributeName: userSessionAttributes.stickerFileUniqueId,
+      AttributeName: userSessionAttributes.fileUniqueId,
       AttributeType: 'S'
     }],
     BillingMode: 'PROVISIONED',

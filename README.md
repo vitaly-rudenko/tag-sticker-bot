@@ -4,14 +4,14 @@
 
 ## Description
 
-This bot enables users to tag stickers, perform quick searches, and mark favorites directly within Telegram.
+This bot enables users to tag stickers & GIFs, perform quick searches, and mark favorites directly within Telegram.
 
 Features:
-- 📝 Tag stickers (up to 10 tags per sticker)
-- 🔒 Create private tags for stickers that only you can search
-- 🔍 Search stickers by your tags or all tags (inline query)
+- 📝 Tag stickers & GIFs (up to 10 tags per file)
+- 🔒 Create private tags for files that only you can search
+- 🔍 Search files by your tags or all tags (inline query)
 - 🖇 Quickly tag all stickers in a sticker set
-- ❤️ Mark stickers as favorites for quick access
+- ❤️ Mark files as favorites for quick access
 
 ## Stack & tools
 - Node.JS, AWS DynamoDB

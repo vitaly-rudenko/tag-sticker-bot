@@ -30,7 +30,7 @@ export async function createBot({
   } = useCommonFlow({ bot })
 
   const {
-    handleSticker,
+    handleFile,
     handleChooseUntagged,
     stepQueue,
     clearQueue,
@@ -79,7 +79,8 @@ export async function createBot({
       return next()
     }
   })
-  bot.on(message('sticker'), handleSticker)
+  bot.on(message('sticker'), handleFile)
+  bot.on(message('animation'), handleFile)
   bot.on(message('text'), handleTag)
 
   bot.start(start)
@@ -87,13 +88,13 @@ export async function createBot({
 
   bot.action(/^queue:step:(.+)$/, stepQueue)
   bot.action('queue:clear', clearQueue)
-  bot.action('sticker:tag-single', tagSingle)
-  bot.action('sticker:choose-untagged', handleChooseUntagged)
-  bot.action('sticker:tag-untagged', tagUntagged)
-  bot.action('sticker:tag-untagged-by-me', tagUntaggedByMe)
-  bot.action('sticker:tag-all', tagAll)
-  bot.action('sticker:favorite', favorite)
-  bot.action('sticker:unfavorite', unfavorite)
+  bot.action('file:tag-single', tagSingle)
+  bot.action('file:choose-untagged', handleChooseUntagged)
+  bot.action('file:tag-untagged', tagUntagged)
+  bot.action('file:tag-untagged-by-me', tagUntaggedByMe)
+  bot.action('file:tag-all', tagAll)
+  bot.action('file:favorite', favorite)
+  bot.action('file:unfavorite', unfavorite)
   bot.action('scope:toggle', toggleScope)
 
   bot.action('action:ignore', (context) => context.answerCbQuery().catch(() => {}))

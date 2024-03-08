@@ -3,12 +3,12 @@
 ## Tags
 
 ```
-| tagId         | authorUserId | fileUniqueId | valuePartition | value   | setName | ... |
-|---------------|--------------|--------------|----------------|---------|---------|-----|
-| user-1#fuid-1 | user-1       | fuid-1       | val            | value-1 | set-1   | ... |
-| user-1#fuid-1 | user-1       | fuid-1       | val            | value-2 | set-1   | ... |
-| user-1#fuid-1 | user-1       | fuid-1       | val            | value-3 | set-1   | ... |
-| user-2#fuid-2 | user-2       | fuid-2       | val            | value-3 | set-2   | ... |
+| tagId         | authorUserId | fileUniqueId | valuePartition | value   | setName | ... | animationMimeType |
+|---------------|--------------|--------------|----------------|---------|---------|-----|-------------------|
+| user-1#fuid-1 | user-1       | fuid-1       | val            | value-1 |         | ... | 1                 |
+| user-1#fuid-1 | user-1       | fuid-1       | val            | value-2 | set-1   | ... |                   |
+| user-1#fuid-1 | user-1       | fuid-1       | val            | value-3 |         | ... | 2                 |
+| user-2#fuid-2 | user-2       | fuid-2       | val            | value-3 | set-2   | ... |                   |
 ```
 
 HASH: `tagId`

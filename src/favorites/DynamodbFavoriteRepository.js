@@ -1,6 +1,7 @@
 import { DeleteItemCommand, GetItemCommand, PutItemCommand, paginateQuery } from '@aws-sdk/client-dynamodb'
 import { favoriteAttributes as attr } from './attributes.js'
 import { logger } from '../logger.js'
+import { decodeMimeType, encodeMimeType } from '../utils/mimeType.js'
 
 export class DynamodbFavoriteRepository {
   /**
@@ -18,20 +19,20 @@ export class DynamodbFavoriteRepository {
   /**
    * @param {{
    *   userId: string
-   *   sticker: import('../types.d.ts').Sticker
+   *   file: import('../types.d.ts').File
    * }} input
    */
-  async mark({ userId, sticker }) {
+  async mark({ userId, file }) {
+
     const { ConsumedCapacity } = await this._dynamodbClient.send(
       new PutItemCommand({
         TableName: this._tableName,
         Item: {
           [attr.userId]: { S: userId },
-          [attr.stickerFileId]: { S: sticker.file_id },
-          [attr.stickerFileUniqueId]: { S: sticker.file_unique_id },
-          [attr.stickerFormat]: { N: sticker.is_animated ? '1' : sticker.is_video ? '2' : '0' },
-          ...sticker.set_name && { [attr.stickerSetName]: { S: sticker.set_name } },
-          ...sticker.emoji && { [attr.stickerEmoji]: { S: sticker.emoji } },
+          [attr.fileId]: { S: file.file_id },
+          [attr.fileUniqueId]: { S: file.file_unique_id },
+          ...file.set_name && { [attr.stickerSetName]: { S: file.set_name } },
+          ...file.mime_type && { [attr.animationMimeType]: { N: encodeMimeType(file.mime_type) } },
         },
         ReturnConsumedCapacity: 'TOTAL',
       })
@@ -43,16 +44,16 @@ export class DynamodbFavoriteRepository {
   /**
    * @param {{
    *   userId: string
-   *   stickerFileUniqueId: string
+   *   fileUniqueId: string
    * }} input
    */
-  async unmark({ userId, stickerFileUniqueId }) {
+  async unmark({ userId, fileUniqueId }) {
     const { ConsumedCapacity } = await this._dynamodbClient.send(
       new DeleteItemCommand({
         TableName: this._tableName,
         Key: {
           [attr.userId]: { S: userId },
-          [attr.stickerFileUniqueId]: { S: stickerFileUniqueId },
+          [attr.fileUniqueId]: { S: fileUniqueId },
         },
         ReturnConsumedCapacity: 'TOTAL',
       })
@@ -65,13 +66,13 @@ export class DynamodbFavoriteRepository {
    * @param {{
    *   userId: string
    *   limit: number
-   *   fromStickerFileUniqueId?: string
+   *   fromFileUniqueId?: string
    * }} input
-   * @returns {Promise<import('../types.d.ts').Sticker[]>}
+   * @returns {Promise<import('../types.d.ts').File[]>}
    */
-  async query({ userId, limit, fromStickerFileUniqueId }) {
-      /** @type {import('../types.d.ts').Sticker[]} */
-    const stickers = []
+  async query({ userId, limit, fromFileUniqueId }) {
+      /** @type {import('../types.d.ts').File[]} */
+    const files = []
 
     const favoritePaginator = paginateQuery({ client: this._dynamodbClient, pageSize: this._queryPageSize }, {
       TableName: this._tableName,
@@ -83,10 +84,10 @@ export class DynamodbFavoriteRepository {
         ':userId': { S: userId },
       },
       ReturnConsumedCapacity: 'TOTAL',
-      ...fromStickerFileUniqueId && {
+      ...fromFileUniqueId && {
         ExclusiveStartKey: {
           [attr.userId]: { S: userId },
-          [attr.stickerFileUniqueId]: { S: fromStickerFileUniqueId },
+          [attr.fileUniqueId]: { S: fromFileUniqueId },
         }
       }
     })
@@ -96,45 +97,39 @@ export class DynamodbFavoriteRepository {
 
       if (!Items) continue
       for (const item of Items) {
-        const stickerFileId = item[attr.stickerFileId]?.S
-        const stickerFileUniqueId = item[attr.stickerFileUniqueId]?.S
-        const stickerFormat = item[attr.stickerFormat]?.N
-        if (!stickerFileUniqueId || !stickerFileId || !stickerFormat) continue
+        const fileId = item[attr.fileId]?.S
+        const fileUniqueId = item[attr.fileUniqueId]?.S
+        if (!fileUniqueId || !fileId) continue
 
-        const stickerSetName = item[attr.stickerSetName]?.S
-        const stickerEmoji = item[attr.stickerEmoji]?.S
-
-        stickers.push({
-          ...stickerSetName && { set_name: stickerSetName },
-          ...stickerEmoji && { emoji: stickerEmoji },
-          file_unique_id: stickerFileUniqueId,
-          file_id: stickerFileId,
-          is_animated: stickerFormat === '1',
-          is_video: stickerFormat === '2',
+        files.push({
+          file_id: fileId,
+          file_unique_id: fileUniqueId,
+          set_name: item[attr.stickerSetName]?.S,
+          mime_type: decodeMimeType(item[attr.animationMimeType]?.N),
         })
 
-        if (stickers.length === limit) break
+        if (files.length === limit) break
       }
 
-      if (stickers.length === limit) break
+      if (files.length === limit) break
     }
 
-    return stickers
+    return files
   }
 
   /**
    * @param {{
    *   userId: string
-   *   stickerFileUniqueId: string
+   *   fileUniqueId: string
    * }} input
    */
-  async isMarked({ userId, stickerFileUniqueId }) {
+  async isMarked({ userId, fileUniqueId }) {
     const { Item, ConsumedCapacity } = await this._dynamodbClient.send(
       new GetItemCommand({
         TableName: this._tableName,
         Key: {
           [attr.userId]: { S: userId },
-          [attr.stickerFileUniqueId]: { S: stickerFileUniqueId },
+          [attr.fileUniqueId]: { S: fileUniqueId },
         },
         ReturnConsumedCapacity: 'TOTAL',
         ProjectionExpression: '#userId',

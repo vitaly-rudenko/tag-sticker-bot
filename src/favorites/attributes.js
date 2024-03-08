@@ -1,8 +1,7 @@
 export const favoriteAttributes = Object.freeze({
   userId: 'u',
+  animationMimeType: 'mime',
   stickerSetName: 'set',
-  stickerFileUniqueId: 'fuid',
-  stickerFileId: 'fid',
-  stickerFormat: 'fmt',
-  stickerEmoji: 'emj',
+  fileUniqueId: 'fuid',
+  fileId: 'fid',
 })

@@ -124,7 +124,11 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
-      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
+      nonKeyAttributes: [
+        tagAttributes.fileUniqueId,
+        tagAttributes.fileId,
+        tagAttributes.animationMimeType,
+      ],
       readCapacity: 2,
       writeCapacity: 2,
     })
@@ -140,7 +144,11 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
-      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.stickerFileId],
+      nonKeyAttributes: [
+        tagAttributes.fileUniqueId,
+        tagAttributes.fileId,
+        tagAttributes.animationMimeType,
+      ],
       readCapacity: 2,
       writeCapacity: 2,
     })
@@ -156,7 +164,7 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       projectionType: cdk.aws_dynamodb.ProjectionType.INCLUDE,
-      nonKeyAttributes: [tagAttributes.stickerFileUniqueId, tagAttributes.isPrivate],
+      nonKeyAttributes: [tagAttributes.fileUniqueId, tagAttributes.isPrivate],
       readCapacity: 2,
       writeCapacity: 2,
     })
@@ -171,7 +179,7 @@ export class TagStickerBotStack extends cdk.Stack {
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       sortKey: {
-        name: favoriteAttributes.stickerFileUniqueId,
+        name: favoriteAttributes.fileUniqueId,
         type: cdk.aws_dynamodb.AttributeType.STRING
       },
       billingMode: cdk.aws_dynamodb.BillingMode.PROVISIONED,
