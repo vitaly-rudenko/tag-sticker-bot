@@ -3,6 +3,7 @@ import { encodeBitmap, decodeBitmap } from '../utils/bitmap.js'
 import { calculateExpiresAt } from '../utils/calculateExpiresAt.js'
 import { userSessionAttributes as attr } from './attributes.js'
 import { logger } from '../logger.js'
+import { decodeMimeType, encodeMimeType } from '../utils/mimeType.js'
 
 const EXPIRATION_TIME_S = 60 * 60 // 1 hour
 
@@ -24,8 +25,8 @@ export class DynamodbUserSessionRepository {
    */
   async set(userId, context) {
     if (
-      context.sticker?.set_name && context.queue?.stickerSetName &&
-      context.sticker.set_name !== context.queue?.stickerSetName
+      context.file?.set_name && context.queue?.stickerSetName &&
+      context.file.set_name !== context.queue?.stickerSetName
     ) {
       throw new Error('Sticker set and queue set do not match')
     }
@@ -43,15 +44,14 @@ export class DynamodbUserSessionRepository {
           ...context.tagInstructionMessageId && {
             [attr.tagInstructionMessageId]: { N: String(context.tagInstructionMessageId) },
           },
-          ...context.stickerMessageId && {
-            [attr.stickerMessageId]: { N: String(context.stickerMessageId) },
+          ...context.fileMessageId && {
+            [attr.fileMessageId]: { N: String(context.fileMessageId) },
           },
-          ...context.sticker && {
-            ...context.sticker.set_name && { [attr.stickerSetName]: { S: context.sticker.set_name } },
-            ...context.sticker.emoji && { [attr.stickerEmoji]: { S: context.sticker.emoji } },
-            [attr.stickerFileUniqueId]: { S: context.sticker.file_unique_id },
-            [attr.stickerFileId]: { S: context.sticker.file_id },
-            [attr.stickerFormat]: { N: context.sticker.is_animated ? '1' : context.sticker.is_video ? '2' : '0' },
+          ...context.file && {
+            ...context.file.set_name && { [attr.stickerSetName]: { S: context.file.set_name } },
+            ...context.file.mime_type && { [attr.animationMimeType]: { N: encodeMimeType(context.file.mime_type) } },
+            [attr.fileUniqueId]: { S: context.file.file_unique_id },
+            [attr.fileId]: { S: context.file.file_id },
           },
           ...context.queue && {
             [attr.stickerSetName]: { S: context.queue.stickerSetName },
@@ -90,11 +90,10 @@ export class DynamodbUserSessionRepository {
     const isPrivate = Item[attr.isPrivate]?.BOOL
     const phase = Item[attr.phase]?.S
     const stickerSetName = Item[attr.stickerSetName]?.S
-    const stickerFileUniqueId = Item[attr.stickerFileUniqueId]?.S
-    const stickerFileId = Item[attr.stickerFileId]?.S
-    const stickerMessageId = Item[attr.stickerMessageId]?.N
-    const stickerFormat = Item[attr.stickerFormat]?.N
-    const stickerEmoji = Item[attr.stickerEmoji]?.S
+    const animationMimeType = decodeMimeType(Item[attr.animationMimeType]?.N)
+    const fileUniqueId = Item[attr.fileUniqueId]?.S
+    const fileId = Item[attr.fileId]?.S
+    const fileMessageId = Item[attr.fileMessageId]?.N
     const tagInstructionMessageId = Item[attr.tagInstructionMessageId]?.N
     const queueStickerSetBitmap = Item[attr.queueStickerSetBitmap]?.S
     const queueStickerSetBitmapLength = Item[attr.queueStickerSetBitmapLength]?.N
@@ -104,17 +103,15 @@ export class DynamodbUserSessionRepository {
     return {
       isPrivate: isPrivate ?? false,
       ...phase && { phase },
-      ...stickerFileUniqueId && stickerFileId && stickerFormat && {
-        sticker: {
+      ...fileUniqueId && fileId && {
+        file: {
+          file_id: fileId,
+          file_unique_id: fileUniqueId,
           set_name: stickerSetName,
-          file_unique_id: stickerFileUniqueId,
-          file_id: stickerFileId,
-          is_animated: stickerFormat === '1',
-          is_video: stickerFormat === '2',
-          emoji: stickerEmoji,
+          mime_type: animationMimeType,
         }
       },
-      ...stickerMessageId && { stickerMessageId: Number(stickerMessageId) },
+      ...fileMessageId && { fileMessageId: Number(fileMessageId) },
       ...tagInstructionMessageId && { tagInstructionMessageId: Number(tagInstructionMessageId) },
       ...stickerSetName && queueStickerSetBitmap && queueStickerSetBitmapLength && queuePosition && queueStickerSetBitmapSize && {
         queue: {

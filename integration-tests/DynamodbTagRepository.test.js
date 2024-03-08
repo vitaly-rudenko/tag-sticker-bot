@@ -8,8 +8,8 @@ function generateId(name) {
   return `${name}-${randomBytes(8).toString('hex')}`
 }
 
-function withSetName(sticker, setName) {
-  return { ...sticker, set_name: setName }
+function withSetName(file, setName) {
+  return { ...file, set_name: setName }
 }
 
 describe('DynamodbTagRepository', () => {
@@ -28,72 +28,72 @@ describe('DynamodbTagRepository', () => {
     const user2 = generateId('user-2')
     const set1 = generateId('set-1')
     const set2 = generateId('set-2')
-    const stickerId1 = generateId('sticker-1')
-    const stickerId2 = generateId('sticker-2')
-    const stickerId3 = generateId('sticker-3')
-    const stickerId4 = generateId('sticker-4')
-    const stickerId5 = generateId('sticker-5')
+    const fileId1 = generateId('file-1')
+    const fileId2 = generateId('file-2')
+    const fileId3 = generateId('file-3')
+    const fileId4 = generateId('file-4')
+    const fileId5 = generateId('file-5')
 
-    const sticker1 = { file_unique_id: stickerId1, file_id: generateId('file-id') }
-    const sticker2 = { file_unique_id: stickerId2, file_id: generateId('file-id') }
-    const sticker3 = { file_unique_id: stickerId3, file_id: generateId('file-id') }
-    const sticker4 = { file_unique_id: stickerId4, file_id: generateId('file-id') }
-    const sticker5 = { file_unique_id: stickerId5, file_id: generateId('file-id') }
+    const file1 = { file_unique_id: fileId1, file_id: generateId('file-id') }
+    const file2 = { file_unique_id: fileId2, file_id: generateId('file-id') }
+    const file3 = { file_unique_id: fileId3, file_id: generateId('file-id') }
+    const file4 = { file_unique_id: fileId4, file_id: generateId('file-id') }
+    const file5 = { file_unique_id: fileId5, file_id: generateId('file-id') }
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker1, set1),
+      file: withSetName(file1, set1),
       authorUserId: user1,
       values: ['hello world'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker2, set1),
+      file: withSetName(file2, set1),
       authorUserId: user2,
       values: ['hello there'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker3, set2),
+      file: withSetName(file3, set2),
       authorUserId: user2,
       values: ['there it is'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker4, set2),
+      file: withSetName(file4, set2),
       authorUserId: user1,
       values: ['reuse 1 to be overwritten'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker4, set2),
+      file: withSetName(file4, set2),
       authorUserId: user2,
       values: ['reuse 2 to be overwritten'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker4, set2),
+      file: withSetName(file4, set2),
       authorUserId: user1,
       values: ['reuse 1'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: withSetName(sticker4, set2),
+      file: withSetName(file4, set2),
       authorUserId: user2,
       values: ['reuse 2'],
     })
 
     await tagRepository.store({
       isPrivate: false,
-      sticker: sticker5,
+      file: file5,
       authorUserId: user2,
-      values: ['setless sticker'],
+      values: ['setless file'],
     })
 
     // query
@@ -102,13 +102,13 @@ describe('DynamodbTagRepository', () => {
       ownedOnly: false,
       authorUserId: user1,
       stickerSetName: set1,
-    })).resolves.toEqual(new Set([stickerId1, stickerId2]))
+    })).resolves.toEqual(new Set([fileId1, fileId2]))
 
     await expect(tagRepository.queryStatus({
       ownedOnly: false,
       authorUserId: user1,
       stickerSetName: set2,
-    })).resolves.toEqual(new Set([stickerId3, stickerId4]))
+    })).resolves.toEqual(new Set([fileId3, fileId4]))
 
     await expect(tagRepository.queryStatus({
       ownedOnly: false,
@@ -125,7 +125,7 @@ describe('DynamodbTagRepository', () => {
       query: 'hey'
     })).resolves.toEqual({
       searchResults: [],
-      includesOwnedStickers: false
+      includesOwnedFiles: false
     })
 
     await expect(tagRepository.search({
@@ -135,7 +135,7 @@ describe('DynamodbTagRepository', () => {
       query: 'it is',
     })).resolves.toEqual({
       searchResults: [],
-      includesOwnedStickers: false
+      includesOwnedFiles: false
     })
 
     await expect(tagRepository.search({
@@ -144,8 +144,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'hello'
     })).resolves.toEqual({
-      searchResults: [sticker1, sticker2],
-      includesOwnedStickers: true,
+      searchResults: [file1, file2],
+      includesOwnedFiles: true,
     })
 
     await expect(tagRepository.search({
@@ -154,8 +154,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'there'
     })).resolves.toEqual({
-      searchResults: [sticker3],
-      includesOwnedStickers: false,
+      searchResults: [file3],
+      includesOwnedFiles: false,
     })
 
     await expect(tagRepository.search({
@@ -164,8 +164,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'hello',
     })).resolves.toEqual({
-      searchResults: [sticker1],
-      includesOwnedStickers: true,
+      searchResults: [file1],
+      includesOwnedFiles: true,
     })
 
     await expect(tagRepository.search({
@@ -174,8 +174,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'hello',
     })).resolves.toEqual({
-      searchResults: [sticker2],
-      includesOwnedStickers: true,
+      searchResults: [file2],
+      includesOwnedFiles: true,
     })
 
     await expect(tagRepository.search({
@@ -184,8 +184,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'reuse',
     })).resolves.toEqual({
-      searchResults: [sticker4],
-      includesOwnedStickers: true,
+      searchResults: [file4],
+      includesOwnedFiles: true,
     })
 
     await expect(tagRepository.search({
@@ -194,8 +194,8 @@ describe('DynamodbTagRepository', () => {
       limit: 100,
       query: 'set',
     })).resolves.toEqual({
-      searchResults: [sticker5],
-      includesOwnedStickers: false,
+      searchResults: [file5],
+      includesOwnedFiles: false,
     })
   })
 
@@ -204,104 +204,104 @@ describe('DynamodbTagRepository', () => {
     const userId2 = generateId('user-2')
     const userId3 = generateId('user-3')
     const setName = generateId('set')
-    const stickerId1 = generateId('sticker-1')
-    const stickerId2 = generateId('sticker-2')
-    const stickerId3 = generateId('sticker-3')
-    const stickerId4 = generateId('sticker-4')
+    const fileId1 = generateId('file-1')
+    const fileId2 = generateId('file-2')
+    const fileId3 = generateId('file-3')
+    const fileId4 = generateId('file-4')
 
-    const sticker1 = { file_id: generateId('file-id'), file_unique_id: stickerId1 }
-    const sticker2 = { file_id: generateId('file-id'), file_unique_id: stickerId2 }
-    const sticker3 = { file_id: generateId('file-id'), file_unique_id: stickerId3 }
-    const sticker4 = { file_id: generateId('file-id'), file_unique_id: stickerId4 }
+    const file1 = { file_id: generateId('file-id'), file_unique_id: fileId1 }
+    const file2 = { file_id: generateId('file-id'), file_unique_id: fileId2 }
+    const file3 = { file_id: generateId('file-id'), file_unique_id: fileId3 }
+    const file4 = { file_id: generateId('file-id'), file_unique_id: fileId4 }
 
     await tagRepository.store({
-      sticker: withSetName(sticker1, setName),
+      file: withSetName(file1, setName),
       authorUserId: userId1,
       isPrivate: true,
-      values: ['sticker-1'],
+      values: ['file-1'],
     })
 
     await tagRepository.store({
-      sticker: withSetName(sticker2, setName),
+      file: withSetName(file2, setName),
       authorUserId: userId1,
       isPrivate: false,
-      values: ['sticker-2'],
+      values: ['file-2'],
     })
 
     await tagRepository.store({
-      sticker: withSetName(sticker3, setName),
+      file: withSetName(file3, setName),
       authorUserId: userId2,
       isPrivate: false,
-      values: ['sticker-3'],
+      values: ['file-3'],
     })
 
     await tagRepository.store({
-      sticker: withSetName(sticker4, setName),
+      file: withSetName(file4, setName),
       authorUserId: userId2,
       isPrivate: true,
-      values: ['sticker-4'],
+      values: ['file-4'],
     })
 
     // search
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: false,
       authorUserId: userId1,
       limit: 100,
     })).resolves.toEqual({
-      searchResults: [sticker1, sticker2, sticker3],
-      includesOwnedStickers: true
+      searchResults: [file1, file2, file3],
+      includesOwnedFiles: true
     })
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: false,
       authorUserId: userId2,
       limit: 100,
     })).resolves.toEqual({
-      searchResults: [sticker3, sticker4, sticker2],
-      includesOwnedStickers: true
+      searchResults: [file3, file4, file2],
+      includesOwnedFiles: true
     })
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: true,
       authorUserId: userId1,
       limit: 100,
     })).resolves.toEqual({
-      searchResults: [sticker1, sticker2],
-      includesOwnedStickers: true
+      searchResults: [file1, file2],
+      includesOwnedFiles: true
     })
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: true,
       authorUserId: userId2,
       limit: 100,
     })).resolves.toEqual({
-      searchResults: [sticker3, sticker4],
-      includesOwnedStickers: true
+      searchResults: [file3, file4],
+      includesOwnedFiles: true
     })
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: false,
       authorUserId: userId3,
       limit: 100,
     })).resolves.toEqual({
-      searchResults: [sticker2, sticker3],
-      includesOwnedStickers: false
+      searchResults: [file2, file3],
+      includesOwnedFiles: false
     })
 
     expect(tagRepository.search({
-      query: 'sticker',
+      query: 'file',
       ownedOnly: true,
       authorUserId: userId3,
       limit: 100,
     })).resolves.toEqual({
       searchResults: [],
-      includesOwnedStickers: false
+      includesOwnedFiles: false
     })
 
     // query
@@ -310,31 +310,31 @@ describe('DynamodbTagRepository', () => {
       stickerSetName: setName,
       authorUserId: userId1,
       ownedOnly: false,
-    })).resolves.toEqual(new Set([stickerId1, stickerId2, stickerId3]))
+    })).resolves.toEqual(new Set([fileId1, fileId2, fileId3]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: setName,
       authorUserId: userId1,
       ownedOnly: true,
-    })).resolves.toEqual(new Set([stickerId1, stickerId2]))
+    })).resolves.toEqual(new Set([fileId1, fileId2]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: setName,
       authorUserId: userId2,
       ownedOnly: false,
-    })).resolves.toEqual(new Set([stickerId2, stickerId3, stickerId4]))
+    })).resolves.toEqual(new Set([fileId2, fileId3, fileId4]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: setName,
       authorUserId: userId2,
       ownedOnly: true,
-    })).resolves.toEqual(new Set([stickerId3, stickerId4]))
+    })).resolves.toEqual(new Set([fileId3, fileId4]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: setName,
       authorUserId: userId3,
       ownedOnly: false,
-    })).resolves.toEqual(new Set([stickerId2, stickerId3]))
+    })).resolves.toEqual(new Set([fileId2, fileId3]))
 
     await expect(tagRepository.queryStatus({
       stickerSetName: setName,
@@ -346,22 +346,22 @@ describe('DynamodbTagRepository', () => {
   it('should properly replace tags with different scopes', async () => {
     const userId1 = generateId('user-1')
     const userId2 = generateId('user-2')
-    const stickerId1 = generateId('sticker-1')
+    const fileId1 = generateId('file-1')
 
-    const sticker = { file_id: generateId('file-id'), file_unique_id: stickerId1 }
+    const file = { file_id: generateId('file-id'), file_unique_id: fileId1 }
     const value = generateId('value')
 
     await tagRepository.store({
       authorUserId: userId1,
       isPrivate: false,
-      sticker,
+      file,
       values: [value],
     })
 
     await tagRepository.store({
       authorUserId: userId1,
       isPrivate: true,
-      sticker,
+      file,
       values: [value],
     })
 
@@ -370,19 +370,19 @@ describe('DynamodbTagRepository', () => {
       authorUserId: userId1,
       limit: 100,
       ownedOnly: false
-    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: true })
+    })).resolves.toEqual({ searchResults: [file], includesOwnedFiles: true })
 
     await expect(tagRepository.search({
       query: value,
       authorUserId: userId2,
       limit: 100,
       ownedOnly: false
-    })).resolves.toEqual({ searchResults: [], includesOwnedStickers: false })
+    })).resolves.toEqual({ searchResults: [], includesOwnedFiles: false })
 
     await tagRepository.store({
       authorUserId: userId1,
       isPrivate: false,
-      sticker,
+      file,
       values: [value],
     })
 
@@ -391,19 +391,19 @@ describe('DynamodbTagRepository', () => {
       authorUserId: userId1,
       limit: 100,
       ownedOnly: false
-    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: true })
+    })).resolves.toEqual({ searchResults: [file], includesOwnedFiles: true })
 
     await expect(tagRepository.search({
       query: value,
       authorUserId: userId2,
       limit: 100,
       ownedOnly: false
-    })).resolves.toEqual({ searchResults: [sticker], includesOwnedStickers: false })
+    })).resolves.toEqual({ searchResults: [file], includesOwnedFiles: false })
   })
 
   it('should handle high throughput for store()', async () => {
     const authorUserId = generateId('user')
-    const sticker = {
+    const file = {
       file_id: generateId('file'),
       file_unique_id: generateId('unique'),
       set_name: generateId('set'),
@@ -412,14 +412,14 @@ describe('DynamodbTagRepository', () => {
     await tagRepository.store({
       isPrivate: false,
       authorUserId,
-      sticker,
+      file,
       values: Array.from(new Array(25), () => generateId('value')),
     })
 
     await tagRepository.store({
       isPrivate: false,
       authorUserId,
-      sticker,
+      file,
       values: Array.from(new Array(25), () => generateId('value')),
     })
   })

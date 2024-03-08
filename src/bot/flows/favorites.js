@@ -16,14 +16,14 @@ export function useFavoritesFlow({ userSessionRepository, favoriteRepository, te
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker } = await userSessionRepository.get(userId)
-    if (!sticker) return
+    const { file } = await userSessionRepository.get(userId)
+    if (!file) return
 
-    await favoriteRepository.mark({ userId, sticker })
+    await favoriteRepository.mark({ userId, file })
     await userSessionRepository.clear(userId)
 
     await context.reply([
-      '✅ Added the sticker to favorites.',
+      '✅ Added the file to favorites.',
       '🕒 It may take up to 10 minutes to see the changes.'
     ].join('\n'))
   }
@@ -34,14 +34,14 @@ export function useFavoritesFlow({ userSessionRepository, favoriteRepository, te
     await context.deleteMessage().catch(() => {})
 
     const { userId } = context.state
-    const { sticker } = await userSessionRepository.get(userId)
-    if (!sticker) return
+    const { file } = await userSessionRepository.get(userId)
+    if (!file) return
 
-    await favoriteRepository.unmark({ userId, stickerFileUniqueId: sticker.file_unique_id })
+    await favoriteRepository.unmark({ userId, fileUniqueId: file.file_unique_id })
     await userSessionRepository.clear(userId)
 
     await context.reply([
-      '✅ Removed the sticker from favorites.',
+      '✅ Removed the file from favorites.',
       '🕒 It may take up to 10 minutes to see the changes.'
     ].join('\n'))
   }
