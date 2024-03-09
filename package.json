@@ -11,10 +11,10 @@
     "test": "npm run setup-local && npm run jest",
     "jest": "node --env-file=.env.local --experimental-vm-modules node_modules/jest/bin/jest.js",
     "lint": "tsc",
-    "build": "rimraf dist && rollup -c",
+    "build": "rimraf dist && rollup -c && npm install --cpu=x64 --os=linux --prefix ./dist/rest-api sharp@0.33.2",
+    "deploy:prod": "NODE_ENV=production npm run build && node --env-file=.env.prod ./node_modules/.bin/cdk deploy",
     "deploy:dev": "npm run build && node --env-file=.env.dev ./node_modules/.bin/cdk deploy",
-    "undeploy:dev": "node --env-file=.env.dev ./node_modules/.bin/cdk destroy",
-    "deploy:prod": "npm run build && node --env-file=.env.prod ./node_modules/.bin/cdk deploy"
+    "undeploy:dev": "node --env-file=.env.dev ./node_modules/.bin/cdk destroy"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",

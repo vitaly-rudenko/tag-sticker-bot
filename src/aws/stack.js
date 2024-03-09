@@ -16,7 +16,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 
 const appName = 'tsb'
 const version = packageJson.version
 const isProduction = environment === 'prod'
-const dist = path.join(root, 'dist', isProduction ? 'prod' : 'dev')
+const dist = path.join(root, 'dist')
 
 export class TagStickerBotStack extends cdk.Stack {
   /**

@@ -9,16 +9,15 @@ import terser from '@rollup/plugin-terser'
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url))
 const lambdas = fs.readdirSync(path.join(__dirname, 'src', 'aws', 'lambdas'))
 
+const isProduction = process.env.NODE_ENV === 'production'
+
 /** @type {import('rollup').RollupOptions[]} */
 export default lambdas.map(lambda => ({
   input: `src/aws/lambdas/${lambda}/index.mjs`,
-  output: [{
-    file: `dist/dev/${lambda}/index.mjs`,
+  output: [ {
+    file: `dist/${lambda}/index.mjs`,
     format: 'esm',
-  }, {
-    file: `dist/prod/${lambda}/index.mjs`,
-    format: 'esm',
-    plugins: [terser({
+    plugins: [isProduction && terser({
       module: true,
       format: {
         comments: false,
@@ -27,9 +26,16 @@ export default lambdas.map(lambda => ({
   }],
   plugins: [
     json(),
-    commonjs(),
+    commonjs({
+      dynamicRequireTargets: [
+        '@img/sharp-wasm32/sharp.node',
+        '@img/sharp-linux-x64/sharp.node',
+        '**/sharp-wasm32.node',
+        '**/sharp-linux-x64.node',
+      ]
+    }),
     resolve(),
   ],
-  external: [/^@aws-sdk\/.*/],
+  external: [/^@aws-sdk\/.*/, 'sharp'],
   context: 'globalThis',
 }))

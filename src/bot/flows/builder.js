@@ -92,18 +92,21 @@ export function useBuilderFlow({ userSessionRepository, bot }) {
     const { file } = await userSessionRepository.get(userId)
     if (!file) return
 
+    const loadingMessage = await context.reply('⌛ Creating a sticker, please wait...')
+
     const fileLink = await bot.telegram.getFileLink(file.file_id)
     const fileResponse = await fetch(fileLink.toString())
     if (!fileResponse.body) return
 
     const stickerPipeline = sharp()
       .resize({ fit: 'inside', width: STICKER_SIZE, height: STICKER_SIZE })
-      .webp({ quality: 100, lossless: true })
+      .webp({ quality: 100 })
       .timeout({ seconds: STICKER_PIPELINE_TIMEOUT_SECONDS })
 
     Readable.fromWeb(fileResponse.body).pipe(stickerPipeline)
 
     const message = await context.replyWithSticker({ source: stickerPipeline })
+    await context.deleteMessage(loadingMessage.message_id).catch(() => {})
 
     await userSessionRepository.set(userId, {
       isPrivate: false,
