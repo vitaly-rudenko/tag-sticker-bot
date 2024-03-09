@@ -7,6 +7,7 @@ import { useTaggingFlow } from './flows/tagging.js'
 import { useCommonFlow } from './flows/common.js'
 import { useFavoritesFlow } from './flows/favorites.js'
 import { deleteMessages } from '../utils/deleteMessages.js'
+import { useBuilderFlow } from './flows/builder.js'
 
 /**
  * @param {{
@@ -71,6 +72,14 @@ export async function createBot({
     userSessionRepository,
   })
 
+  const {
+    handlePhoto,
+    createSticker,
+  } = useBuilderFlow({
+    bot,
+    userSessionRepository,
+  })
+
   bot.use(withUserId)
   bot.on('inline_query', handleSearch)
 
@@ -81,6 +90,8 @@ export async function createBot({
   })
   bot.on(message('sticker'), handleFile)
   bot.on(message('animation'), handleFile)
+  bot.on(message('photo'), handlePhoto)
+  bot.on(message('document'), handlePhoto)
   bot.on(message('text'), handleTag)
 
   bot.start(start)
@@ -95,6 +106,7 @@ export async function createBot({
   bot.action('file:tag-all', tagAll)
   bot.action('file:favorite', favorite)
   bot.action('file:unfavorite', unfavorite)
+  bot.action('builder:create', createSticker)
   bot.action('scope:toggle', toggleScope)
 
   bot.action('action:ignore', (context) => context.answerCbQuery().catch(() => {}))
@@ -106,7 +118,12 @@ export async function createBot({
     const { tagInstructionMessageId } = await userSessionRepository.get(userId)
 
     await deleteMessages(bot.telegram, context.chat.id, [tagInstructionMessageId])
-    await context.reply('👌 Action cancelled.')
+
+    try {
+      await context.answerCbQuery('Action cancelled')
+    } catch {
+      await context.reply('👌 Action cancelled.')
+    }
   })
 
   return bot
