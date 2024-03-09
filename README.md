@@ -12,6 +12,7 @@ Features:
 - 🔍 Search files by your tags or all tags (inline query)
 - 🖇 Quickly tag all stickers in a sticker set
 - ❤️ Mark files as favorites for quick access
+- 🖼 Create new stickers from photos or files
 
 ## Stack & tools
 - Node.JS, AWS DynamoDB
