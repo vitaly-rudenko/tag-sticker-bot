@@ -24,6 +24,9 @@ export function useCommonFlow({ bot }) {
       '*Favorites*',
       '❤️ You can also mark a file as your favorite\\.',
       `🔍 Quickly get your favorite files by typing "\`@${escapeMd(bot.botInfo.username)}\` "\\.`,
+      '',
+      '*Builder*',
+      '🖼 You can also create a new sticker by sending a photo or a file\\.',
     ].join('\n'), { parse_mode: 'MarkdownV2' })
   }
 
