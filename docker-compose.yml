@@ -1,20 +1,21 @@
-version: '3'
-
 services:
-  localstack:
-    image: localstack/localstack
-    container_name: localstack
+  tsb_postgres:
+    container_name: tsb_postgres
+    image: postgres:13-alpine
+    restart: unless-stopped
     environment:
-      - SERVICES=dynamodb
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-    ports:
-      - "4566:4566"
-      - "8000:4566"
+      POSTGRES_DB: "tagstickerbot"
+      POSTGRES_USER: "tagstickerbot"
+      POSTGRES_PASSWORD: "p4ssw0rd"
     volumes:
-      - "localstack_data:/var/lib/localstack"
-    command: "start"
+      - "tsb_postgres_data:/var/lib/postgresql/data"
+    networks:
+      - "global_network"
+
+networks:
+  global_network:
+    external: true
 
 volumes:
-  localstack_data:
+  tsb_postgres_data:
     driver: local

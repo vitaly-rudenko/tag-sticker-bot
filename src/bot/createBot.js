@@ -8,6 +8,7 @@ import { useCommonFlow } from './flows/common.js'
 import { useFavoritesFlow } from './flows/favorites.js'
 import { deleteMessages } from '../utils/deleteMessages.js'
 import { useBuilderFlow } from './flows/builder.js'
+import { logger } from '../logger.js'
 
 /**
  * @param {{
@@ -24,6 +25,9 @@ export async function createBot({
   favoriteRepository,
 }) {
   const bot = new Telegraf(telegramBotToken)
+
+  process.once('SIGINT', () => bot.stop('SIGINT'))
+  process.once('SIGTERM', () => bot.stop('SIGTERM'))
 
   const {
     start,
@@ -124,6 +128,19 @@ export async function createBot({
     } catch {
       await context.reply('👌 Action cancelled.')
     }
+  })
+
+  bot.catch(async (err, context) => {
+    logger.error({
+      err,
+      ...context && {
+        context: {
+          ...context.update && Object.keys(context.update).length > 0 ? { update: context.update } : undefined,
+          ...context.botInfo && Object.keys(context.botInfo).length > 0 ? { botInfo: context.botInfo } : undefined,
+          ...context.state && Object.keys(context.state).length > 0 ? { state: context.state } : undefined,
+        }
+      },
+    }, 'Unhandled telegram error')
   })
 
   return bot

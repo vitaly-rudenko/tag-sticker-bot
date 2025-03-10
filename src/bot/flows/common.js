@@ -1,7 +1,19 @@
-import * as env from '../../env.js'
 import { escapeMd } from '../../utils/escapeMd.js'
 
 /** @typedef {import('telegraf').Context} Context */
+
+/** @returns {string} */
+function getAppVersion() {
+  try {
+    const packageJsonPath = path.join(process.cwd(), 'package.json')
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, { encoding: 'utf-8' }))
+    return packageJson?.version ?? 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+const appVersion = getAppVersion()
 
 /**
  * @param {{
@@ -32,7 +44,7 @@ export function useCommonFlow({ bot }) {
 
   /** @param {Context} context */
   async function version(context) {
-    await context.reply(`Version: ${env.version ?? 'unknown'}`)
+    await context.reply(`Version: ${appVersion ?? 'unknown'}`)
   }
 
   return {
