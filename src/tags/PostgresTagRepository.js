@@ -1,3 +1,5 @@
+import { generateQuery } from '../utils/generate-query.js'
+
 export class PostgresTagRepository {
   /**
    * @param {{
@@ -8,7 +10,6 @@ export class PostgresTagRepository {
     this._postgresClient = postgresClient
     this._maxTagsPerFile = 25
   }
-
 
   /**
    * @param {{
@@ -25,17 +26,25 @@ export class PostgresTagRepository {
       throw new Error(`Cannot store more than ${this._maxTagsPerFile} tags per request`)
 
     await this._postgresClient.query(
-      `DELETE FROM tags
-       WHERE author_user_id = $1 AND file_unique_id = $2;`,
-      [authorUserId, file.file_unique_id]
+      ...generateQuery(
+        `DELETE FROM tags
+         WHERE author_user_id = :authorUserId AND file_unique_id = :fileUniqueId;`,
+         { authorUserId, fileUniqueId: file.file_unique_id }
+      )
     )
 
-    const insertionValues = values.map((value) => [authorUserId, isPrivate, value, file.file_unique_id, file.file_id, file.set_name, file.mime_type])
+    const insertSqls = []
+    const insertBinds = []
+    for (const value of values) {
+      const valueBinds = [authorUserId, isPrivate, value, file.file_unique_id, file.file_id, file.set_name, file.mime_type]
+      insertSqls.push(`(${valueBinds.map((_, i) => `$${insertBinds.length + i + 1}`).join(', ')})`)
+      insertBinds.push(...valueBinds)
+    }
 
     await this._postgresClient.query(
       `INSERT INTO tags (author_user_id, is_private, value, file_unique_id, file_id, set_name, mime_type)
-       VALUES (${insertionValues.flatMap((sub, i) => sub.map((_, j) => `$${i * sub.length + j + 1}`)).join('), (')});`,
-       insertionValues.flat(),
+       VALUES ${insertSqls.join(', ')};`,
+      insertBinds
     )
   }
 
@@ -49,11 +58,13 @@ export class PostgresTagRepository {
    */
   async queryStatus({ stickerSetName, authorUserId, ownedOnly }) {
     const { rows } = await this._postgresClient.query(
+      ...generateQuery(
       `SELECT DISTINCT author_user_id, is_private, file_unique_id
        FROM tags
-       WHERE set_name = $1
-       ${ownedOnly ? 'AND author_user_id = $2' : ''};`,
-      [stickerSetName, authorUserId]
+         WHERE set_name = :stickerSetName
+         ${ownedOnly ? 'AND author_user_id = :authorUserId' : ''};`,
+        { stickerSetName, authorUserId }
+      )
     )
 
     return new Set(
@@ -81,7 +92,7 @@ export class PostgresTagRepository {
     }
 
     // always search in owned tags first
-    const { fileUniqueIds, files: ownedFiles } = await this._search({ query, limit, authorUserId })
+    const { fileUniqueIds, files: ownedFiles } = await this._search({ query, limit, authorUserId, excludeFileUniqueIds: new Set() })
     const remainingLimit = limit - ownedFiles.length
 
     // search in public tags if necessary
@@ -109,18 +120,20 @@ export class PostgresTagRepository {
    *   query: string
    *   limit: number
    *   authorUserId?: string
-   *   excludeFileUniqueIds?: Set<string>
+   *   excludeFileUniqueIds: Set<string>
    * }} input
    */
   async _search({ query, limit, authorUserId, excludeFileUniqueIds }) {
     const { rows } = await this._postgresClient.query(
-      `SELECT DISTINCT file_id, file_unique_id, set_name, mime_type
-       FROM tags
-       WHERE value ILIKE '%' || $1 || '%'
-       ${authorUserId ? 'AND author_user_id = $3' : ''}
-       ${excludeFileUniqueIds.size > 0 ? `AND file_unique_id != ALL(${Array.from(new Array(excludeFileUniqueIds.size), (_, i) => `${4 + i}`).join(', ')})` : ''}
-       LIMIT $2;`,
-      [query, limit, authorUserId, ...excludeFileUniqueIds]
+      ...generateQuery(
+        `SELECT DISTINCT file_id, file_unique_id, set_name, mime_type
+         FROM tags
+         WHERE value ILIKE '%' || :query || '%'
+         ${authorUserId ? 'AND author_user_id = :authorUserId' : ''}
+         ${excludeFileUniqueIds.size > 0 ? 'AND file_unique_id NOT IN (:excludeFileUniqueIds)' : ''}
+         LIMIT :limit;`,
+         { query, authorUserId, excludeFileUniqueIds, limit }
+      )
     )
 
     const files = rows.map(row => ({

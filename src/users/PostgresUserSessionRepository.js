@@ -1,4 +1,5 @@
 import { decodeMimeType } from '../utils/mimeType.js'
+import { generateQuery } from '../utils/generate-query.js'
 
 export class PostgresUserSessionRepository {
   /**
@@ -9,7 +10,6 @@ export class PostgresUserSessionRepository {
   constructor({ postgresClient })  {
     this._postgresClient = postgresClient
   }
-
 
   /**
    * @param {string} userId
@@ -23,12 +23,25 @@ export class PostgresUserSessionRepository {
       throw new Error('Sticker set and queue set do not match')
     }
 
+    const expiresAt = new Date(Date.now() + 60 * 60_000) // 1 hour
+
     await this._postgresClient.query(
-      `INSERT INTO user_sessions (user_id, is_private, phase, file, file_message_id, tag_instruction_message_id, queue)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (user_id) DO UPDATE
-       SET is_private = $2, phase = $3, file = $4, file_message_id = $5, tag_instruction_message_id = $6, queue = $7;`,
-       [userId, context.isPrivate, context.phase, context.file, context.fileMessageId, context.tagInstructionMessageId, context.queue]
+      ...generateQuery(
+        `INSERT INTO user_sessions (user_id, is_private, phase, file, file_message_id, tag_instruction_message_id, queue, expires_at)
+         VALUES (:userId, :isPrivate, :phase, :file, :fileMessageId, :tagInstructionMessageId, :queue, :expiresAt)
+         ON CONFLICT (user_id) DO UPDATE
+         SET is_private = :isPrivate, phase = :phase, file = :file, file_message_id = :fileMessageId, tag_instruction_message_id = :tagInstructionMessageId, queue = :queue, expires_at = :expiresAt;`,
+        {
+          userId,
+          isPrivate: context.isPrivate,
+          phase: context.phase,
+          file: context.file,
+          fileMessageId: context.fileMessageId,
+          tagInstructionMessageId: context.tagInstructionMessageId,
+          queue: context.queue,
+          expiresAt
+        }
+      )
     )
   }
 
@@ -38,10 +51,12 @@ export class PostgresUserSessionRepository {
    */
   async get(userId) {
     const { rows } = await this._postgresClient.query(
-      `SELECT user_id, is_private, phase, file, file_message_id, tag_instruction_message_id, queue
-       FROM user_sessions
-       WHERE user_id = $1;`,
-       [userId]
+      ...generateQuery(
+        `SELECT user_id, is_private, phase, file, file_message_id, tag_instruction_message_id, queue
+         FROM user_sessions
+         WHERE user_id = :userId;`,
+        { userId }
+      )
     )
     if (rows.length === 0) return { isPrivate: false }
 
@@ -50,50 +65,27 @@ export class PostgresUserSessionRepository {
 
     const isPrivate = rows[0].is_private
     const phase = rows[0].phase
-    const stickerSetName = rows[0].file?.set_name
-    const animationMimeType = decodeMimeType(file?.mime_type)
-    const fileUniqueId = file?.file_unique_id
-    const fileId = file?.file_id
     const fileMessageId = rows[0].file_message_id
     const tagInstructionMessageId = rows[0].tag_instruction_message_id
-    const queueStickerSetBitmap = queue?.stickerSetBitmap
-    const queueStickerSetBitmapLength = queue?.stickerSetBitmapLength
-    const queueStickerSetBitmapSize = queue?.stickerSetBitmapSize
-    const queuePosition = queue?.position
 
     return {
       isPrivate: isPrivate ?? false,
       ...phase && { phase },
-      ...fileUniqueId && fileId && {
-        file: {
-          file_id: fileId,
-          file_unique_id: fileUniqueId,
-          set_name: stickerSetName,
-          mime_type: animationMimeType,
-        }
-      },
+      ...file && { file },
       ...fileMessageId && { fileMessageId: Number(fileMessageId) },
       ...tagInstructionMessageId && { tagInstructionMessageId: Number(tagInstructionMessageId) },
-      ...stickerSetName && queueStickerSetBitmap && queueStickerSetBitmapLength && queuePosition && queueStickerSetBitmapSize && {
-        queue: {
-          position: Number(queuePosition),
-          stickerSetName: stickerSetName,
-          stickerSetBitmap: {
-            bitmap: decodeBitmap(queueStickerSetBitmap, Number(queueStickerSetBitmapLength)),
-            length: Number(queueStickerSetBitmapLength),
-            size: Number(queueStickerSetBitmapSize),
-          },
-        }
-      },
+      ...queue && { queue },
     }
   }
 
   /** @param {string} userId */
   async clear(userId) {
     await this._postgresClient.query(
-      `DELETE FROM user_sessions
-       WHERE user_id = $1;`,
-       [userId]
+      ...generateQuery(
+        `DELETE FROM user_sessions
+         WHERE user_id = :userId;`,
+        { userId }
+      )
     )
   }
 }
