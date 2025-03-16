@@ -1,4 +1,4 @@
-import { MAX_TAGS_PER_FILE, MIN_QUERY_LENGTH, MAX_QUERY_LENGTH, MAX_TAG_INPUT_LENGTH } from '../../constants.js'
+import { MAX_TAGS_PER_FILE, MIN_QUERY_LENGTH, MAX_QUERY_LENGTH, MAX_TAG_INPUT_LENGTH } from '../../constants.ts'
 import { deleteMessages } from '../../utils/deleteMessages.js'
 import { escapeMd } from '../../utils/escapeMd.js'
 import { filesToBitmap } from '../../utils/files.js'

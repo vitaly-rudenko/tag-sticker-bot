@@ -4,7 +4,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env src/app.js",
+    "start": "node --env-file=.env --experimental-strip-types src/app.ts",
     "dev": "nodemon --exec 'npm start'",
     "test": "npm run jest",
     "jest": "node --env-file=.env --experimental-vm-modules node_modules/jest/bin/jest.js",

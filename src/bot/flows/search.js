@@ -1,4 +1,4 @@
-import { INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.js'
+import { INLINE_QUERY_RESULT_LIMIT, MAX_QUERY_LENGTH, MIN_QUERY_LENGTH } from '../../constants.ts'
 import { inlineQueryCacheTimeS } from '../../env.js'
 import { normalizeTagValue } from '../../utils/tags.js'
 
