@@ -88,10 +88,10 @@ export async function createBot({
   bot.on('inline_query', handleSearch)
 
   bot.use((context, next) => {
-    if (context.chat?.type === 'private') {
-      return next()
-    }
+    if (context.chat?.type !== 'private') return
+    return next()
   })
+
   bot.on(message('sticker'), handleFile)
   bot.on(message('animation'), handleFile)
   bot.on(message('photo'), handlePhoto)
