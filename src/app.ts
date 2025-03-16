@@ -1,266 +1,39 @@
-import { z } from 'zod'
 import pg from 'pg'
-import { markdownEscapes } from 'markdown-escapes'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
+import { type TaggableFile } from './common/taggable-file.ts'
+import { FavoritesRepository } from './favorites/favorites-repository.ts'
+import { TagsRepository } from './tags/tags-repository.ts'
+import { type Visibility, visibilitySchema } from './tags/visibility.ts'
+import { UserSessionsRepository } from './user-sessions/user-sessions-repository.ts'
+import { escapeMd } from './utils/escape-md.ts'
+import { requireNonNullable } from './utils/require-non-nullable.ts'
 
 // TODO: logging
+// TODO: indexes
 
 const postgresClient = new pg.Client(process.env.DATABASE_URL)
 await postgresClient.connect()
+
+const tagsRepository = new TagsRepository({ client: postgresClient })
+const favoritesRepository = new FavoritesRepository({ client: postgresClient })
+const userSessionsRepository = new UserSessionsRepository({ client: postgresClient })
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
 
-const taggableFileSchema = z.discriminatedUnion('fileType', [
-  z.strictObject({
-    fileId: z.string(),
-    fileUniqueId: z.string(),
-    fileType: z.literal('sticker'),
-    setName: z.string().optional(),
-  }),
-  z.strictObject({
-    fileId: z.string(),
-    fileUniqueId: z.string(),
-    fileType: z.literal('animation'),
-    mimeType: z.string(),
-  })
-])
-
-type TaggableFile = z.infer<typeof taggableFileSchema>
-
-type FavoritesRepository = {
-  add: (input: { userId: number; taggableFile: TaggableFile }) => Promise<void>
-  delete: (input: { userId: number; fileUniqueId: string }) => Promise<void>
-  exists: (input: { userId: number; fileUniqueId: string }) => Promise<boolean>
-  list: (input: { userId: number; limit: number }) => Promise<TaggableFile[]>
+function formatFileType(taggableFile: TaggableFile): string {
+  return taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'
 }
 
-const visibilitySchema = z.enum(['private', 'public'])
-type Visibility = z.infer<typeof visibilitySchema>
-
-type UserSession = {
-  tagging?: {
-    taggableFileMessageId: number
-    taggableFile: TaggableFile
-    visibility: Visibility
-    promptMessageId?: number
-    instructionsMessageId?: number
-  }
+function capitalize(input: string) {
+  return input[0].toUpperCase() + input.slice(1)
 }
 
-type UserSessionsRepository = {
-  get: (input: { userId: number }) => Promise<UserSession | undefined>
-  set: (input: { userId: number; userSession: UserSession }) => Promise<void>
-  clear: (input: { userId: number }) => Promise<void>
-}
-
-const tagSchema = z.strictObject({
-  authorUserId: z.number(),
-  value: z.string(),
-  visibility: visibilitySchema,
-  taggableFile: taggableFileSchema,
-})
-type Tag = z.infer<typeof tagSchema>
-
-type TagRepository = {
-  replace: (input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; values: string[] }) => Promise<void>
-  search: (input: { query: string; requesterUserId: number; ownedOnly: boolean; limit: number }) => Promise<Tag[]>
-}
-
-function requireNonNullable<T>(input: T): NonNullable<T> {
-  if (input === null || input === undefined) {
-    throw new Error(`Expected non-nullable value`)
-  }
-
-  return input
-}
-
-const MARKDOWN_ESCAPE_REGEX = new RegExp(`(?<!\\\\)([\\${markdownEscapes.join('\\')}])`, 'g')
-function escapeMd(input: string) {
-  return input.replace(MARKDOWN_ESCAPE_REGEX, '\\$1')
-}
-
-const favoritesRepository: FavoritesRepository = {
-  async add({ userId, taggableFile }) {
-    await postgresClient.query(
-      `INSERT INTO favorites (user_id, file_id, file_unique_id, file_type, set_name, mime_type)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (user_id, file_unique_id) DO NOTHING;`,
-      [
-        userId,
-        taggableFile.fileId,
-        taggableFile.fileUniqueId,
-        taggableFile.fileType,
-        taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
-        taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
-      ]
-    )
-  },
-
-  async delete({ userId, fileUniqueId }) {
-    await postgresClient.query(
-      `DELETE FROM favorites
-       WHERE user_id = $1
-         AND file_unique_id = $2;`,
-      [userId, fileUniqueId]
-    )
-  },
-
-  async exists({ userId, fileUniqueId }) {
-    const { rows } = await postgresClient.query(
-      `SELECT 1
-       FROM favorites
-       WHERE user_id = $1
-         AND file_unique_id = $2;`,
-      [userId, fileUniqueId]
-    )
-
-    return rows.length > 0
-  },
-
-  async list({ userId, limit }) {
-    const { rows } = await postgresClient.query(
-      `SELECT file_unique_id, file_id, file_type, set_name, mime_type
-       FROM favorites
-       WHERE user_id = $1
-       LIMIT $2;`,
-      [userId, limit]
-    )
-
-    return rows.map(row => taggableFileSchema.parse({
-      fileUniqueId: row.file_unique_id,
-      fileId: row.file_id,
-      fileType: row.file_type,
-      ...row.file_type === 'sticker' && {
-        setName: row.set_name,
-      },
-      ...row.file_type === 'animation' && {
-        mimeType: row.mime_type,
-      },
-    }))
-  }
-}
-
-const userSessionsRepository: UserSessionsRepository = {
-  async set({ userId, userSession }) {
-    await postgresClient.query(
-      `INSERT INTO user_sessions (user_id, data)
-       VALUES ($1, $2)
-       ON CONFLICT (user_id) DO UPDATE
-       SET data = $2;`,
-      [userId, userSession],
-    )
-  },
-  async get({ userId }) {
-    const { rows } = await postgresClient.query(
-      `SELECT data
-       FROM user_sessions
-       WHERE user_id = $1;`,
-      [userId]
-    );
-
-    return rows.length > 0 ? rows[0].data : undefined
-  },
-  async clear({ userId }) {
-    await postgresClient.query(
-      `DELETE FROM user_sessions
-       WHERE user_id = $1`,
-      [userId]
-    )
-  }
-}
-
-const tagsRepository: TagRepository = {
-  async replace({ authorUserId, taggableFile, values, visibility }) {
-    try {
-      await postgresClient.query('BEGIN;')
-
-      await postgresClient.query(
-        `DELETE FROM tags
-         WHERE author_user_id = $1
-           AND file_unique_id = $2;`,
-        [authorUserId, taggableFile.fileUniqueId],
-      )
-
-      // TODO: bulk insert
-      for (const value of values) {
-        await postgresClient.query(
-          `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, mime_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
-          [
-            authorUserId,
-            visibility,
-            value,
-            taggableFile.fileId,
-            taggableFile.fileUniqueId,
-            taggableFile.fileType,
-            taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
-            taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
-          ],
-        )
-      }
-
-      await postgresClient.query('COMMIT;')
-    } catch (error) {
-      await postgresClient.query('ROLLBACK;')
-      throw error
-    }
-  },
-
-  async search({ query, requesterUserId, ownedOnly, limit }) {
-    const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
-
-    const { rows } = await postgresClient.query(
-      `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, mime_type
-       FROM tags
-       WHERE value ILIKE '%' || $1 || '%'
-         AND author_user_id = $2
-       LIMIT $3;`,
-      [escapedQuery, requesterUserId, limit]
-    )
-
-    if (rows.length < limit && !ownedOnly) {
-      const fileUniqueIdsToExclude = rows.map(row => row.file_unique_id)
-
-      const { rows: remainingRows } = await postgresClient.query(
-        `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, mime_type
-         FROM tags
-         WHERE value ILIKE '%' || $1 || '%'
-           AND (author_user_id = $2 OR visibility IN ($4))
-           ${fileUniqueIdsToExclude.length > 0 && `AND file_unique_id NOT IN (${fileUniqueIdsToExclude.map((_, i) => `$${5 + i}`)})`}
-         LIMIT $3;`,
-        [
-          escapedQuery,
-          requesterUserId,
-          limit - rows.length,
-          'public' satisfies Visibility,
-          ...fileUniqueIdsToExclude,
-        ]
-      )
-
-      rows.push(...remainingRows)
-    }
-
-    return rows.map(row => tagSchema.parse({
-      authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
-      value: row.value,
-      visibility: row.visibility,
-      taggableFile: {
-        fileUniqueId: row.file_unique_id,
-        fileId: row.file_id,
-        fileType: row.file_type,
-        ...row.file_type === 'sticker' && {
-          setName: row.set_name,
-        },
-        ...row.file_type === 'animation' && {
-          mimeType: row.mime_type,
-        },
-      }
-    }))
-  }
+function formatValuesList(values: string[]): string {
+  return values.map(tag => `*__${escapeMd(tag)}__*`).join(', ')
 }
 
 async function $handleTaggingFileMessage(context: Context) {
@@ -286,21 +59,56 @@ async function $handleTaggingFileMessage(context: Context) {
   if (!taggableFile) return
 
   const isFavorite = await favoritesRepository.exists({ userId: requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
+  const stats = await tagsRepository.stats({ requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
 
-  const promptMessage = await context.sendMessage('👇 What do you want to do?', {
-    parse_mode: 'MarkdownV2',
-    reply_parameters: { message_id: context.message.message_id },
-    reply_markup: Markup.inlineKeyboard([
-      Markup.button.callback(
-        `📎 Tag this ${taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'}`,
-        'tagging:tag-single'
-      ),
-      isFavorite
-        ? Markup.button.callback('💔 Delete from favorites', 'tagging:delete-from-favorites')
-        : Markup.button.callback('❤️ Add to favorites', 'tagging:add-to-favorites'),
-        Markup.button.callback('❌ Cancel', 'tagging:cancel'),
-    ], { columns: 1 }).reply_markup,
-  })
+  const message: string[] = []
+  const fileType_ = formatFileType(taggableFile)
+  if (stats.public.total === 0 && stats.requester.total === 0) {
+    message.push(`No one has tagged this ${fileType_} yet\\.`)
+  } else {
+    if (stats.requester.total > 0) {
+      const visibility_ = stats.requester.visibility === 'public' ? 'public' : 'private'
+      const tags_ = stats.requester.total > 1 ? 'tags' : 'tag'
+      const valuesList_ = formatValuesList(stats.requester.values)
+      message.push(`You have created ${stats.requester.total} *${visibility_}* ${tags_} for this ${fileType_}: ${valuesList_}\\.`)
+    } else {
+      message.push(`You have not tagged this ${fileType_}\\.`)
+    }
+
+    message.push('')
+
+    if (stats.public.total > 0) {
+      const remainingCount = stats.public.total - stats.public.values.length
+      const tags_ = stats.public.total > 1 ? 'tags' : 'tag'
+      const values_ = formatValuesList(stats.public.values)
+      const andMore_ = remainingCount > 0 ? ` and ${remainingCount} more` : ''
+      message.push(`This ${fileType_} has ${stats.public.total} public ${tags_}: ${values_}${andMore_}\\.`)
+    } else {
+      message.push(`No one else has tagged this ${fileType_}\\.`)
+    }
+  }
+
+  message.push('', '👇 What do you want to do?')
+
+  const promptMessage = await context.sendMessage(
+    message.join('\n'),
+    {
+      parse_mode: 'MarkdownV2',
+      reply_parameters: { message_id: context.message.message_id },
+      reply_markup: Markup.inlineKeyboard([
+        Markup.button.callback(
+          stats.requester.total > 0
+            ? `📎 Replace my tags`
+            : `📎 Tag this ${formatFileType(taggableFile)}`,
+          'tagging:tag-single'
+        ),
+        isFavorite
+          ? Markup.button.callback('💔 Un-favorite', 'tagging:delete-from-favorites')
+          : Markup.button.callback('❤️ Favorite', 'tagging:add-to-favorites'),
+          Markup.button.callback('❌ Cancel', 'tagging:cancel'),
+      ], { columns: 2 }).reply_markup,
+    }
+  )
 
   await userSessionsRepository.set({
     userId: requesterUserId,
@@ -332,7 +140,7 @@ async function $handleTaggingAddToFavoritesAction(context: Context) {
 
   await context.sendMessage(
     [
-      `❤️ Added ${taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'} to favorites\\.`,
+      `❤️ Added ${formatFileType(taggableFile)} to favorites\\.`,
       '🕒 It may take up to 10 minutes to see the changes\\.'
     ].join('\n'),
     {
@@ -359,7 +167,7 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
 
   await context.sendMessage(
     [
-      `💔 Deleted ${taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'} from favorites\\.`,
+      `💔 Deleted ${formatFileType(taggableFile)} from favorites\\.`,
       '🕒 It may take up to 10 minutes to see the changes\\.'
     ].join('\n'),
     {
@@ -367,6 +175,31 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
       reply_parameters: { message_id: taggableFileMessageId }
     }
   )
+}
+
+function buildTaggingInstructionsMessage(visibility: Visibility) {
+  return {
+    message: [
+      '✏️ Send tags separated by comma\\.',
+      'Example: *__cute cat__*, *__funny animal__*\\.',
+      '',
+      visibility === 'private'
+        ? '🔒 No one can see your *private* tags\\.'
+        : '🔓 Anyone can see your *public* tags\\.',
+      `Tag authors are never revealed\\.`
+    ].join('\n'),
+    extra: {
+      parse_mode: 'MarkdownV2',
+      reply_markup: Markup.inlineKeyboard(
+        [
+          Markup.button.callback(`${visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
+          Markup.button.callback(`${visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
+          Markup.button.callback('❌ Cancel', 'tagging:cancel'),
+        ],
+        { columns: 2 },
+      ).reply_markup,
+    }
+  } as const
 }
 
 async function $handleTaggingTagSingleAction(context: Context) {
@@ -383,28 +216,11 @@ async function $handleTaggingTagSingleAction(context: Context) {
     await context.deleteMessage(promptMessageId).catch(() => {})
   }
 
-  // TODO: DRY
+  const { message, extra } = buildTaggingInstructionsMessage(visibility)
+
   const instructionsMessage = await context.sendMessage(
-    [
-      '✏️ Send tags separated by comma \\(for example: *__cute dancing cat, funny cat__*\\)\\.',
-      '',
-      visibility === 'private'
-        ? '🔒 Nobody can see or find your *private* tags, except for you\\.'
-        : '🔓 Anyone can see and find your *public* tags\\.',
-      `🙈 Authors of tags are never revealed\\.`
-    ].join('\n'),
-    {
-      parse_mode: 'MarkdownV2',
-      reply_parameters: { message_id: taggableFileMessageId },
-      reply_markup: Markup.inlineKeyboard(
-        [
-          Markup.button.callback(`${visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
-          Markup.button.callback(`${visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
-          Markup.button.callback('❌ Cancel', 'tagging:cancel'),
-        ],
-        { columns: 2 },
-      ).reply_markup,
-    }
+    message,
+    { reply_parameters: { message_id: taggableFileMessageId }, ...extra }
   )
 
   await userSessionsRepository.set({
@@ -443,7 +259,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
     return
   }
   if (values.length > 10) {
-    await context.sendMessage(`❌ No more than 10 tags are allowed per ${taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'}.`)
+    await context.sendMessage(`❌ No more than 10 tags are allowed per ${formatFileType(taggableFile)}.`)
     return
   }
 
@@ -454,12 +270,12 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   await tagsRepository.replace({ authorUserId: requesterUserId, taggableFile, visibility, values })
   await userSessionsRepository.clear({ userId: requesterUserId })
 
+  const tags_ = values.length > 1 ? 'these tags' : 'this tag'
+  const valuesList_ = values.map(tag => `*__${escapeMd(tag)}__*`).join(', ')
   await context.sendMessage(
     [
-      `✅ ${taggableFile.fileType === 'sticker' ? 'Sticker' : 'GIF'} is now searchable by ${values.length > 1 ? 'these tags' : 'this tag'}: ${values.map(tag => `*__${escapeMd(tag)}__*`).join(', ')}\\.`,
-      visibility === 'public'
-        ? '🔓 Visibility: *public*\\.'
-        : '🔒 Visibility: *private*\\.',
+      `✅ ${capitalize(formatFileType(taggableFile))} is now searchable by ${tags_}: ${valuesList_}\\.`,
+      visibility === 'public' ? '🔓 Visibility: *public*\\.' : '🔒 Visibility: *private*\\.',
       '🕒 It may take up to 10 minutes to see the changes\\.',
     ].join('\n'),
     {
@@ -521,28 +337,8 @@ async function $handleTaggingSetVisibilityAction(context: Context) {
   })
 
   if (instructionsMessageId) {
-    // TODO: DRY
-    await context.editMessageText(
-      [
-        '✏️ Send tags separated by comma \\(for example: *__cute dancing cat, funny cat__*\\)\\.',
-        '',
-        visibility === 'private'
-          ? '🔒 Nobody can see or find your *private* tags, except for you\\.'
-          : '🔓 Anyone can see and find your *public* tags\\.',
-        `🙈 Authors of tags are never revealed\\.`
-      ].join('\n'),
-      {
-        parse_mode: 'MarkdownV2',
-        reply_markup: Markup.inlineKeyboard(
-          [
-            Markup.button.callback(`${visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
-            Markup.button.callback(`${visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
-            Markup.button.callback('❌ Cancel', 'tagging:cancel'),
-          ],
-          { columns: 2 },
-        ).reply_markup,
-      }
-    )
+    const { message, extra } = buildTaggingInstructionsMessage(visibility)
+    await context.editMessageText(message, extra)
   }
 }
 
@@ -610,7 +406,7 @@ async function $handleSearchInlineQuery(context: Context) {
         text: isFavoritesQuery
           ? taggableFiles.length === 0
             ? "You don't have any favorite stickers or GIFs yet. Click here to add"
-            : "Click here to add or remove your favorite stickers or GIFs"
+            : "Click here to manage your favorite stickers and GIFs"
           : "Can't find a sticker or GIF? Click here to contribute",
         start_parameter: 'stub', // for some reason this field is required
       }
@@ -620,7 +416,7 @@ async function $handleSearchInlineQuery(context: Context) {
 
 bot.on('inline_query', $handleSearchInlineQuery)
 
-// Only allow to use in private chat with bot
+// Only allow to manage favorites and tags in the private chat with bot
 bot.use((context, next) => {
   if (context.chat?.type !== 'private') return
   next()

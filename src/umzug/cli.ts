@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { umzug } from './umzug.ts'
-import type { MigrationMeta } from 'umzug'
+import { type MigrationMeta } from 'umzug'
 
 class Cli {
   constructor() {

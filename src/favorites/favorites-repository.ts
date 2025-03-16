@@ -1,0 +1,73 @@
+import { type Client } from 'pg'
+import { type TaggableFile, taggableFileSchema } from '../common/taggable-file.ts';
+
+export class FavoritesRepository {
+  #client: Client
+
+  constructor(input: { client: Client }) {
+    this.#client = input.client
+  }
+
+  async add(input: { userId: number; taggableFile: TaggableFile }): Promise<void> {
+    const { userId, taggableFile } = input
+
+    await this.#client.query(
+      `INSERT INTO favorites (user_id, file_id, file_unique_id, file_type, set_name, mime_type)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (user_id, file_unique_id) DO NOTHING;`,
+      [
+        userId,
+        taggableFile.fileId,
+        taggableFile.fileUniqueId,
+        taggableFile.fileType,
+        taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
+        taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
+      ]
+    )
+  }
+
+  async delete(input: { userId: number; fileUniqueId: string }): Promise<void> {
+    const { userId, fileUniqueId } = input
+
+    await this.#client.query(
+      `DELETE FROM favorites
+       WHERE user_id = $1
+         AND file_unique_id = $2;`,
+      [userId, fileUniqueId]
+    )
+  }
+
+  async exists(input: { userId: number; fileUniqueId: string }): Promise<boolean> {
+    const { userId, fileUniqueId } = input
+
+    const { rows } = await this.#client.query(
+      `SELECT 1
+       FROM favorites
+       WHERE user_id = $1
+         AND file_unique_id = $2;`,
+      [userId, fileUniqueId]
+    )
+
+    return rows.length > 0
+  }
+
+  async list(input: { userId: number; limit: number }): Promise<TaggableFile[]> {
+    const { userId, limit } = input
+
+    const { rows } = await this.#client.query(
+      `SELECT file_unique_id, file_id, file_type, set_name, mime_type
+       FROM favorites
+       WHERE user_id = $1
+       LIMIT $2;`,
+      [userId, limit]
+    )
+
+    return rows.map(row => taggableFileSchema.parse({
+      fileUniqueId: row.file_unique_id,
+      fileId: row.file_id,
+      fileType: row.file_type,
+      ...row.file_type === 'sticker' && { setName: row.set_name },
+      ...row.file_type === 'animation' && { mimeType: row.mime_type },
+    }))
+  }
+}

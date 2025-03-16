@@ -1,5 +1,5 @@
-import type { Client } from 'pg'
-import type { MigrationMeta } from 'umzug'
+import { type Client } from 'pg'
+import { type MigrationMeta } from 'umzug'
 
 export class PostgresStorage {
   #client: Client
