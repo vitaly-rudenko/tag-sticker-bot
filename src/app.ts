@@ -130,8 +130,6 @@ const favoritesRepository: FavoritesRepository = {
       [userId, limit]
     )
 
-    console.log(rows)
-
     return rows.map(row => taggableFileSchema.parse({
       fileUniqueId: row.file_unique_id,
       fileId: row.file_id,
@@ -377,7 +375,6 @@ async function $handleTaggingTagSingleAction(context: Context) {
   const requesterUserId = context.callbackQuery.from.id
 
   const userSession = await userSessionsRepository.get({ userId: requesterUserId })
-  console.log(userSession)
   if (!userSession?.tagging) return
 
   const { promptMessageId, taggableFileMessageId, visibility } = userSession.tagging
@@ -502,7 +499,6 @@ async function $handleTaggingCancelAction(context: Context) {
 }
 
 async function $handleTaggingSetVisibilityAction(context: Context) {
-  console.log(context)
   if (!context.callbackQuery?.message || !('match' in context) || !Array.isArray(context.match)) return
 
   const requesterUserId = context.callbackQuery.from.id
