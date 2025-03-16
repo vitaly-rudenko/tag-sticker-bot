@@ -8,6 +8,7 @@ import { env, telegramBotToken } from './env.js'
 
 async function start() {
   const postgresClient = new pg.Client(env.DATABASE_URL)
+  await postgresClient.connect()
 
   const userSessionRepository = new PostgresUserSessionRepository({ postgresClient })
   const tagRepository = new PostgresTagRepository({ postgresClient })
