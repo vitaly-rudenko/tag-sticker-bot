@@ -37,7 +37,9 @@ export function useQueueFlow({
       '👇 What do you want to do?',
     ].join('\n'), {
       parse_mode: 'MarkdownV2',
-      reply_to_message_id: context.message.message_id,
+      reply_parameters: {
+        message_id: context.message.message_id,
+      },
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback(
           'sticker' in context.message ? '📎 Tag this sticker' : '📎 Tag this GIF',
@@ -204,7 +206,7 @@ export function useQueueFlow({
 
     const { message_id } = await context.reply(
       '✏️ Send tags separated by comma \\(for example: *__cute dancing cat, funny cat__*\\)\\.',
-      { reply_to_message_id: fileMessageId, parse_mode: 'MarkdownV2' }
+      { reply_parameters: { message_id: fileMessageId }, parse_mode: 'MarkdownV2' }
     )
 
     await userSessionRepository.set(userId, {

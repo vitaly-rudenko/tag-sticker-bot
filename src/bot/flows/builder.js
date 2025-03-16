@@ -118,7 +118,9 @@ export function useBuilderFlow({ userSessionRepository, bot }) {
       '👇 What do you want to do?',
     ].join('\n'), {
       parse_mode: 'MarkdownV2',
-      reply_to_message_id: message.message_id,
+      reply_parameters: {
+        message_id: message.message_id,
+      },
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback('📎 Tag this sticker', 'file:tag-single'),
         Markup.button.callback('❤️ Add to favorites', 'file:favorite'),

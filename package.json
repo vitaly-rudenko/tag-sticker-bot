@@ -18,15 +18,18 @@
     "markdown-escapes": "^2.0.1",
     "pg": "^8.13.3",
     "sharp": "^0.33.2",
-    "telegraf": "^4.15.3",
+    "telegraf": "^4.16.3",
     "umzug": "^3.8.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.8",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.11.11",
     "jest": "^29.4.3",
-    "jest-extended": "^3.2.4",
     "nodemon": "^2.0.20",
-    "rimraf": "^5.0.5"
+    "rimraf": "^5.0.5",
+    "tsc": "^2.0.4",
+    "typescript": "^5.8.2"
   },
   "nodemonConfig": {
     "watch": [

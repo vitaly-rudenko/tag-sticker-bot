@@ -1,5 +1,3 @@
-const BITS = 32
-
 /** @param {boolean[]} booleans */
 export function booleansToBitmap(booleans) {
   return {

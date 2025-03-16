@@ -1,15 +1,12 @@
-import { deleteMessages } from '../../utils/deleteMessages.js'
-
 /** @typedef {import('telegraf').Context} Context */
 
 /**
  * @param {{
  *   userSessionRepository: import('../../types.d.ts').UserSessionRepository
  *   favoriteRepository: import('../../types.d.ts').FavoriteRepository,
- *   telegram: import('telegraf').Telegram
  * }} input
  */
-export function useFavoritesFlow({ userSessionRepository, favoriteRepository, telegram }) {
+export function useFavoritesFlow({ userSessionRepository, favoriteRepository }) {
   /** @param {Context} context */
   async function favorite(context) {
     if (!context.chat) return

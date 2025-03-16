@@ -136,7 +136,7 @@ class MigrationsCli {
       await new Promise((resolve, reject) => {
         rs.on('error', reject)
         ws.on('error', reject)
-        ws.on('finish', resolve)
+        ws.on('finish', () => resolve(undefined))
 
         rs.pipe(ws)
       })

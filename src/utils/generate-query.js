@@ -1,3 +1,8 @@
+/**
+ * @param {string} sql
+ * @param {object} replacements
+ * @returns {[string, any[]]}
+ */
 export function generateQuery(sql, replacements) {
   if (typeof sql !== 'string') {
     throw new Error(`Invalid sql: ${sql}`)

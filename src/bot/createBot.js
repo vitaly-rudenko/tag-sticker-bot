@@ -71,7 +71,6 @@ export async function createBot({
     favorite,
     unfavorite,
   } = useFavoritesFlow({
-    telegram: bot.telegram,
     favoriteRepository,
     userSessionRepository,
   })

@@ -1,4 +1,3 @@
-import { decodeMimeType } from '../utils/mimeType.js'
 import { generateQuery } from '../utils/generate-query.js'
 
 export class PostgresUserSessionRepository {
