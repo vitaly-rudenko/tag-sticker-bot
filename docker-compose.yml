@@ -1,7 +1,7 @@
 services:
   tsb_postgres:
     container_name: tsb_postgres
-    image: postgres:13-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: "tagstickerbot"

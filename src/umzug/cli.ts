@@ -1,8 +1,9 @@
 import fs from 'fs'
 import path from 'path'
-import { umzug } from './umzug.js'
+import { umzug } from './umzug.ts'
+import type { MigrationMeta } from 'umzug'
 
-class MigrationsCli {
+class Cli {
   constructor() {
     umzug.on('migrating', event => console.log(`== ${event.name}: migrating ==`))
     umzug.on('migrated', event => console.log(`== ${event.name}: migrated ==\n`))
@@ -10,11 +11,9 @@ class MigrationsCli {
     umzug.on('reverted', event => console.log(`== ${event.name}: reverted ==\n`))
   }
 
-  /**
-   * @param {string} task
-   * @param {{ migrateTo: string; undoTo: string; migrationName: string }} param1
-   */
-  async runTask(task, { migrateTo, undoTo, migrationName }) {
+  async runTask(task: string, options: { migrateTo?: string, undoTo?: string, migrationName?: string }) {
+    const { migrateTo, undoTo, migrationName } = options
+
     switch (task) {
       case 'db:reset':
         await this.undo(0)
@@ -57,13 +56,7 @@ class MigrationsCli {
     }
   }
 
-  /**
-   * Executes all pending migrations up to specified one.
-   * If destination is not specified, executes all pending migrations.
-   *
-   * @param {string} [destination] Migration destination.
-   */
-  async migrate(destination) {
+  async migrate(destination?: string) {
     const migrations = destination !== undefined
       ? await umzug.up({ to: destination })
       : await umzug.up()
@@ -75,10 +68,7 @@ class MigrationsCli {
     }
   }
 
-  /**
-   * @param {string | 0} [destination] Migration destination.
-   */
-  async undo(destination) {
+  async undo(destination?: string | 0) {
     const migrations = destination !== undefined
       ? await umzug.down({ to: destination })
       : await umzug.down()
@@ -112,8 +102,7 @@ class MigrationsCli {
     }
   }
 
-  /** @param {string} migrationName */
-  async generate(migrationName) {
+  async generate(migrationName: string) {
     const date = new Date()
     const timestamp = [
       date.getUTCFullYear(),
@@ -150,33 +139,27 @@ class MigrationsCli {
     }
   }
 
-  /** @param {import('umzug').MigrationMeta[]} migrations */
-  _printMigrations(migrations) {
+  _printMigrations(migrations: MigrationMeta[]) {
     migrations.forEach((migration, index) =>
       this._printMigration(migration, index + 1))
   }
 
-  /**
-   * @param {import('umzug').MigrationMeta | string} migration
-   * @param {number} [index]
-   */
-  _printMigration(migration, index = undefined) {
+  _printMigration(migration: MigrationMeta | string, index?: number) {
     const fileName = (typeof migration === 'string' ? migration : migration.name).replace('.cjs', '')
     const prefix = index !== undefined ? `${index})` : '-'
 
     console.log(`  ${prefix} ${fileName}`)
   }
 
-  /** @param {number} number */
-  _format(number) {
+  _format(number: number) {
     return number.toString().padStart(2, '0')
   }
 }
 
-const cli = new MigrationsCli()
+const cli = new Cli()
 
 const task = process.argv[2]
-const options = {}
+const options: { migrateTo?: string, undoTo?: string, migrationName?: string } = {}
 
 if (task === 'db:migrate')
   options.migrateTo = process.argv[3]
