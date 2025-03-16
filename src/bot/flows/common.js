@@ -1,16 +1,14 @@
+import * as fs from 'fs'
+import * as path from 'path'
 import { escapeMd } from '../../utils/escapeMd.js'
 
 /** @typedef {import('telegraf').Context} Context */
 
 /** @returns {string} */
 function getAppVersion() {
-  try {
-    const packageJsonPath = path.join(process.cwd(), 'package.json')
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, { encoding: 'utf-8' }))
-    return packageJson?.version ?? 'unknown'
-  } catch {
-    return 'unknown'
-  }
+  const packageJsonPath = path.join(process.cwd(), 'package.json')
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, { encoding: 'utf-8' }))
+  return packageJson.version
 }
 
 const appVersion = getAppVersion()
