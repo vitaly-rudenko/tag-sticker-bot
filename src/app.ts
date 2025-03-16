@@ -11,6 +11,7 @@ import { requireNonNullable } from './utils/require-non-nullable.ts'
 
 // TODO: logging
 // TODO: indexes
+// TODO: move mime type, set name, emoji, etc. to separate "files" table
 
 const postgresClient = new pg.Client(process.env.DATABASE_URL)
 await postgresClient.connect()
@@ -47,6 +48,7 @@ async function $handleTaggingFileMessage(context: Context) {
       fileUniqueId: context.message.sticker.file_unique_id,
       fileType: 'sticker',
       setName: context.message.sticker.set_name,
+      emoji: context.message.sticker.emoji,
     }
     : 'animation' in context.message ? {
       fileId: context.message.animation.file_id,

@@ -26,8 +26,8 @@ export class TagsRepository {
       // TODO: bulk insert
       for (const value of values) {
         await this.#client.query(
-          `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, mime_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8);`,
+          `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, emoji, mime_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
           [
             authorUserId,
             visibility,
@@ -36,6 +36,7 @@ export class TagsRepository {
             taggableFile.fileUniqueId,
             taggableFile.fileType,
             taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
+            taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
             taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
           ],
         )
@@ -54,7 +55,7 @@ export class TagsRepository {
     const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
 
     const { rows } = await this.#client.query(
-      `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, mime_type
+      `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
        FROM tags
        WHERE value ILIKE '%' || $1 || '%'
          AND author_user_id = $2
@@ -66,7 +67,7 @@ export class TagsRepository {
       const fileUniqueIdsToExclude = rows.map(row => row.file_unique_id)
 
       const { rows: remainingRows } = await this.#client.query(
-        `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, mime_type
+        `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
          FROM tags
          WHERE value ILIKE '%' || $1 || '%'
            AND (author_user_id = $2 OR visibility = $4)
@@ -92,7 +93,10 @@ export class TagsRepository {
         fileUniqueId: row.file_unique_id,
         fileId: row.file_id,
         fileType: row.file_type,
-        ...row.file_type === 'sticker' && { setName: row.set_name },
+        ...row.file_type === 'sticker' && {
+          setName: row.set_name,
+          emoji: row.emoji,
+        },
         ...row.file_type === 'animation' && { mimeType: row.mime_type },
       }
     }))

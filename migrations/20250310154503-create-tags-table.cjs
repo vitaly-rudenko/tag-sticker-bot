@@ -14,6 +14,7 @@ module.exports = {
           file_id VARCHAR(100) NOT NULL,
           file_type VARCHAR(100) NOT NULL,
           set_name VARCHAR(1000),
+          emoji VARCHAR(100),
           mime_type VARCHAR(100),
           created_at TIMESTAMPTZ DEFAULT NOW(),
           updated_at TIMESTAMPTZ DEFAULT NOW()
