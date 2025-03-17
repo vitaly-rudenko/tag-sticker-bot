@@ -49,6 +49,19 @@ export class TagsRepository {
     }
   }
 
+  async deleteAll(input: { authorUserId: number; fileUniqueId: string }): Promise<number | null> {
+    const { authorUserId, fileUniqueId } = input
+
+    const { rowCount } = await this.#client.query(
+      `DELETE FROM tags
+       WHERE author_user_id = $1
+         AND file_unique_id = $2;`,
+      [authorUserId, fileUniqueId],
+    )
+
+    return rowCount
+  }
+
   async search(input: { query: string; requesterUserId: number; ownedOnly: boolean; limit: number }): Promise<Tag[]> {
     const { query, requesterUserId, ownedOnly, limit } = input
 
@@ -100,6 +113,16 @@ export class TagsRepository {
         ...row.file_type === 'animation' && { mimeType: row.mime_type },
       }
     }))
+  }
+
+  // TODO: optimize
+  async exists(input: { authorUserId: number; fileUniqueId: string }): Promise<boolean> {
+    const { authorUserId, fileUniqueId } = input
+
+    return (await this.stats({
+      requesterUserId: authorUserId,
+      fileUniqueId,
+    })).requester.total > 0
   }
 
   async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{

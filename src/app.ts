@@ -84,7 +84,7 @@ async function $handleTaggingFileMessage(context: Context) {
       const tags_ = stats.public.total > 1 ? 'tags' : 'tag'
       const values_ = formatValuesList(stats.public.values)
       const andMore_ = remainingCount > 0 ? ` and ${remainingCount} more` : ''
-      message.push(`This ${fileType_} has ${stats.public.total} public ${tags_}: ${values_}${andMore_}\\.`)
+      message.push(`This ${fileType_} has ${stats.public.total} *public* ${tags_}: ${values_}${andMore_}\\.`)
     } else {
       message.push(`No one else has tagged this ${fileType_}\\.`)
     }
@@ -100,7 +100,7 @@ async function $handleTaggingFileMessage(context: Context) {
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback(
           stats.requester.total > 0
-            ? `📎 Replace my tags`
+            ? `📎 Edit my tags`
             : `📎 Tag this ${formatFileType(taggableFile)}`,
           'tagging:tag-single'
         ),
@@ -179,13 +179,13 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
   )
 }
 
-function buildTaggingInstructionsMessage(visibility: Visibility) {
+function buildTaggingInstructionsMessage(input: { visibility: Visibility; showDeleteButton: boolean }) {
   return {
     message: [
       '✏️ Send tags separated by comma\\.',
       'Example: *__cute cat__*, *__funny animal__*\\.',
       '',
-      visibility === 'private'
+      input.visibility === 'private'
         ? '🔒 No one can see your *private* tags\\.'
         : '🔓 Anyone can see your *public* tags\\.',
       `Tag authors are never revealed\\.`
@@ -194,11 +194,14 @@ function buildTaggingInstructionsMessage(visibility: Visibility) {
       parse_mode: 'MarkdownV2',
       reply_markup: Markup.inlineKeyboard(
         [
-          Markup.button.callback(`${visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
-          Markup.button.callback(`${visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
+          Markup.button.callback(`${input.visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
+          Markup.button.callback(`${input.visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
+          ...input.showDeleteButton
+            ? [Markup.button.callback(`🗑 Delete my tags`, 'tagging:delete-tags')]
+            : [],
           Markup.button.callback('❌ Cancel', 'tagging:cancel'),
         ],
-        { columns: 2 },
+        { wrap: (_, index) => index > 1 },
       ).reply_markup,
     }
   } as const
@@ -212,13 +215,19 @@ async function $handleTaggingTagSingleAction(context: Context) {
   const userSession = await userSessionsRepository.get({ userId: requesterUserId })
   if (!userSession?.tagging) return
 
-  const { promptMessageId, taggableFileMessageId, visibility } = userSession.tagging
+  const { promptMessageId, taggableFileMessageId, taggableFile, visibility } = userSession.tagging
 
   if (promptMessageId) {
     await context.deleteMessage(promptMessageId).catch(() => {})
   }
 
-  const { message, extra } = buildTaggingInstructionsMessage(visibility)
+  const { message, extra } = buildTaggingInstructionsMessage({
+    visibility,
+    showDeleteButton: await tagsRepository.exists({
+      authorUserId: requesterUserId,
+      fileUniqueId: taggableFile.fileUniqueId,
+    })
+  })
 
   const instructionsMessage = await context.sendMessage(
     message,
@@ -325,7 +334,7 @@ async function $handleTaggingSetVisibilityAction(context: Context) {
   const userSession = await userSessionsRepository.get({ userId: requesterUserId })
   if (!userSession?.tagging) return
 
-  const { instructionsMessageId } = userSession.tagging
+  const { taggableFile, instructionsMessageId } = userSession.tagging
 
   await userSessionsRepository.set({
     userId: requesterUserId,
@@ -339,9 +348,51 @@ async function $handleTaggingSetVisibilityAction(context: Context) {
   })
 
   if (instructionsMessageId) {
-    const { message, extra } = buildTaggingInstructionsMessage(visibility)
+    const { message, extra } = buildTaggingInstructionsMessage({
+      visibility,
+      showDeleteButton: await tagsRepository.exists({
+        authorUserId: requesterUserId,
+        fileUniqueId: taggableFile.fileUniqueId,
+      })
+    })
+
     await context.editMessageText(message, extra)
   }
+}
+
+async function $handleTaggingDeleteTagsAction(context: Context) {
+  if (!context.callbackQuery?.message) return
+
+  const requesterUserId = context.callbackQuery.from.id
+
+  const userSession = await userSessionsRepository.get({ userId: requesterUserId })
+  if (!userSession?.tagging) return
+
+  const { taggableFile, taggableFileMessageId, instructionsMessageId } = userSession.tagging
+
+  if (instructionsMessageId) {
+    await context.deleteMessage(instructionsMessageId).catch(() => {})
+  }
+
+  const deletedCount = await tagsRepository.deleteAll({
+    authorUserId: requesterUserId,
+    fileUniqueId: taggableFile.fileUniqueId,
+  })
+
+  await userSessionsRepository.clear({ userId: requesterUserId })
+
+  const count_ = deletedCount !== null ? deletedCount : 'all your'
+  const tags_ = deletedCount === 1 ? 'tag' : 'tags'
+  await context.sendMessage(
+    [
+      `🗑 Deleted ${count_} ${tags_} for this ${formatFileType(taggableFile)}\\.`,
+      '🕒 It may take up to 10 minutes to see the changes\\.'
+    ].join('\n'),
+    {
+      parse_mode: 'MarkdownV2',
+      reply_parameters: { message_id: taggableFileMessageId }
+    }
+  )
 }
 
 async function $handleSearchInlineQuery(context: Context) {
@@ -432,6 +483,7 @@ bot.action('tagging:add-to-favorites', $handleTaggingAddToFavoritesAction)
 bot.action('tagging:delete-from-favorites', $handleTaggingDeleteFromFavoritesAction)
 bot.action('tagging:tag-single', $handleTaggingTagSingleAction)
 bot.action(/^tagging:set-visibility:(.+?)$/, $handleTaggingSetVisibilityAction)
+bot.action('tagging:delete-tags', $handleTaggingDeleteTagsAction)
 bot.action('tagging:cancel', $handleTaggingCancelAction)
 
 bot.catch((error, context) => {
