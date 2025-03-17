@@ -9,8 +9,8 @@ import { UserSessionsRepository } from './user-sessions/user-sessions-repository
 import { escapeMd } from './utils/escape-md.ts'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
 import { logger } from './utils/logging/logger.ts'
-
-// TODO: move mime type, set name, emoji, etc. to separate "files" table
+import { FilesRepository } from './files/files-repository.ts'
+import { exhaust } from './utils/exhaust.ts'
 
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
@@ -28,6 +28,7 @@ await postgresClient.connect()
 const tagsRepository = new TagsRepository({ client: postgresClient })
 const favoritesRepository = new FavoritesRepository({ client: postgresClient })
 const userSessionsRepository = new UserSessionsRepository({ client: postgresClient })
+const filesRepository = new FilesRepository({ client: postgresClient })
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
@@ -68,6 +69,16 @@ async function $handleTaggingFileMessage(context: Context) {
     : undefined
 
   if (!taggableFile) return
+
+  await filesRepository.store({
+    fileUniqueId: taggableFile.fileUniqueId,
+    fileType: taggableFile.fileType,
+    data: 'sticker' in context.message
+      ? context.message.sticker
+      : 'animation' in context.message
+      ? context.message.animation
+      : exhaust(),
+  })
 
   const isFavorite = await favoritesRepository.exists({ userId: requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
   const stats = await tagsRepository.stats({ requesterUserId, fileUniqueId: taggableFile.fileUniqueId })

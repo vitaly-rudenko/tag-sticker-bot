@@ -1,7 +1,7 @@
 import { type Client } from 'pg'
-import { type Tag, tagSchema } from './tag.ts';
-import { type TaggableFile } from '../common/taggable-file.ts';
-import { visibilitySchema, type Visibility } from './visibility.ts';
+import { type Tag, tagSchema } from './tag.ts'
+import { type TaggableFile } from '../common/taggable-file.ts'
+import { visibilitySchema, type Visibility } from './visibility.ts'
 
 export class TagsRepository {
   #client: Client

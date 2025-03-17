@@ -1,5 +1,5 @@
 import { type Client } from 'pg'
-import { type UserSession, userSessionSchema } from './user-session.ts';
+import { type UserSession, userSessionSchema } from './user-session.ts'
 
 export class UserSessionsRepository {
   #client: Client
@@ -28,7 +28,7 @@ export class UserSessionsRepository {
        FROM user_sessions
        WHERE user_id = $1;`,
       [userId]
-    );
+    )
 
     return rows.length > 0
       ? userSessionSchema.parse(rows[0].data)

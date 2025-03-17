@@ -1,5 +1,5 @@
 import { type Client } from 'pg'
-import { type TaggableFile, taggableFileSchema } from '../common/taggable-file.ts';
+import { type TaggableFile, taggableFileSchema } from '../common/taggable-file.ts'
 
 export class FavoritesRepository {
   #client: Client
