@@ -6,9 +6,10 @@
   "scripts": {
     "start": "node --env-file=.env --experimental-strip-types src/app.ts",
     "dev": "nodemon --exec 'npm start'",
-    "test": "node --env-file=.env --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "node --env-file=.env --experimental-strip-types --test",
     "lint": "tsc",
-    "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts"
+    "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts",
+    "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
@@ -24,10 +25,8 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.8",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
-    "jest": "^29.4.3",
     "nodemon": "^2.0.20",
     "tsc": "^2.0.4",
     "typescript": "^5.8.2"

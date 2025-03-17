@@ -14,8 +14,7 @@ module.exports = {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
 
-        CREATE UNIQUE INDEX files_file_unique_id_idx
-                         ON files (file_unique_id);
+        CREATE UNIQUE INDEX files_file_unique_id_uq ON files (file_unique_id);
 
         COMMIT;
       `)
@@ -31,7 +30,7 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX files_file_unique_id_idx;
+        DROP INDEX files_file_unique_id_uq;
         DROP TABLE files;
 
         COMMIT;

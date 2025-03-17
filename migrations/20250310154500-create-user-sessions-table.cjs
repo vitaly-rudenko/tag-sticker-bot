@@ -13,8 +13,7 @@ module.exports = {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
 
-        CREATE UNIQUE INDEX user_sessions_user_id_idx
-                         ON user_sessions (user_id);
+        CREATE UNIQUE INDEX user_sessions_user_id_uq ON user_sessions (user_id);
 
         COMMIT;
       `)
@@ -30,7 +29,7 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX user_sessions_user_id_idx;
+        DROP INDEX user_sessions_user_id_uq;
         DROP TABLE user_sessions;
 
         COMMIT;

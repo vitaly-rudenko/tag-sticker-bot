@@ -11,6 +11,7 @@ import { requireNonNullable } from './utils/require-non-nullable.ts'
 import { logger } from './utils/logging/logger.ts'
 import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
+import { isDefined } from './utils/is-defined.ts'
 
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
@@ -43,8 +44,8 @@ function capitalize(input: string) {
   return input[0].toUpperCase() + input.slice(1)
 }
 
-function formatValuesList(values: string[]): string {
-  return values.map(tag => `*__${escapeMd(tag)}__*`).join(', ')
+function formatValue(value: string): string {
+  return `*__${escapeMd(value)}__*`
 }
 
 async function $handleTaggingFileMessage(context: Context) {
@@ -70,6 +71,14 @@ async function $handleTaggingFileMessage(context: Context) {
 
   if (!taggableFile) return
 
+  const userSession = await userSessionsRepository.get({ userId: requesterUserId })
+  if (userSession?.tagging) {
+    const { promptMessageId, instructionsMessageId } = userSession.tagging
+    if (promptMessageId || instructionsMessageId) {
+      await context.deleteMessages([promptMessageId, instructionsMessageId].filter(isDefined)).catch(() => {})
+    }
+  }
+
   await filesRepository.store({
     fileUniqueId: taggableFile.fileUniqueId,
     fileType: taggableFile.fileType,
@@ -85,26 +94,25 @@ async function $handleTaggingFileMessage(context: Context) {
 
   const message: string[] = []
   const fileType_ = formatFileType(taggableFile)
-  if (stats.public.total === 0 && stats.requester.total === 0) {
+  if (stats.publicTags.total === 0 && !stats.requesterTag) {
     message.push(`No one has tagged this ${fileType_} yet\\.`)
   } else {
-    if (stats.requester.total > 0) {
-      const visibility_ = stats.requester.visibility === 'public' ? 'public' : 'private'
-      const tags_ = stats.requester.total > 1 ? 'tags' : 'tag'
-      const valuesList_ = formatValuesList(stats.requester.values)
-      message.push(`You have created ${stats.requester.total} *${visibility_}* ${tags_} for this ${fileType_}: ${valuesList_}\\.`)
+    if (stats.requesterTag) {
+      const visibility_ = stats.requesterTag.visibility === 'public' ? 'publicly' : 'privately'
+      const value_ = formatValue(stats.requesterTag.value)
+      message.push(`You have *${visibility_}* tagged this ${fileType_}: ${value_}\\.`)
     } else {
       message.push(`You have not tagged this ${fileType_}\\.`)
     }
 
     message.push('')
 
-    if (stats.public.total > 0) {
-      const remainingCount = stats.public.total - stats.public.values.length
-      const tags_ = stats.public.total > 1 ? 'tags' : 'tag'
-      const values_ = formatValuesList(stats.public.values)
+    if (stats.publicTags.total > 0) {
+      const remainingCount = stats.publicTags.total - stats.publicTags.values.length
+      const tags_ = stats.publicTags.total > 1 ? 'tags' : 'tag'
+      const values_ = stats.publicTags.values.map(value => formatValue(value))
       const andMore_ = remainingCount > 0 ? ` and ${remainingCount} more` : ''
-      message.push(`This ${fileType_} has ${stats.public.total} *public* ${tags_}: ${values_}${andMore_}\\.`)
+      message.push(`This ${fileType_} has ${stats.publicTags.total} *public* ${tags_}: ${values_}${andMore_}\\.`)
     } else {
       message.push(`No one else has tagged this ${fileType_}\\.`)
     }
@@ -119,9 +127,9 @@ async function $handleTaggingFileMessage(context: Context) {
       reply_parameters: { message_id: context.message.message_id },
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback(
-          stats.requester.total > 0
-            ? `📎 Edit my tags`
-            : `📎 Tag this ${formatFileType(taggableFile)}`,
+          stats.requesterTag
+            ? `📎 Edit my tag`
+            : `📎 Tag ${formatFileType(taggableFile)}`,
           'tagging:tag-single'
         ),
         isFavorite
@@ -147,6 +155,7 @@ async function $handleTaggingFileMessage(context: Context) {
 
 async function $handleTaggingAddToFavoritesAction(context: Context) {
   if (!context.callbackQuery?.message) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
 
@@ -174,6 +183,7 @@ async function $handleTaggingAddToFavoritesAction(context: Context) {
 
 async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
   if (!context.callbackQuery?.message) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
 
@@ -199,16 +209,16 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
   )
 }
 
-function buildTaggingInstructionsMessage(input: { visibility: Visibility; showDeleteButton: boolean }) {
+function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; visibility: Visibility; showDeleteButton: boolean }) {
   return {
     message: [
-      '✏️ Send tags separated by comma\\.',
-      'Example: *__cute cat__*, *__funny animal__*\\.',
+      `✏️ Send tag for this ${formatFileType(input.taggableFile)}\\.`,
+      'Example: *__cute cat, funny animal__*\\.',
       '',
       input.visibility === 'private'
         ? '🔒 No one can see your *private* tags\\.'
         : '🔓 Anyone can see your *public* tags\\.',
-      `Tag authors are never revealed\\.`
+      `Tag's author is never revealed\\.`
     ].join('\n'),
     extra: {
       parse_mode: 'MarkdownV2',
@@ -217,7 +227,7 @@ function buildTaggingInstructionsMessage(input: { visibility: Visibility; showDe
           Markup.button.callback(`${input.visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
           Markup.button.callback(`${input.visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
           ...input.showDeleteButton
-            ? [Markup.button.callback(`🗑 Delete my tags`, 'tagging:delete-tags')]
+            ? [Markup.button.callback(`🗑 Delete my tag`, 'tagging:delete-tags')]
             : [],
           Markup.button.callback('❌ Cancel', 'tagging:cancel'),
         ],
@@ -229,6 +239,7 @@ function buildTaggingInstructionsMessage(input: { visibility: Visibility; showDe
 
 async function $handleTaggingTagSingleAction(context: Context) {
   if (!context.callbackQuery?.message) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
 
@@ -243,6 +254,7 @@ async function $handleTaggingTagSingleAction(context: Context) {
 
   const { message, extra } = buildTaggingInstructionsMessage({
     visibility,
+    taggableFile,
     showDeleteButton: await tagsRepository.exists({
       authorUserId: requesterUserId,
       fileUniqueId: taggableFile.fileUniqueId,
@@ -280,17 +292,13 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   const text = context.message.text
   if (text.startsWith('/')) return next()
 
-  const values = context.message.text.split(',').map(tag => tag.trim())
-  if (values.some(tag => tag.length < 2)) {
+  const value = context.message.text.trim()
+  if (value.length < 2) {
     await context.sendMessage('❌ Tag must not be shorter than 2 characters.')
     return
   }
-  if (values.some(tag => tag.length > 100)) {
-    await context.sendMessage('❌ Tag must not be longer than 100 characters.')
-    return
-  }
-  if (values.length > 10) {
-    await context.sendMessage(`❌ No more than 10 tags are allowed per ${formatFileType(taggableFile)}.`)
+  if (value.length > 200) {
+    await context.sendMessage('❌ Tag must not be longer than 200 characters.')
     return
   }
 
@@ -298,14 +306,13 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
     await context.deleteMessage(instructionsMessageId).catch(() => {})
   }
 
-  await tagsRepository.replace({ authorUserId: requesterUserId, taggableFile, visibility, values })
+  await tagsRepository.replace({ authorUserId: requesterUserId, taggableFile, visibility, value })
   await userSessionsRepository.clear({ userId: requesterUserId })
 
-  const tags_ = values.length > 1 ? 'these tags' : 'this tag'
-  const valuesList_ = values.map(tag => `*__${escapeMd(tag)}__*`).join(', ')
+  const value_ = formatValue(value)
   await context.sendMessage(
     [
-      `✅ ${capitalize(formatFileType(taggableFile))} is now searchable by ${tags_}: ${valuesList_}\\.`,
+      `✅ ${capitalize(formatFileType(taggableFile))} is now searchable by: ${value_}\\.`,
       visibility === 'public' ? '🔓 Visibility: *public*\\.' : '🔒 Visibility: *private*\\.',
       '🕒 It may take up to 10 minutes to see the changes\\.',
     ].join('\n'),
@@ -318,6 +325,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
 
 async function $handleTaggingCancelAction(context: Context) {
   if (!context.callbackQuery?.message) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
 
@@ -347,6 +355,7 @@ async function $handleTaggingCancelAction(context: Context) {
 
 async function $handleTaggingSetVisibilityAction(context: Context) {
   if (!context.callbackQuery?.message || !('match' in context) || !Array.isArray(context.match)) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
   const visibility = visibilitySchema.parse(context.match[1])
@@ -370,18 +379,20 @@ async function $handleTaggingSetVisibilityAction(context: Context) {
   if (instructionsMessageId) {
     const { message, extra } = buildTaggingInstructionsMessage({
       visibility,
+      taggableFile,
       showDeleteButton: await tagsRepository.exists({
         authorUserId: requesterUserId,
         fileUniqueId: taggableFile.fileUniqueId,
       })
     })
 
-    await context.editMessageText(message, extra)
+    await context.editMessageText(message, extra).catch(() => {})
   }
 }
 
 async function $handleTaggingDeleteTagsAction(context: Context) {
   if (!context.callbackQuery?.message) return
+  await context.answerCbQuery()
 
   const requesterUserId = context.callbackQuery.from.id
 
@@ -394,18 +405,16 @@ async function $handleTaggingDeleteTagsAction(context: Context) {
     await context.deleteMessage(instructionsMessageId).catch(() => {})
   }
 
-  const deletedCount = await tagsRepository.deleteAll({
+  await tagsRepository.delete({
     authorUserId: requesterUserId,
     fileUniqueId: taggableFile.fileUniqueId,
   })
 
   await userSessionsRepository.clear({ userId: requesterUserId })
 
-  const count_ = deletedCount !== null ? deletedCount : 'all your'
-  const tags_ = deletedCount === 1 ? 'tag' : 'tags'
   await context.sendMessage(
     [
-      `🗑 Deleted ${count_} ${tags_} for this ${formatFileType(taggableFile)}\\.`,
+      `🗑 Deleted your tag for this ${formatFileType(taggableFile)}\\.`,
       '🕒 It may take up to 10 minutes to see the changes\\.'
     ].join('\n'),
     {
@@ -490,9 +499,9 @@ async function $handleSearchInlineQuery(context: Context) {
 bot.on('inline_query', $handleSearchInlineQuery)
 
 // Only allow to manage favorites and tags in the private chat with bot
-bot.use((context, next) => {
+bot.use(async (context, next) => {
   if (context.chat?.type !== 'private') return
-  next()
+  return next()
 })
 
 bot.on(message('sticker'), $handleTaggingFileMessage)
@@ -519,12 +528,11 @@ bot.catch((err, context) => {
   }, 'Unhandled telegram error')
 })
 
-bot.launch()
+bot
+  .launch(() => logger.info({}, 'Started!'))
   .catch((err) => {
     logger.error({ err }, 'Failed to launch the bot')
     process.exit(1)
   })
-
-logger.info({}, 'Started!')
 
 export {}

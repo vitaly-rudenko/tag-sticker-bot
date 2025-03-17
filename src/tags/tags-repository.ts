@@ -10,93 +10,78 @@ export class TagsRepository {
     this.#client = input.client
   }
 
-  async replace(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; values: string[] }): Promise<void> {
-    const { authorUserId, taggableFile, visibility, values } = input
+  async replace(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; value: string }): Promise<void> {
+    const { authorUserId, taggableFile, visibility, value } = input
 
-    try {
-      await this.#client.query('BEGIN;')
-
-      await this.#client.query(
-        `DELETE FROM tags
-         WHERE author_user_id = $1
-           AND file_unique_id = $2;`,
-        [authorUserId, taggableFile.fileUniqueId],
-      )
-
-      // TODO: bulk insert
-      for (const value of values) {
-        await this.#client.query(
-          `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, emoji, mime_type)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);`,
-          [
-            authorUserId,
-            visibility,
-            value,
-            taggableFile.fileId,
-            taggableFile.fileUniqueId,
-            taggableFile.fileType,
-            taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
-            taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
-            taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
-          ],
-        )
-      }
-
-      await this.#client.query('COMMIT;')
-    } catch (error) {
-      await this.#client.query('ROLLBACK;')
-      throw error
-    }
+    await this.#client.query(
+      `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, emoji, mime_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (author_user_id, file_unique_id) DO UPDATE
+       SET visibility = $2
+         , value = $3
+         , file_id = $4
+         , file_type = $6
+         , set_name = $7
+         , emoji = $8
+         , mime_type = $9;`,
+      [
+        authorUserId,
+        visibility,
+        value,
+        taggableFile.fileId,
+        taggableFile.fileUniqueId,
+        taggableFile.fileType,
+        taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
+        taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
+        taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
+      ],
+    )
   }
 
-  async deleteAll(input: { authorUserId: number; fileUniqueId: string }): Promise<number | null> {
+  async delete(input: { authorUserId: number; fileUniqueId: string }): Promise<void> {
     const { authorUserId, fileUniqueId } = input
 
-    const { rowCount } = await this.#client.query(
+    await this.#client.query(
       `DELETE FROM tags
        WHERE author_user_id = $1
          AND file_unique_id = $2;`,
       [authorUserId, fileUniqueId],
     )
-
-    return rowCount
   }
 
   async search(input: { query: string; requesterUserId: number; ownedOnly: boolean; limit: number }): Promise<Tag[]> {
     const { query, requesterUserId, ownedOnly, limit } = input
 
     const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
+    const exactQuery = `%${escapedQuery}%` // "%hello world%"
+    const fuzzyQuery = `%${escapedQuery.replaceAll(' ', '%')}%` // "%hello%world%"
 
-    const { rows } = await this.#client.query(
-      `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
-       FROM tags
-       WHERE value ILIKE '%' || $1 || '%'
-         AND author_user_id = $2
-       LIMIT $3;`,
-      [escapedQuery, requesterUserId, limit]
-    )
-
-    if (rows.length < limit && !ownedOnly) {
-      const fileUniqueIdsToExclude = rows.map(row => row.file_unique_id)
-
-      const { rows: remainingRows } = await this.#client.query(
-        `SELECT DISTINCT ON (file_unique_id) author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
+    const { rows } = await this.#client.query<{
+      author_user_id: string
+      visibility: string
+      value: string
+      file_unique_id: string
+      file_id: string
+      file_type: string
+      set_name: string | null
+      emoji: string | null
+      mime_type: string | null
+    }>(
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
+         , (author_user_id = $2) AS is_owner
+          , (value ILIKE $4) AS is_exact_match
+       FROM (
+         SELECT DISTINCT ON (file_unique_id) *
          FROM tags
-         WHERE value ILIKE '%' || $1 || '%'
-           AND (author_user_id = $2 OR visibility = $4)
-           ${fileUniqueIdsToExclude.length > 0 && `AND file_unique_id NOT IN (${fileUniqueIdsToExclude.map((_, i) => `$${5 + i}`)})`}
-         LIMIT $3;`,
-        [
-          escapedQuery,
-          requesterUserId,
-          limit - rows.length,
-          'public' satisfies Visibility,
-          ...fileUniqueIdsToExclude,
-        ]
-      )
-
-      rows.push(...remainingRows)
-    }
+         WHERE value ILIKE $3
+         ${ownedOnly ? `AND author_user_id = $2` : `AND (author_user_id = $2 OR visibility = $5)`}
+       ) AS filtered_tags
+       ORDER BY (author_user_id = $2) DESC, (value ILIKE $4) DESC
+       LIMIT $1;`,
+       ownedOnly
+        ? [limit, requesterUserId, fuzzyQuery, exactQuery]
+        : [limit, requesterUserId, fuzzyQuery, exactQuery, 'public' satisfies Visibility]
+    )
 
     return rows.map(row => tagSchema.parse({
       authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
@@ -107,31 +92,34 @@ export class TagsRepository {
         fileId: row.file_id,
         fileType: row.file_type,
         ...row.file_type === 'sticker' && {
-          setName: row.set_name,
-          emoji: row.emoji,
+          setName: row.set_name ?? undefined,
+          emoji: row.emoji ?? undefined,
         },
         ...row.file_type === 'animation' && { mimeType: row.mime_type },
       }
     }))
   }
 
-  // TODO: optimize
   async exists(input: { authorUserId: number; fileUniqueId: string }): Promise<boolean> {
     const { authorUserId, fileUniqueId } = input
 
-    return (await this.stats({
-      requesterUserId: authorUserId,
-      fileUniqueId,
-    })).requester.total > 0
+    const { rows } = await this.#client.query(
+      `SELECT 1
+       FROM tags
+       WHERE author_user_id = $1
+         AND file_unique_id = $2;`,
+      [authorUserId, fileUniqueId]
+    )
+
+    return rows.length > 0
   }
 
   async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{
-    requester: {
-      total: number
+    requesterTag?: {
       visibility: Visibility
-      values: string[]
+      value: string
     }
-    public: {
+    publicTags: {
       total: number
       values: string[]
     }
@@ -145,13 +133,14 @@ export class TagsRepository {
       `SELECT value, visibility
        FROM tags
        WHERE file_unique_id = $1
-         AND author_user_id = $2;`,
+         AND author_user_id = $2
+       LIMIT 1;`,
       [fileUniqueId, requesterUserId]
     )
 
     const { rows: publicRows } = await this.#client.query<{
-      public_total: number
-      public_values: string[]
+      total: number
+      values: string[]
     }>(
       `WITH public_tag_values AS NOT MATERIALIZED (
          SELECT value
@@ -160,21 +149,21 @@ export class TagsRepository {
            AND author_user_id <> $2
            AND visibility = $3
        )
-       SELECT (SELECT COUNT(*) FROM public_tag_values)::int AS public_total,
-              (SELECT array_agg(value) FROM (SELECT value FROM public_tag_values LIMIT 3)) AS public_values;`,
+       SELECT (SELECT COUNT(*) FROM public_tag_values)::int AS total,
+              (SELECT array_agg(value) FROM (SELECT value FROM public_tag_values LIMIT 3)) AS values;`,
       [fileUniqueId, requesterUserId, 'public' satisfies Visibility],
     )
 
     return {
-      requester: {
-        total: requesterRows.length,
-        // All tags have the same visibility, so we can just take the first one
-        visibility: visibilitySchema.parse(requesterRows.at(0)?.visibility ?? 'public'),
-        values: requesterRows.map(row => row.value),
-      },
-      public: {
-        total: publicRows.at(0)?.public_total ?? 0,
-        values: publicRows.at(0)?.public_values ?? [],
+      requesterTag: requesterRows.length > 0
+        ? {
+          visibility: visibilitySchema.parse(requesterRows[0].visibility),
+          value: requesterRows[0].value,
+        }
+        : undefined,
+      publicTags: {
+        total: publicRows.at(0)?.total ?? 0,
+        values: publicRows.at(0)?.values ?? [],
       }
     }
   }
