@@ -23,6 +23,9 @@ module.exports = {
         CREATE UNIQUE INDEX tags_author_user_id_file_unique_id_value_idx
                          ON tags (author_user_id, file_unique_id, value);
 
+        CREATE INDEX tags_value_trgm_idx      ON tags USING gin (value gin_trgm_ops);
+        CREATE INDEX tags_file_visibility_idx ON tags (file_unique_id, visibility);
+
         COMMIT;
       `)
 

@@ -10,7 +10,6 @@ import { escapeMd } from './utils/escape-md.ts'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
 
 // TODO: logging
-// TODO: indexes
 // TODO: move mime type, set name, emoji, etc. to separate "files" table
 
 const postgresClient = new pg.Client(process.env.DATABASE_URL)
