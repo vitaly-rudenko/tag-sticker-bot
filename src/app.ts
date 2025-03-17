@@ -8,9 +8,19 @@ import { type Visibility, visibilitySchema } from './tags/visibility.ts'
 import { UserSessionsRepository } from './user-sessions/user-sessions-repository.ts'
 import { escapeMd } from './utils/escape-md.ts'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
+import { logger } from './utils/logging/logger.ts'
 
-// TODO: logging
 // TODO: move mime type, set name, emoji, etc. to separate "files" table
+
+process.on('uncaughtException', (err) => {
+  logger.error({ err }, 'Uncaught exception')
+  process.exit(1)
+})
+
+process.on('unhandledRejection', (err) => {
+  logger.error({ err }, 'Unhandled rejection')
+  process.exit(1)
+})
 
 const postgresClient = new pg.Client(process.env.DATABASE_URL)
 await postgresClient.connect()
@@ -485,16 +495,25 @@ bot.action(/^tagging:set-visibility:(.+?)$/, $handleTaggingSetVisibilityAction)
 bot.action('tagging:delete-tags', $handleTaggingDeleteTagsAction)
 bot.action('tagging:cancel', $handleTaggingCancelAction)
 
-bot.catch((error, context) => {
-  console.error('Failed to handle bot update', error, context)
+bot.catch((err, context) => {
+  logger.error({
+    err,
+    ...context && {
+      context: {
+        ...context.update && Object.keys(context.update).length > 0 ? { update: context.update } : undefined,
+        ...context.botInfo && Object.keys(context.botInfo).length > 0 ? { botInfo: context.botInfo } : undefined,
+        ...context.state && Object.keys(context.state).length > 0 ? { state: context.state } : undefined,
+      }
+    },
+  }, 'Unhandled telegram error')
 })
 
 bot.launch()
-  .catch((error) => {
-    console.error('Bot launch failed', error)
+  .catch((err) => {
+    logger.error({ err }, 'Failed to launch the bot')
     process.exit(1)
   })
 
-console.log('Bot started')
+logger.info({}, 'Started!')
 
 export {}

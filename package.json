@@ -15,6 +15,9 @@
   "dependencies": {
     "markdown-escapes": "^2.0.1",
     "pg": "^8.13.3",
+    "pino": "^9.6.0",
+    "pino-abstract-transport": "^2.0.0",
+    "pino-pretty": "^13.0.0",
     "sharp": "^0.33.2",
     "telegraf": "^4.16.3",
     "umzug": "^3.8.2",
