@@ -35,8 +35,8 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX IF EXISTS favorites_user_id_file_unique_id_idx;
-        DROP TABLE IF EXISTS favorites;
+        DROP INDEX favorites_user_id_file_unique_id_idx;
+        DROP TABLE favorites;
 
         COMMIT;
       `)

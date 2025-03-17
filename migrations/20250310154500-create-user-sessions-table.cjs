@@ -30,8 +30,8 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX IF EXISTS user_sessions_user_id_idx;
-        DROP TABLE IF EXISTS user_sessions;
+        DROP INDEX user_sessions_user_id_idx;
+        DROP TABLE user_sessions;
 
         COMMIT;
       `)

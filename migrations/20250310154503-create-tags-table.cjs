@@ -42,8 +42,10 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX IF EXISTS tags_author_user_id_file_unique_id_value_idx;
-        DROP TABLE IF EXISTS tags;
+        DROP INDEX tags_author_user_id_file_unique_id_value_idx;
+        DROP INDEX tags_value_trgm_idx;
+        DROP INDEX tags_file_visibility_idx;
+        DROP TABLE tags;
 
         COMMIT;
       `)

@@ -21,8 +21,7 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX IF EXISTS user_sessions_user_id_idx;
-        DROP TABLE IF EXISTS user_sessions;
+        DROP EXTENSION IF EXISTS pg_trgm;
 
         COMMIT;
       `)
