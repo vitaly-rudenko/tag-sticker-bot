@@ -1,4 +1,4 @@
-import { Client } from 'pg'
+import { type Client } from 'pg'
 
 export class StickerSetsRepository {
   #client: Client

@@ -11,22 +11,16 @@ console.log('Log level:', logLevel)
 
 export const logger = pino({
   level: logLevel,
-  transport: {
-    targets: [{
-      level: 'error',
-      target: path.join(path.dirname(fileURLToPath(import.meta.url)), './pino-telegram-transport.ts'),
+}, pino.multistream([
+  { stream: process.stdout },
+  {
+    level: 'error',
+    stream: pino.transport({
+      target: path.join(path.dirname(fileURLToPath(import.meta.url)), './pino-telegram-transport.mjs'),
       options: {
         telegramBotToken,
         debugChatId,
-      },
-    }, {
-      level: 'trace',
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        ignore: 'pid,hostname',
-        translateTime: true,
-      },
-    }]
+      }
+    })
   }
-})
+]))

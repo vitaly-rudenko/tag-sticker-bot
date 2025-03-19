@@ -3,7 +3,8 @@ import build from 'pino-abstract-transport'
 import { Telegraf } from 'telegraf'
 import { escapeMd } from '../escape-md.ts'
 
-export default async function (input: { telegramBotToken: string, debugChatId: number }) {
+/** @param {{ telegramBotToken: string, debugChatId: number }} input */
+export default async function (input) {
   const { telegramBotToken, debugChatId } = input
 
   const bot = new Telegraf(telegramBotToken)

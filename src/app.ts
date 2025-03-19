@@ -84,6 +84,8 @@ async function $handleTaggingFileMessage(context: Context) {
   await filesRepository.upsert({
     fileUniqueId: taggableFile.fileUniqueId,
     fileType: taggableFile.fileType,
+    setName: 'sticker' in context.message ? context.message.sticker.set_name : undefined,
+    mimeType: 'animation' in context.message ? context.message.animation.mime_type : undefined,
     data: 'sticker' in context.message
       ? context.message.sticker
       : 'animation' in context.message
@@ -232,7 +234,7 @@ function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; vi
       input.visibility === 'private'
         ? '🔒 No one can see your *private* tags\\.'
         : '🔓 Anyone can see your *public* tags\\.',
-      `Tag's author is never revealed\\.`
+      `Author of tags are never revealed\\.`
     ].join('\n'),
     extra: {
       parse_mode: 'MarkdownV2',
@@ -541,6 +543,8 @@ bot.catch((err, context) => {
     },
   }, 'Unhandled telegram error')
 })
+
+logger.info({}, 'Starting...')
 
 bot
   .launch(() => logger.info({}, 'Started!'))

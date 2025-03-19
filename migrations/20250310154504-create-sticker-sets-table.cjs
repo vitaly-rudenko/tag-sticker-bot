@@ -14,7 +14,9 @@ module.exports = {
           updated_at TIMESTAMPTZ DEFAULT NOW()
         );
 
-        CREATE UNIQUE INDEX sticker_sets_set_name_uq ON sticker_sets (set_name);
+        CREATE UNIQUE INDEX sticker_sets_set_name_uq       ON sticker_sets (set_name);
+        CREATE        INDEX sticker_sets_set_name_trgm_idx ON sticker_sets USING gin (set_name gin_trgm_ops);
+        CREATE        INDEX sticker_sets_title_trgm_idx    ON sticker_sets USING gin (title gin_trgm_ops);
 
         COMMIT;
       `)
@@ -30,8 +32,10 @@ module.exports = {
       await db.query(`
         BEGIN;
 
+        DROP INDEX sticker_sets_title_trgm_idx;
+        DROP INDEX sticker_sets_set_name_trgm_idx;
         DROP INDEX sticker_sets_set_name_uq;
-        DROP INDEX sticker_sets;
+        DROP TABLE sticker_sets;
 
         COMMIT;
       `)

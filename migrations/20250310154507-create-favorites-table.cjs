@@ -20,7 +20,7 @@ module.exports = {
 
         CREATE UNIQUE INDEX favorites_user_id_file_unique_id_uq ON favorites (user_id, file_unique_id);
         CREATE        INDEX favorites_file_unique_id_idx        ON favorites (file_unique_id);
-        CREATE        INDEX favorites_set_name_idx              ON favorites (set_name) WHERE set_name IS NOT NULL;
+        CREATE        INDEX favorites_file_type_set_name_idx    ON favorites (file_type, set_name);
 
         COMMIT;
       `)
@@ -36,7 +36,7 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX favorites_set_name_idx;
+        DROP INDEX favorites_file_type_set_name_idx;
         DROP INDEX favorites_file_unique_id_idx;
         DROP INDEX favorites_user_id_file_unique_id_uq;
         DROP TABLE favorites;
