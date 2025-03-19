@@ -1,0 +1,9 @@
+#!/bin/bash
+
+sudo docker compose rm -fvs
+
+git pull
+
+sudo docker compose build --force-rm
+sudo docker compose up -d tsb_app
+sudo docker compose logs --tail=10000 -f tsb_app
