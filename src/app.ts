@@ -1,4 +1,5 @@
 import pg from 'pg'
+import fs from 'fs'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
 import { type TaggableFile } from './common/taggable-file.ts'
@@ -48,6 +49,31 @@ function capitalize(input: string) {
 
 function formatValue(value: string): string {
   return `*__${escapeMd(value)}__*`
+}
+
+async function $handleStartCommand(context: Context) {
+  bot.botInfo ??= await bot.telegram.getMe()
+
+  await context.reply([
+    '👋 Hi, just send a sticker or GIF to tag or mark as favorite\\.',
+    '',
+    '*Tagging*',
+    '📝 Tag stickers and GIFs to quickly find them: *__funny dancing cat__*\\.',
+    `🔍 After tagging a file, type "\`@${escapeMd(bot.botInfo.username)} cat\`" to quickly find it\\.`,
+    `💡 To search by your own tags, add *\\!* to the query: "\`@${escapeMd(bot.botInfo.username)} !cat\`"`,
+    '',
+    '*Favorites*',
+    '❤️ You can also mark a file as your favorite\\.',
+    `🔍 Quickly get your favorite files by typing "\`@${escapeMd(bot.botInfo.username)}\` "\\.`,
+    '',
+    '*Builder*',
+    '🖼 You can also create a new sticker by sending a photo or a file\\.',
+  ].join('\n'), { parse_mode: 'MarkdownV2' })
+}
+
+const { version } = JSON.parse(fs.readFileSync('./package.json', 'utf-8'))
+async function $handleVersionCommand(context: Context) {
+  await context.reply(`🤖 Version: ${version}`)
 }
 
 async function $handleTaggingFileMessage(context: Context) {
@@ -524,9 +550,8 @@ bot.use(async (context, next) => {
   return next()
 })
 
-bot.on(message('sticker'), $handleTaggingFileMessage)
-bot.on(message('animation'), $handleTaggingFileMessage)
-bot.on(message('text'), $handleTaggingTextMessage)
+bot.start($handleStartCommand)
+bot.command('version', $handleVersionCommand)
 
 bot.action('tagging:add-to-favorites', $handleTaggingAddToFavoritesAction)
 bot.action('tagging:delete-from-favorites', $handleTaggingDeleteFromFavoritesAction)
@@ -534,6 +559,10 @@ bot.action('tagging:tag-single', $handleTaggingTagSingleAction)
 bot.action(/^tagging:set-visibility:(.+?)$/, $handleTaggingSetVisibilityAction)
 bot.action('tagging:delete-tags', $handleTaggingDeleteTagsAction)
 bot.action('tagging:cancel', $handleTaggingCancelAction)
+
+bot.on(message('sticker'), $handleTaggingFileMessage)
+bot.on(message('animation'), $handleTaggingFileMessage)
+bot.on(message('text'), $handleTaggingTextMessage)
 
 bot.catch((err, context) => {
   logger.error({
