@@ -1,6 +1,6 @@
 import { type Client } from 'pg'
 import { type Tag, tagSchema } from './tag.ts'
-import { type TaggableFile } from '../common/taggable-file.ts'
+import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.ts'
 import { visibilitySchema, type Visibility } from './visibility.ts'
 
 export class TagsRepository {
@@ -12,6 +12,8 @@ export class TagsRepository {
 
   async upsert(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; value: string }): Promise<void> {
     const { authorUserId, taggableFile, visibility, value } = input
+
+    taggableFileSchema.parse(taggableFile) // validate
 
     await this.#client.query(
       `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type)

@@ -9,7 +9,8 @@
     "test": "node --env-file=.env --experimental-strip-types --test",
     "lint": "tsc",
     "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts",
-    "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts"
+    "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts",
+    "script:populate": "node --experimental-strip-types --env-file=.env scripts/populate.mjs"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
+    "csv-parse": "^5.6.0",
     "nodemon": "^2.0.20",
     "tsc": "^2.0.4",
     "typescript": "^5.8.2"

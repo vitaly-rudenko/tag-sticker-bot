@@ -95,13 +95,17 @@ async function $handleTaggingFileMessage(context: Context) {
 
   if ('sticker' in context.message) {
     if (context.message.sticker.set_name) {
-      const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
+      try {
+        const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
 
-      await stickerSetsRepository.upsert({
-        setName: stickerSet.name,
-        title: stickerSet.title,
-        data: stickerSet,
-      })
+        await stickerSetsRepository.upsert({
+          setName: stickerSet.name,
+          title: stickerSet.title,
+          data: stickerSet,
+        })
+      } catch (error) {
+        logger.error({ error, context }, 'Failed to get sticker set')
+      }
     }
   }
 

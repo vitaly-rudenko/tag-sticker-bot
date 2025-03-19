@@ -145,3 +145,5 @@ dist
 .DS_Store
 
 cdk.out/
+results.csv
+results.json
