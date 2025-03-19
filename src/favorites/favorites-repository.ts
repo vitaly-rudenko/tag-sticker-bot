@@ -12,13 +12,18 @@ export class FavoritesRepository {
     const { userId, taggableFile } = input
 
     await this.#client.query(
-      `INSERT INTO favorites (user_id, file_id, file_unique_id, file_type, set_name, emoji, mime_type)
+      `INSERT INTO favorites (user_id, file_unique_id, file_id, file_type, set_name, emoji, mime_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (user_id, file_unique_id) DO NOTHING;`,
+       ON CONFLICT (user_id, file_unique_id) DO UPDATE
+       SET file_id = $3
+         , file_type = $4
+         , set_name = $5
+         , emoji = $6
+         , mime_type = $7;`,
       [
         userId,
-        taggableFile.fileId,
         taggableFile.fileUniqueId,
+        taggableFile.fileId,
         taggableFile.fileType,
         taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
         taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
@@ -71,7 +76,9 @@ export class FavoritesRepository {
         emoji: row.emoji,
         setName: row.set_name,
       },
-      ...row.file_type === 'animation' && { mimeType: row.mime_type },
+      ...row.file_type === 'animation' && {
+        mimeType: row.mime_type,
+      },
     }))
   }
 }

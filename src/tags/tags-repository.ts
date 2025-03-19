@@ -14,22 +14,22 @@ export class TagsRepository {
     const { authorUserId, taggableFile, visibility, value } = input
 
     await this.#client.query(
-      `INSERT INTO tags (author_user_id, visibility, value, file_id, file_unique_id, file_type, set_name, emoji, mime_type)
+      `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (author_user_id, file_unique_id) DO UPDATE
-       SET visibility = $2
-         , value = $3
-         , file_id = $4
+       SET visibility = $3
+         , value = $4
+         , file_id = $5
          , file_type = $6
          , set_name = $7
          , emoji = $8
          , mime_type = $9;`,
       [
         authorUserId,
+        taggableFile.fileUniqueId,
         visibility,
         value,
         taggableFile.fileId,
-        taggableFile.fileUniqueId,
         taggableFile.fileType,
         taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
         taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
@@ -68,15 +68,16 @@ export class TagsRepository {
       mime_type: string | null
     }>(
       `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
-         , (author_user_id = $2) AS is_owner
-          , (value ILIKE $4) AS is_exact_match
+            , (author_user_id = $2) AS is_owner
+            , (value ILIKE $4) AS is_exact_match
        FROM (
          SELECT DISTINCT ON (file_unique_id) *
          FROM tags
          WHERE value ILIKE $3
          ${ownedOnly ? `AND author_user_id = $2` : `AND (author_user_id = $2 OR visibility = $5)`}
        ) AS filtered_tags
-       ORDER BY (author_user_id = $2) DESC, (value ILIKE $4) DESC
+       ORDER BY (author_user_id = $2) DESC
+              , (value ILIKE $4) DESC
        LIMIT $1;`,
        ownedOnly
         ? [limit, requesterUserId, fuzzyQuery, exactQuery]
@@ -95,7 +96,9 @@ export class TagsRepository {
           setName: row.set_name ?? undefined,
           emoji: row.emoji ?? undefined,
         },
-        ...row.file_type === 'animation' && { mimeType: row.mime_type },
+        ...row.file_type === 'animation' && {
+          mimeType: row.mime_type,
+        },
       }
     }))
   }
