@@ -12,6 +12,7 @@ import { logger } from './utils/logging/logger.ts'
 import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
+import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
 
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
@@ -30,6 +31,7 @@ const tagsRepository = new TagsRepository({ client: postgresClient })
 const favoritesRepository = new FavoritesRepository({ client: postgresClient })
 const userSessionsRepository = new UserSessionsRepository({ client: postgresClient })
 const filesRepository = new FilesRepository({ client: postgresClient })
+const stickerSetsRepository = new StickerSetsRepository({ client: postgresClient })
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
@@ -79,7 +81,7 @@ async function $handleTaggingFileMessage(context: Context) {
     }
   }
 
-  await filesRepository.store({
+  await filesRepository.upsert({
     fileUniqueId: taggableFile.fileUniqueId,
     fileType: taggableFile.fileType,
     data: 'sticker' in context.message
@@ -88,6 +90,18 @@ async function $handleTaggingFileMessage(context: Context) {
       ? context.message.animation
       : exhaust(),
   })
+
+  if ('sticker' in context.message) {
+    if (context.message.sticker.set_name) {
+      const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
+
+      await stickerSetsRepository.upsert({
+        setName: stickerSet.name,
+        title: stickerSet.title,
+        data: stickerSet,
+      })
+    }
+  }
 
   const isFavorite = await favoritesRepository.exists({ userId: requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
   const stats = await tagsRepository.stats({ requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
