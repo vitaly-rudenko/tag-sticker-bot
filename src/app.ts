@@ -238,7 +238,7 @@ function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; vi
       input.visibility === 'private'
         ? '🔒 No one can see your *private* tags\\.'
         : '🔓 Anyone can see your *public* tags\\.',
-      `Author of tags are never revealed\\.`
+      `Authors of tags are never revealed\\.`
     ].join('\n'),
     extra: {
       parse_mode: 'MarkdownV2',
