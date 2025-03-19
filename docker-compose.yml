@@ -1,20 +1,37 @@
-version: '3'
-
 services:
-  localstack:
-    image: localstack/localstack
-    container_name: localstack
+  tsb_app:
+    container_name: tsb_app
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - tsb_postgres
     environment:
-      - SERVICES=dynamodb
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-    ports:
-      - "4566:4566"
-      - "8000:4566"
+      TELEGRAM_BOT_TOKEN: "$TELEGRAM_BOT_TOKEN"
+      DEBUG_CHAT_ID: "$DEBUG_CHAT_ID"
+      DATABASE_URL: "postgres://tagstickerbot:p4ssw0rd@tsb_postgres:5432/tagstickerbot"
+      LOG_LEVEL: "info"
+    networks:
+      - "global_network"
+
+  tsb_postgres:
+    container_name: tsb_postgres
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "tagstickerbot"
+      POSTGRES_USER: "tagstickerbot"
+      POSTGRES_PASSWORD: "p4ssw0rd"
     volumes:
-      - "localstack_data:/var/lib/localstack"
-    command: "start"
+      - "tsb_postgres_data:/var/lib/postgresql/data"
+    networks:
+      - "global_network"
+
+networks:
+  global_network:
+    external: true
 
 volumes:
-  localstack_data:
+  tsb_postgres_data:
     driver: local

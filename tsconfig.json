@@ -1,17 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2022",
+    "lib": ["ESNext"],
     "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "node16",
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "allowJs": true,
-    "checkJs": true,
-    "esModuleInterop": true,
-    "noEmit": true
+    "forceConsistentCasingInFileNames": true,
+    "useUnknownInCatchVariables": false,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true
   },
-  "include": ["src/**/*.js", "src/aws/lambdas/init/index.mjs", "src/aws/lambdas/rest-api/index.mjs"],
+  "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]
 }
