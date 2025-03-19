@@ -306,7 +306,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
     await context.deleteMessage(instructionsMessageId).catch(() => {})
   }
 
-  await tagsRepository.replace({ authorUserId: requesterUserId, taggableFile, visibility, value })
+  await tagsRepository.upsert({ authorUserId: requesterUserId, taggableFile, visibility, value })
   await userSessionsRepository.clear({ userId: requesterUserId })
 
   const value_ = formatValue(value)

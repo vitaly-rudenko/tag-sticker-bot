@@ -10,7 +10,7 @@ export class TagsRepository {
     this.#client = input.client
   }
 
-  async replace(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; value: string }): Promise<void> {
+  async upsert(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; value: string }): Promise<void> {
     const { authorUserId, taggableFile, visibility, value } = input
 
     await this.#client.query(

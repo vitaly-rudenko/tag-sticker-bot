@@ -21,14 +21,12 @@ module.exports = {
         );
 
         CREATE UNIQUE INDEX tags_author_user_id_file_unique_id_uq ON tags (author_user_id, file_unique_id);
-
-        CREATE INDEX tags_value_trgm_idx      ON tags USING gin (value gin_trgm_ops);
-        CREATE INDEX tags_file_visibility_idx ON tags (file_unique_id, visibility);
+        CREATE        INDEX tags_file_unique_id_visibility_idx    ON tags (file_unique_id, visibility);
+        CREATE        INDEX tags_set_name_idx                     ON tags (set_name) WHERE set_name IS NOT NULL;
+        CREATE        INDEX tags_value_trgm_idx                   ON tags USING gin (value gin_trgm_ops);
 
         COMMIT;
       `)
-
-      // TODO: add index on value
     } catch (err) {
       await db.query('ROLLBACK;')
       throw err
@@ -41,8 +39,9 @@ module.exports = {
       await db.query(`
         BEGIN;
 
-        DROP INDEX tags_file_visibility_idx;
         DROP INDEX tags_value_trgm_idx;
+        DROP INDEX tags_set_name_idx;
+        DROP INDEX tags_file_unique_id_visibility_idx;
         DROP INDEX tags_author_user_id_file_unique_id_uq;
         DROP TABLE tags;
 

@@ -8,7 +8,7 @@ export class FilesRepository {
     this.#client = input.client
   }
 
-  async store(input: { fileUniqueId: string; fileType: FileType; data: object }): Promise<void> {
+  async upsert(input: { fileUniqueId: string; fileType: FileType; data: object }): Promise<void> {
     const { fileUniqueId, fileType, data } = input
 
     await this.#client.query(

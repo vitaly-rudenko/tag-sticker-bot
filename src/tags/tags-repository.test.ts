@@ -51,21 +51,21 @@ describe('TagsRepository', () => {
       }
 
       // Sticker 1
-      await tagsRepository.replace({
+      await tagsRepository.upsert({
         authorUserId: authorUserId1,
         taggableFile: taggableFile1,
         value: 'hello my beautiful world',
         visibility: 'public',
       })
 
-      await tagsRepository.replace({
+      await tagsRepository.upsert({
         authorUserId: authorUserId2,
         taggableFile: taggableFile2,
         value: 'hello world!',
         visibility: 'public',
       })
 
-      await tagsRepository.replace({
+      await tagsRepository.upsert({
         authorUserId: authorUserId3,
         taggableFile: taggableFile3,
         value: 'hello world',
@@ -73,7 +73,7 @@ describe('TagsRepository', () => {
       })
 
       // duplicate
-      await tagsRepository.replace({
+      await tagsRepository.upsert({
         authorUserId: authorUserId1,
         taggableFile: taggableFile1,
         value: 'Hello, world.',
@@ -81,7 +81,7 @@ describe('TagsRepository', () => {
       })
 
       // alternative tag
-      await tagsRepository.replace({
+      await tagsRepository.upsert({
         authorUserId: authorUserId2,
         taggableFile: taggableFile1,
         value: 'Goodbye, world.',
