@@ -255,10 +255,12 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
   )
 }
 
-function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; visibility: Visibility; showDeleteButton: boolean }) {
+function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; visibility: Visibility; isReplacing: boolean }) {
+  const new_ = input.isReplacing ? 'new ' : ''
+
   return {
     message: [
-      `✏️ Send tag for this ${formatFileType(input.taggableFile)}\\.`,
+      `✏️ Send ${new_}tag for this ${formatFileType(input.taggableFile)}\\.`,
       'Example: *__cute cat, funny animal__*\\.',
       '',
       input.visibility === 'private'
@@ -272,7 +274,7 @@ function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; vi
         [
           Markup.button.callback(`${input.visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
           Markup.button.callback(`${input.visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
-          ...input.showDeleteButton
+          ...input.isReplacing
             ? [Markup.button.callback(`🗑 Delete my tag`, 'tagging:delete-tags')]
             : [],
           Markup.button.callback('❌ Cancel', 'tagging:cancel'),
@@ -301,7 +303,7 @@ async function $handleTaggingTagSingleAction(context: Context) {
   const { message, extra } = buildTaggingInstructionsMessage({
     visibility,
     taggableFile,
-    showDeleteButton: await tagsRepository.exists({
+    isReplacing: await tagsRepository.exists({
       authorUserId: requesterUserId,
       fileUniqueId: taggableFile.fileUniqueId,
     })
@@ -426,7 +428,7 @@ async function $handleTaggingSetVisibilityAction(context: Context) {
     const { message, extra } = buildTaggingInstructionsMessage({
       visibility,
       taggableFile,
-      showDeleteButton: await tagsRepository.exists({
+      isReplacing: await tagsRepository.exists({
         authorUserId: requesterUserId,
         fileUniqueId: taggableFile.fileUniqueId,
       })
