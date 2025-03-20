@@ -517,53 +517,89 @@ async function $handleSearchInlineQuery(context: Context) {
     return
   }
 
-  await context.answerInlineQuery(
-    taggableFiles.map((file, index) => {
-      if (file.fileType === 'animation') {
-        if (file.mimeType === 'video/mp4') {
-          return {
-            id: String(index),
-            type: 'mpeg4_gif',
-            mpeg4_file_id: file.fileId,
+  try {
+    await context.answerInlineQuery(
+      taggableFiles.map((file, index) => {
+        if (file.fileType === 'animation') {
+          if (file.mimeType === 'video/mp4') {
+            return {
+              id: String(index),
+              type: 'mpeg4_gif',
+              mpeg4_file_id: file.fileId,
+            }
+          }
+
+          if (file.mimeType === 'image/gif') {
+            return {
+              id: String(index),
+              type: 'gif',
+              gif_file_id: file.fileId,
+            }
           }
         }
 
-        if (file.mimeType === 'image/gif') {
-          return {
-            id: String(index),
-            type: 'gif',
-            gif_file_id: file.fileId,
-          }
+        return {
+          type: 'sticker',
+          id: String(index),
+          sticker_file_id: file.fileId,
+        }
+      }),
+      {
+        cache_time: taggableFiles.length > 0 ? 10 * 60 : undefined, // 10 minutes in seconds, do not cache if no results
+        is_personal: isPersonal,
+        button: {
+          text: isFavoritesQuery
+            ? taggableFiles.length === 0
+              ? "You don't have any favorite stickers or GIFs yet. Click here to add"
+              : "Click here to manage your favorite stickers and GIFs"
+            : "Can't find a sticker or GIF? Click here to contribute",
+          start_parameter: 'stub', // for some reason this field is required
         }
       }
-
-      return {
-        type: 'sticker',
-        id: String(index),
-        sticker_file_id: file.fileId,
-      }
-    }),
-    {
-      cache_time: taggableFiles.length > 0 ? 10 * 60 : undefined, // 10 minutes in seconds, do not cache if no results
-      is_personal: isPersonal,
-      button: {
-        text: isFavoritesQuery
-          ? taggableFiles.length === 0
-            ? "You don't have any favorite stickers or GIFs yet. Click here to add"
-            : "Click here to manage your favorite stickers and GIFs"
-          : "Can't find a sticker or GIF? Click here to contribute",
-        start_parameter: 'stub', // for some reason this field is required
-      }
+    )
+  } catch (error) {
+    if (error.response?.description.includes('DOCUMENT_INVALID'))  {
+      logger.error({ error }, 'Failed to send inline query results due to invalid file')
+      processPotentiallyInvalidTaggableFilesInBackground(taggableFiles)
+    } else {
+      throw error
     }
-  )
+  }
 }
 
+async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles: TaggableFile[]) {
+  try {
+    for (const taggableFile of taggableFiles) {
+      // avoid rate limit, processes 50 files in ~30 seconds
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      try {
+        logger.info({ taggableFile }, 'Processing potentially invalid taggableFile')
+
+        await bot.telegram.getFile(taggableFile.fileId)
+      } catch (error) {
+        if (error.response.description.includes('wrong file_id or the file is temporarily unavailable')) {
+          await favoritesRepository.deleteAllByFileId({ fileId: taggableFile.fileId })
+          await filesRepository.deleteAllByFileId({ fileId: taggableFile.fileId })
+          await tagsRepository.deleteAllByFileId({ fileId: taggableFile.fileId })
+
+          logger.error({ taggableFile }, 'Deleted invalid taggableFile')
+        } else {
+          throw error
+        }
+      }
+    }
+  } catch (error) {
+    logger.error({ taggableFiles }, 'Could not process all potentially invalid taggableFiles')
+  }
+}
+
+/* Builder */
 const STICKER_SIZE = 512;
 const SUPPORTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_FILE_SIZE_BYTES = 5_000_000 // 5 mb
 const STICKER_PIPELINE_TIMEOUT_SECONDS = 30
 
-/* Builder */
 async function $handlerBuilderFileMessage(context: Context) {
   if (!context.message) return
 
