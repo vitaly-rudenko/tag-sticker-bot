@@ -138,7 +138,7 @@ async function $handleTaggingFileMessage(
           data: stickerSet,
         })
       } catch (error) {
-        logger.error({ error, message: fileMessage, requesterUserId }, 'Failed to get sticker set')
+        logger.warn({ error, message: fileMessage, requesterUserId }, 'Failed to get sticker set')
       }
     }
   }
@@ -559,7 +559,7 @@ async function $handleSearchInlineQuery(context: Context) {
     )
   } catch (error) {
     if (error.response?.description.includes('DOCUMENT_INVALID'))  {
-      logger.error({ error }, 'Failed to send inline query results due to invalid file')
+      logger.warn({ error }, 'Failed to send inline query results due to invalid file')
       processPotentiallyInvalidTaggableFilesInBackground(taggableFiles)
     } else {
       throw error
@@ -583,7 +583,7 @@ async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles:
           await filesRepository.deleteAllByFileId({ fileId: taggableFile.fileId })
           await tagsRepository.deleteAllByFileId({ fileId: taggableFile.fileId })
 
-          logger.error({ taggableFile }, 'Deleted invalid taggableFile')
+          logger.warn({ taggableFile }, 'Deleted invalid taggableFile')
         } else {
           throw error
         }

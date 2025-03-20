@@ -14,7 +14,7 @@ export const logger = pino({
 }, pino.multistream([
   { stream: process.stdout },
   {
-    level: 'error',
+    level: 'warn',
     stream: pino.transport({
       target: path.join(path.dirname(fileURLToPath(import.meta.url)), './pino-telegram-transport.mjs'),
       options: {
