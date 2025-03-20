@@ -22,4 +22,14 @@ export class FilesRepository {
       [fileUniqueId, fileType, setName, mimeType, data],
     )
   }
+
+  async deleteAllByFileId(input: { fileId: string }): Promise<void> {
+    const { fileId } = input
+
+    await this.#client.query(
+      `DELETE FROM files
+       WHERE file_id = $1;`,
+      [fileId]
+    )
+  }
 }

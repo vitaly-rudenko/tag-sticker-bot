@@ -51,6 +51,16 @@ export class TagsRepository {
     )
   }
 
+  async deleteAllByFileId(input: { fileId: string }): Promise<void> {
+    const { fileId } = input
+
+    await this.#client.query(
+      `DELETE FROM tags
+       WHERE file_id = $1;`,
+      [fileId]
+    )
+  }
+
   async search(input: { query: string; requesterUserId: number; ownedOnly: boolean; limit: number }): Promise<Tag[]> {
     const { query, requesterUserId, ownedOnly, limit } = input
 

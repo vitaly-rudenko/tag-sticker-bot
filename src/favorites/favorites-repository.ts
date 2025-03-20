@@ -43,6 +43,16 @@ export class FavoritesRepository {
     )
   }
 
+  async deleteAllByFileId(input: { fileId: string }): Promise<void> {
+    const { fileId } = input
+
+    await this.#client.query(
+      `DELETE FROM favorites
+       WHERE file_id = $1;`,
+      [fileId]
+    )
+  }
+
   async exists(input: { userId: number; fileUniqueId: string }): Promise<boolean> {
     const { userId, fileUniqueId } = input
 
