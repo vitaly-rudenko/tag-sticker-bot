@@ -22,8 +22,8 @@ export default async function (input) {
           `🤖 ${escapeMd(`@${botInfo.username}`)}`,
           `📆 ${escapeMd(new Date(time).toISOString())}`,
           Object.keys(context).length > 0 && `\`\`\`json
-          ${escapeMd(JSON.stringify(context, null, 2).slice(0, 3000))}
-          \`\`\``,
+${escapeMd(JSON.stringify(context, null, 2).slice(0, 3000))}
+\`\`\``,
         ].filter(Boolean).join('\n')
 
         await bot.telegram.sendMessage(debugChatId, message, { parse_mode: 'MarkdownV2' })
