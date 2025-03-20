@@ -117,6 +117,7 @@ async function $handleTaggingFileMessage(
 
   await filesRepository.upsert({
     fileUniqueId: taggableFile.fileUniqueId,
+    fileId: taggableFile.fileId,
     fileType: taggableFile.fileType,
     setName: 'sticker' in fileMessage ? fileMessage.sticker.set_name : undefined,
     mimeType: 'animation' in fileMessage ? fileMessage.animation.mime_type : undefined,

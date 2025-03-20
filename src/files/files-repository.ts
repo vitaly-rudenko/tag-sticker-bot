@@ -8,18 +8,19 @@ export class FilesRepository {
     this.#client = input.client
   }
 
-  async upsert(input: { fileUniqueId: string; fileType: FileType; setName?: string; mimeType?: string; data: object }): Promise<void> {
-    const { fileUniqueId, fileType, setName, mimeType, data } = input
+  async upsert(input: { fileUniqueId: string; fileId: string; fileType: FileType; setName?: string; mimeType?: string; data: object }): Promise<void> {
+    const { fileUniqueId, fileId, fileType, setName, mimeType, data } = input
 
     await this.#client.query(
-      `INSERT INTO files (file_unique_id, file_type, set_name, mime_type, data)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO files (file_unique_id, file_id, file_type, set_name, mime_type, data)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (file_unique_id) DO UPDATE
        SET file_type = $2
-         , set_name = $3
-         , mime_type = $4
-         , data = $5;`,
-      [fileUniqueId, fileType, setName, mimeType, data],
+         , file_id = $3
+         , set_name = $4
+         , mime_type = $5
+         , data = $6;`,
+      [fileUniqueId, fileId, fileType, setName, mimeType, data],
     )
   }
 
