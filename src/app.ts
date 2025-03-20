@@ -1,5 +1,7 @@
 import pg from 'pg'
 import fs from 'fs'
+import sharp from 'sharp'
+import { Readable } from 'stream'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
 import { type TaggableFile } from './common/taggable-file.ts'
@@ -14,6 +16,7 @@ import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
+import { type Message } from 'telegraf/types'
 
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
@@ -51,6 +54,7 @@ function formatValue(value: string): string {
   return `*__${escapeMd(value)}__*`
 }
 
+/* /start */
 async function $handleStartCommand(context: Context) {
   bot.botInfo ??= await bot.telegram.getMe()
 
@@ -71,29 +75,30 @@ async function $handleStartCommand(context: Context) {
   ].join('\n'), { parse_mode: 'MarkdownV2' })
 }
 
+/* /version */
 const { version } = JSON.parse(fs.readFileSync('./package.json', 'utf-8'))
 async function $handleVersionCommand(context: Context) {
   await context.reply(`🤖 Version: ${version}`)
 }
 
-async function $handleTaggingFileMessage(context: Context) {
-  if (!context.message) return
-
-  const requesterUserId = context.message.from.id
-
+/* Tagging */
+async function $handleTaggingFileMessage(
+  fileMessage: Message,
+  requesterUserId: number,
+) {
   const taggableFile: TaggableFile | undefined
-    = 'sticker' in context.message ? {
-      fileId: context.message.sticker.file_id,
-      fileUniqueId: context.message.sticker.file_unique_id,
+    = 'sticker' in fileMessage ? {
+      fileId: fileMessage.sticker.file_id,
+      fileUniqueId: fileMessage.sticker.file_unique_id,
       fileType: 'sticker',
-      setName: context.message.sticker.set_name,
-      emoji: context.message.sticker.emoji,
+      setName: fileMessage.sticker.set_name,
+      emoji: fileMessage.sticker.emoji,
     }
-    : 'animation' in context.message ? {
-      fileId: context.message.animation.file_id,
-      fileUniqueId: context.message.animation.file_unique_id,
+    : 'animation' in fileMessage ? {
+      fileId: fileMessage.animation.file_id,
+      fileUniqueId: fileMessage.animation.file_unique_id,
       fileType: 'animation',
-      mimeType: requireNonNullable(context.message.animation.mime_type),
+      mimeType: requireNonNullable(fileMessage.animation.mime_type),
     }
     : undefined
 
@@ -103,26 +108,29 @@ async function $handleTaggingFileMessage(context: Context) {
   if (userSession?.tagging) {
     const { promptMessageId, instructionsMessageId } = userSession.tagging
     if (promptMessageId || instructionsMessageId) {
-      await context.deleteMessages([promptMessageId, instructionsMessageId].filter(isDefined)).catch(() => {})
+      await bot.telegram.deleteMessages(
+        fileMessage.chat.id,
+        [promptMessageId, instructionsMessageId].filter(isDefined)
+      ).catch(() => {})
     }
   }
 
   await filesRepository.upsert({
     fileUniqueId: taggableFile.fileUniqueId,
     fileType: taggableFile.fileType,
-    setName: 'sticker' in context.message ? context.message.sticker.set_name : undefined,
-    mimeType: 'animation' in context.message ? context.message.animation.mime_type : undefined,
-    data: 'sticker' in context.message
-      ? context.message.sticker
-      : 'animation' in context.message
-      ? context.message.animation
+    setName: 'sticker' in fileMessage ? fileMessage.sticker.set_name : undefined,
+    mimeType: 'animation' in fileMessage ? fileMessage.animation.mime_type : undefined,
+    data: 'sticker' in fileMessage
+      ? fileMessage.sticker
+      : 'animation' in fileMessage
+      ? fileMessage.animation
       : exhaust(),
   })
 
-  if ('sticker' in context.message) {
-    if (context.message.sticker.set_name) {
+  if ('sticker' in fileMessage) {
+    if (fileMessage.sticker.set_name) {
       try {
-        const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
+        const stickerSet = await bot.telegram.getStickerSet(fileMessage.sticker.set_name)
 
         await stickerSetsRepository.upsert({
           setName: stickerSet.name,
@@ -130,7 +138,7 @@ async function $handleTaggingFileMessage(context: Context) {
           data: stickerSet,
         })
       } catch (error) {
-        logger.error({ error, context }, 'Failed to get sticker set')
+        logger.error({ error, message: fileMessage, requesterUserId }, 'Failed to get sticker set')
       }
     }
   }
@@ -138,39 +146,44 @@ async function $handleTaggingFileMessage(context: Context) {
   const isFavorite = await favoritesRepository.exists({ userId: requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
   const stats = await tagsRepository.stats({ requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
 
-  const message: string[] = []
+  const message_: string[] = []
   const fileType_ = formatFileType(taggableFile)
   if (stats.publicTags.total === 0 && !stats.requesterTag) {
-    message.push(`No one has tagged this ${fileType_} yet\\.`)
+    // Don't add this message if it's a set-less sticker
+    if (taggableFile.fileType !== 'sticker' || taggableFile.setName) {
+      message_.push(`No one has tagged this ${fileType_} yet\\.`)
+    }
   } else {
     if (stats.requesterTag) {
       const visibility_ = stats.requesterTag.visibility === 'public' ? 'publicly' : 'privately'
       const value_ = formatValue(stats.requesterTag.value)
-      message.push(`You have *${visibility_}* tagged this ${fileType_}: ${value_}\\.`)
+      message_.push(`You have *${visibility_}* tagged this ${fileType_}: ${value_}\\.`)
     } else {
-      message.push(`You have not tagged this ${fileType_}\\.`)
+      message_.push(`You have not tagged this ${fileType_}\\.`)
     }
 
-    message.push('')
+    message_.push('')
 
     if (stats.publicTags.total > 0) {
       const remainingCount = stats.publicTags.total - stats.publicTags.values.length
       const tags_ = stats.publicTags.total > 1 ? 'tags' : 'tag'
       const values_ = stats.publicTags.values.map(value => formatValue(value))
       const andMore_ = remainingCount > 0 ? ` and ${remainingCount} more` : ''
-      message.push(`This ${fileType_} has ${stats.publicTags.total} *public* ${tags_}: ${values_}${andMore_}\\.`)
+      message_.push(`This ${fileType_} has ${stats.publicTags.total} *public* ${tags_}: ${values_}${andMore_}\\.`)
     } else {
-      message.push(`No one else has tagged this ${fileType_}\\.`)
+      message_.push(`No one else has tagged this ${fileType_}\\.`)
     }
   }
 
-  message.push('', '👇 What do you want to do?')
+  if (message_.length > 0) message_.push('')
+  message_.push('👇 What do you want to do?')
 
-  const promptMessage = await context.sendMessage(
-    message.join('\n'),
+  const promptMessage = await bot.telegram.sendMessage(
+    fileMessage.chat.id,
+    message_.join('\n'),
     {
       parse_mode: 'MarkdownV2',
-      reply_parameters: { message_id: context.message.message_id },
+      reply_parameters: { message_id: fileMessage.message_id },
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback(
           stats.requesterTag
@@ -191,7 +204,7 @@ async function $handleTaggingFileMessage(context: Context) {
     userSession: {
       tagging: {
         promptMessageId: promptMessage.message_id,
-        taggableFileMessageId: context.message.message_id,
+        taggableFileMessageId: fileMessage.message_id,
         taggableFile,
         visibility: 'public',
       }
@@ -253,36 +266,6 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
       reply_parameters: { message_id: taggableFileMessageId }
     }
   )
-}
-
-function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; visibility: Visibility; isReplacing: boolean }) {
-  const new_ = input.isReplacing ? 'new ' : ''
-
-  return {
-    message: [
-      `✏️ Send ${new_}tag for this ${formatFileType(input.taggableFile)}\\.`,
-      'Example: *__cute cat, funny animal__*\\.',
-      '',
-      input.visibility === 'private'
-        ? '🔒 No one can see your *private* tags\\.'
-        : '🔓 Anyone can see your *public* tags\\.',
-      `Authors of tags are never revealed\\.`
-    ].join('\n'),
-    extra: {
-      parse_mode: 'MarkdownV2',
-      reply_markup: Markup.inlineKeyboard(
-        [
-          Markup.button.callback(`${input.visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
-          Markup.button.callback(`${input.visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
-          ...input.isReplacing
-            ? [Markup.button.callback(`🗑 Delete my tag`, 'tagging:delete-tags')]
-            : [],
-          Markup.button.callback('❌ Cancel', 'tagging:cancel'),
-        ],
-        { wrap: (_, index) => index > 1 },
-      ).reply_markup,
-    }
-  } as const
 }
 
 async function $handleTaggingTagSingleAction(context: Context) {
@@ -472,6 +455,37 @@ async function $handleTaggingDeleteTagsAction(context: Context) {
   )
 }
 
+function buildTaggingInstructionsMessage(input: { taggableFile: TaggableFile; visibility: Visibility; isReplacing: boolean }) {
+  const new_ = input.isReplacing ? 'new ' : ''
+
+  return {
+    message: [
+      `✏️ Send ${new_}tag for this ${formatFileType(input.taggableFile)}\\.`,
+      'Example: *__cute cat, funny animal__*\\.',
+      '',
+      input.visibility === 'private'
+        ? '🔒 No one can see your *private* tags\\.'
+        : '🔓 Anyone can see your *public* tags\\.',
+      `Authors of tags are never revealed\\.`
+    ].join('\n'),
+    extra: {
+      parse_mode: 'MarkdownV2',
+      reply_markup: Markup.inlineKeyboard(
+        [
+          Markup.button.callback(`${input.visibility === 'public' ? '✅ Public' : '🔓 Make public'}`, 'tagging:set-visibility:public'),
+          Markup.button.callback(`${input.visibility === 'private' ? '✅ Private' : '🔒 Make private'}`, 'tagging:set-visibility:private'),
+          ...input.isReplacing
+            ? [Markup.button.callback(`🗑 Delete my tag`, 'tagging:delete-tags')]
+            : [],
+          Markup.button.callback('❌ Cancel', 'tagging:cancel'),
+        ],
+        { wrap: (_, index) => index > 1 },
+      ).reply_markup,
+    }
+  } as const
+}
+
+/* Search */
 async function $handleSearchInlineQuery(context: Context) {
   if (context.inlineQuery?.query === undefined) return
 
@@ -544,6 +558,82 @@ async function $handleSearchInlineQuery(context: Context) {
   )
 }
 
+const STICKER_SIZE = 512;
+const SUPPORTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE_BYTES = 5_000_000 // 5 mb
+const STICKER_PIPELINE_TIMEOUT_SECONDS = 30
+
+/* Builder */
+async function $handlerBuilderFileMessage(context: Context) {
+  if (!context.message) return
+
+  const requesterUserId = context.message.from.id
+
+  const extra = {
+    reply_to_message_id: context.message.message_id,
+    parse_mode: 'MarkdownV2',
+  } as const
+
+  let file
+  if ('photo' in context.message) {
+    const photo = context.message.photo
+      .find(photo => photo.width >= STICKER_SIZE || photo.height >= STICKER_SIZE)
+      ?? context.message.photo.at(-1)
+
+    if (!photo || !photo.file_size) {
+      await context.reply('❌ Invalid photo.', extra)
+      return
+    }
+
+    if (photo.file_size > MAX_FILE_SIZE_BYTES) {
+      await context.reply('❌ The photo is too large, max size is 1 MB.', extra)
+      return
+    }
+
+    file = {
+      file_id: photo.file_id,
+      file_unique_id: photo.file_unique_id,
+    }
+  } else if ('document' in context.message) {
+    if (!context.message.document.mime_type
+     || !SUPPORTED_MIME_TYPES.includes(context.message.document.mime_type)
+     || !context.message.document.file_size) {
+      await context.reply('❌ Invalid file.', extra)
+      return
+    }
+
+    if (context.message.document.file_size > MAX_FILE_SIZE_BYTES) {
+      await context.reply(`❌ The file is too large, max size is 5 MB.`, extra)
+      return
+    }
+
+    file = {
+      file_id: context.message.document.file_id,
+      file_unique_id: context.message.document.file_unique_id,
+    }
+  } else {
+    return
+  }
+
+  const loadingMessage = await context.reply('⌛ Creating a sticker, please wait...')
+
+  const fileLink = await bot.telegram.getFileLink(file.file_id)
+  const fileResponse = await fetch(fileLink.toString())
+  if (!fileResponse.body) return
+
+  const stickerPipeline = sharp()
+    .resize({ fit: 'inside', width: STICKER_SIZE, height: STICKER_SIZE })
+    .webp({ quality: 100 })
+    .timeout({ seconds: STICKER_PIPELINE_TIMEOUT_SECONDS })
+
+  Readable.fromWeb(fileResponse.body).pipe(stickerPipeline)
+
+  const stickerMessage = await context.replyWithSticker({ source: stickerPipeline })
+  await context.deleteMessage(loadingMessage.message_id).catch(() => {})
+
+  await $handleTaggingFileMessage(stickerMessage, requesterUserId)
+}
+
 bot.on('inline_query', $handleSearchInlineQuery)
 
 // Only allow to manage favorites and tags in the private chat with bot
@@ -562,8 +652,10 @@ bot.action(/^tagging:set-visibility:(.+?)$/, $handleTaggingSetVisibilityAction)
 bot.action('tagging:delete-tags', $handleTaggingDeleteTagsAction)
 bot.action('tagging:cancel', $handleTaggingCancelAction)
 
-bot.on(message('sticker'), $handleTaggingFileMessage)
-bot.on(message('animation'), $handleTaggingFileMessage)
+bot.on(message('sticker'), (context) => $handleTaggingFileMessage(context.message, context.from.id))
+bot.on(message('animation'), (context) => $handleTaggingFileMessage(context.message, context.from.id))
+bot.on(message('photo'), $handlerBuilderFileMessage)
+bot.on(message('document'), $handlerBuilderFileMessage)
 bot.on(message('text'), $handleTaggingTextMessage)
 
 bot.catch((err, context) => {
