@@ -1,4 +1,8 @@
 services:
+  tsb_app:
+    profiles:
+      - donotstart
+
   tsb_postgres:
     ports:
-      - "5432:5432"
+      - "5434:5432"
