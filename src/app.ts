@@ -317,7 +317,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   const requesterUserId = context.message.from.id
 
   const userSession = await userSessionsRepository.get({ userId: requesterUserId })
-  if (!userSession?.tagging) return
+  if (!userSession?.tagging || !userSession.tagging.instructionsMessageId) return
 
   const { visibility, taggableFile, taggableFileMessageId, instructionsMessageId } = userSession.tagging
 
