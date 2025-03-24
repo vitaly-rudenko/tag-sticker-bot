@@ -492,8 +492,9 @@ async function $handleSearchInlineQuery(context: Context) {
 
   const requesterUserId = context.inlineQuery.from.id
   const ownedOnly = context.inlineQuery.query.startsWith('!')
+  const effectiveQuery = ownedOnly ? context.inlineQuery.query.slice(1) : context.inlineQuery.query
 
-  const isFavoritesQuery = context.inlineQuery.query.length === 0
+  const isFavoritesQuery = effectiveQuery.length === 0
 
   let taggableFiles: TaggableFile[]
   let isPersonal = false
@@ -501,12 +502,9 @@ async function $handleSearchInlineQuery(context: Context) {
   if (isFavoritesQuery) {
     isPersonal = true
     taggableFiles = await favoritesRepository.list({ userId: requesterUserId, limit: 50 })
-  } else if (
-    context.inlineQuery.query.length >= 2 &&
-    context.inlineQuery.query.length <= 100
-  ) {
+  } else if (effectiveQuery.length >= 2 && effectiveQuery.length <= 100) {
     const tags = await tagsRepository.search({
-      query: ownedOnly ? context.inlineQuery.query.slice(1) : context.inlineQuery.query,
+      query: effectiveQuery,
       requesterUserId,
       ownedOnly,
       limit: 50,
