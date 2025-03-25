@@ -6,3 +6,5 @@ services:
   tsb_postgres:
     ports:
       - "5434:5432"
+    volumes:
+      - "./local/postgres-data:/var/lib/postgresql/data"
