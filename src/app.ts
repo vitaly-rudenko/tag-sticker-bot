@@ -38,7 +38,10 @@ const filesRepository = new FilesRepository({ client: postgresClient })
 const stickerSetsRepository = new StickerSetsRepository({ client: postgresClient })
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
-await bot.telegram.setMyCommands([])
+
+await bot.telegram.setMyCommands([
+  { command: 'start', description: 'Get help' },
+])
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
