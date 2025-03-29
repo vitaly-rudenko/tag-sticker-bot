@@ -1,7 +1,5 @@
 import pg from 'pg'
 import fs from 'fs'
-import sharp from 'sharp'
-import { Readable } from 'stream'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
 import { type TaggableFile } from './common/taggable-file.ts'
@@ -10,13 +8,12 @@ import { TagsRepository } from './tags/tags-repository.ts'
 import { type Visibility, visibilitySchema } from './tags/visibility.ts'
 import { UserSessionsRepository } from './user-sessions/user-sessions-repository.ts'
 import { escapeMd } from './utils/escape-md.ts'
-import { requireNonNullable } from './utils/require-non-nullable.ts'
 import { logger } from './utils/logging/logger.ts'
 import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
-import { type Message } from 'telegraf/types'
+import { type PhotoSize } from 'telegraf/types'
 
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
@@ -47,7 +44,15 @@ process.once('SIGINT', () => bot.stop('SIGINT'))
 process.once('SIGTERM', () => bot.stop('SIGTERM'))
 
 function formatFileType(taggableFile: TaggableFile): string {
-  return taggableFile.fileType === 'sticker' ? 'sticker' : 'GIF'
+  return taggableFile.fileType === 'sticker'
+    ? 'sticker'
+    : taggableFile.fileType === 'animation'
+    ? 'GIF'
+    : taggableFile.fileType === 'photo'
+    ? 'photo'
+    : (taggableFile.fileType === 'video' || taggableFile.fileType === 'video_note')
+    ? 'video'
+    : exhaust()
 }
 
 function capitalize(input: string) {
@@ -58,24 +63,27 @@ function formatValue(value: string): string {
   return `*__${escapeMd(value)}__*`
 }
 
+function pickLargestPhoto(photos: PhotoSize[]) {
+  return [...photos].sort((a, b) => (b.width * b.height) - (a.width * a.height))[0]
+}
+
 /* /start */
 async function $handleStartCommand(context: Context) {
   bot.botInfo ??= await bot.telegram.getMe()
 
   await context.reply([
-    '👋 Hi, just send a sticker or GIF to tag or mark as favorite\\.',
+    '👋 Hi, just send a file to start\\!',
+    '',
+    '🖼 Bot supports GIFs, stickers, photos, videos and video messages\\.',
     '',
     '*Tagging*',
-    '📝 Tag stickers and GIFs to quickly find them: *__funny dancing cat__*\\.',
-    `🔍 After tagging a file, type "\`@${escapeMd(bot.botInfo.username)} cat\`" to quickly find it\\.`,
-    `💡 To search by your own tags, add *\\!* to the query: "\`@${escapeMd(bot.botInfo.username)} !cat\`"`,
+    '📝 Tag files: __**funny dancing cat**__\\.',
+    `🔍 Search tags: "\`@${escapeMd('sttagbot')} cat\`"\\.`,
+    `💡 Your tags: "\`@${escapeMd('sttagbot')} !cat\`"`,
     '',
     '*Favorites*',
-    '❤️ You can also mark a file as your favorite\\.',
-    `🔍 Quickly get your favorite files by typing "\`@${escapeMd(bot.botInfo.username)}\` "\\.`,
-    '',
-    '*Builder*',
-    '🖼 You can also create a new sticker by sending a photo or a file\\.',
+    '❤️ Add files to favorites\\.',
+    `🔍 Access favorites: "\`@${escapeMd('sttagbot')}\` "\\.`,
   ].join('\n'), { parse_mode: 'MarkdownV2' })
 }
 
@@ -86,23 +94,60 @@ async function $handleVersionCommand(context: Context) {
 }
 
 /* Tagging */
-async function $handleTaggingFileMessage(
-  fileMessage: Message,
-  requesterUserId: number,
-) {
+async function $handleTaggingFileMessage(context: Context) {
+  if (!context.message) return
+
+  const requesterUserId = context.message.from.id
+
+  if ('video' in context.message
+    && context.message.video.mime_type !== 'video/mp4') {
+    await context.reply(`❌ Sorry, only MP4 videos are supported.`)
+    return
+  }
+
+  if ('animation' in context.message
+    && context.message.animation.mime_type !== 'video/mp4'
+    && context.message.animation.mime_type !== 'image/gif') {
+    await context.reply(`❌ Sorry, only MP4 and GIF animations are supported.`)
+    return
+  }
+
   const taggableFile: TaggableFile | undefined
-    = 'sticker' in fileMessage ? {
-      fileId: fileMessage.sticker.file_id,
-      fileUniqueId: fileMessage.sticker.file_unique_id,
+    = 'sticker' in context.message ? {
+      fileId: context.message.sticker.file_id,
+      fileUniqueId: context.message.sticker.file_unique_id,
       fileType: 'sticker',
-      setName: fileMessage.sticker.set_name,
-      emoji: fileMessage.sticker.emoji,
+      setName: context.message.sticker.set_name,
+      emoji: context.message.sticker.emoji,
     }
-    : 'animation' in fileMessage ? {
-      fileId: fileMessage.animation.file_id,
-      fileUniqueId: fileMessage.animation.file_unique_id,
+    : 'animation' in context.message ? {
+      fileId: context.message.animation.file_id,
+      fileUniqueId: context.message.animation.file_unique_id,
       fileType: 'animation',
-      mimeType: requireNonNullable(fileMessage.animation.mime_type),
+      mimeType: context.message.animation.mime_type === 'image/gif'
+        ? 'image/gif'
+        : context.message.animation.mime_type === 'video/mp4'
+        ? 'video/mp4'
+        : exhaust(),
+    }
+    : 'photo' in context.message ? {
+      fileId: pickLargestPhoto(context.message.photo).file_id,
+      fileUniqueId: pickLargestPhoto(context.message.photo).file_unique_id,
+      fileType: 'photo'
+    }
+    : 'video' in context.message ? {
+      fileId: context.message.video.file_id,
+      fileUniqueId: context.message.video.file_unique_id,
+      fileType: 'video',
+      mimeType: context.message.video.mime_type === 'video/mp4'
+        ? 'video/mp4'
+        : exhaust(),
+      fileName: context.message.video.file_name ?? 'video.mp4',
+    }
+    : 'video_note' in context.message ? {
+      fileId: context.message.video_note.file_id,
+      fileUniqueId: context.message.video_note.file_unique_id,
+      fileType: 'video_note',
     }
     : undefined
 
@@ -113,7 +158,7 @@ async function $handleTaggingFileMessage(
     const { promptMessageId, instructionsMessageId } = userSession.tagging
     if (promptMessageId || instructionsMessageId) {
       await bot.telegram.deleteMessages(
-        fileMessage.chat.id,
+        context.message.chat.id,
         [promptMessageId, instructionsMessageId].filter(isDefined)
       ).catch(() => {})
     }
@@ -123,19 +168,22 @@ async function $handleTaggingFileMessage(
     fileUniqueId: taggableFile.fileUniqueId,
     fileId: taggableFile.fileId,
     fileType: taggableFile.fileType,
-    setName: 'sticker' in fileMessage ? fileMessage.sticker.set_name : undefined,
-    mimeType: 'animation' in fileMessage ? fileMessage.animation.mime_type : undefined,
-    data: 'sticker' in fileMessage
-      ? fileMessage.sticker
-      : 'animation' in fileMessage
-      ? fileMessage.animation
+    setName: 'setName' in taggableFile ? taggableFile.setName : undefined,
+    mimeType: 'mimeType' in taggableFile ? taggableFile.mimeType : undefined,
+    fileName: 'fileName' in taggableFile ? taggableFile.fileName : undefined,
+    emoji: 'emoji' in taggableFile ? taggableFile.emoji : undefined,
+    data: 'sticker' in context.message ? context.message.sticker
+      : 'animation' in context.message ? context.message.animation
+      : 'photo' in context.message ? pickLargestPhoto(context.message.photo)
+      : 'video' in context.message ? context.message.video
+      : 'video_note' in context.message ? context.message.video_note
       : exhaust(),
   })
 
-  if ('sticker' in fileMessage) {
-    if (fileMessage.sticker.set_name) {
+  if ('sticker' in context.message) {
+    if (context.message.sticker.set_name) {
       try {
-        const stickerSet = await bot.telegram.getStickerSet(fileMessage.sticker.set_name)
+        const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
 
         await stickerSetsRepository.upsert({
           setName: stickerSet.name,
@@ -143,7 +191,7 @@ async function $handleTaggingFileMessage(
           data: stickerSet,
         })
       } catch (error) {
-        logger.warn({ error, message: fileMessage, requesterUserId }, 'Failed to get sticker set')
+        logger.warn({ error, message: context.message, requesterUserId }, 'Failed to get sticker set')
       }
     }
   }
@@ -184,11 +232,11 @@ async function $handleTaggingFileMessage(
   message_.push('👇 What do you want to do?')
 
   const promptMessage = await bot.telegram.sendMessage(
-    fileMessage.chat.id,
+    context.message.chat.id,
     message_.join('\n'),
     {
       parse_mode: 'MarkdownV2',
-      reply_parameters: { message_id: fileMessage.message_id },
+      reply_parameters: { message_id: context.message.message_id },
       reply_markup: Markup.inlineKeyboard([
         Markup.button.callback(
           stats.requesterTag
@@ -209,7 +257,7 @@ async function $handleTaggingFileMessage(
     userSession: {
       tagging: {
         promptMessageId: promptMessage.message_id,
-        taggableFileMessageId: fileMessage.message_id,
+        taggableFileMessageId: context.message.message_id,
         taggableFile,
         visibility: 'public',
       }
@@ -541,6 +589,25 @@ async function $handleSearchInlineQuery(context: Context) {
           }
         }
 
+        if (file.fileType === 'photo') {
+          return {
+            id: String(index),
+            type: 'photo',
+            photo_file_id: file.fileId,
+          }
+        }
+
+        if ((file.fileType === 'video' && file.mimeType === 'video/mp4')
+          || file.fileType === 'video_note') {
+          // Sending as type: 'mpeg4_gif' instead of type: 'video', because it shows animated preview and doesn't require 'title' field
+          // When clicked, it sends a regular video with sound, so there's effectively no drawback
+          return {
+            id: String(index),
+            type: 'mpeg4_gif',
+            mpeg4_file_id: file.fileId,
+          }
+        }
+
         return {
           type: 'sticker',
           id: String(index),
@@ -553,9 +620,9 @@ async function $handleSearchInlineQuery(context: Context) {
         button: {
           text: isFavoritesQuery
             ? taggableFiles.length === 0
-              ? "You don't have any favorite stickers or GIFs yet. Click here to add"
-              : "Click here to manage your favorite stickers and GIFs"
-            : "Can't find a sticker or GIF? Click here to contribute",
+              ? "Add favorite stickers, GIFs and files"
+              : "Manage your favorite stickers, GIFs and files"
+            : "Tag stickers, GIFs and files",
           start_parameter: 'stub', // for some reason this field is required
         }
       }
@@ -597,82 +664,6 @@ async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles:
   }
 }
 
-/* Builder */
-const STICKER_SIZE = 512;
-const SUPPORTED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE_BYTES = 5_000_000 // 5 mb
-const STICKER_PIPELINE_TIMEOUT_SECONDS = 30
-
-async function $handlerBuilderFileMessage(context: Context) {
-  if (!context.message) return
-
-  const requesterUserId = context.message.from.id
-
-  const extra = {
-    reply_to_message_id: context.message.message_id,
-    parse_mode: 'MarkdownV2',
-  } as const
-
-  let file
-  if ('photo' in context.message) {
-    const photo = context.message.photo
-      .find(photo => photo.width >= STICKER_SIZE || photo.height >= STICKER_SIZE)
-      ?? context.message.photo.at(-1)
-
-    if (!photo || !photo.file_size) {
-      await context.reply('❌ Invalid photo.', extra)
-      return
-    }
-
-    if (photo.file_size > MAX_FILE_SIZE_BYTES) {
-      await context.reply('❌ The photo is too large, max size is 1 MB.', extra)
-      return
-    }
-
-    file = {
-      file_id: photo.file_id,
-      file_unique_id: photo.file_unique_id,
-    }
-  } else if ('document' in context.message) {
-    if (!context.message.document.mime_type
-     || !SUPPORTED_MIME_TYPES.includes(context.message.document.mime_type)
-     || !context.message.document.file_size) {
-      await context.reply('❌ Invalid file.', extra)
-      return
-    }
-
-    if (context.message.document.file_size > MAX_FILE_SIZE_BYTES) {
-      await context.reply(`❌ The file is too large, max size is 5 MB.`, extra)
-      return
-    }
-
-    file = {
-      file_id: context.message.document.file_id,
-      file_unique_id: context.message.document.file_unique_id,
-    }
-  } else {
-    return
-  }
-
-  const loadingMessage = await context.reply('⌛ Creating a sticker, please wait...')
-
-  const fileLink = await bot.telegram.getFileLink(file.file_id)
-  const fileResponse = await fetch(fileLink.toString())
-  if (!fileResponse.body) return
-
-  const stickerPipeline = sharp()
-    .resize({ fit: 'inside', width: STICKER_SIZE, height: STICKER_SIZE })
-    .webp({ quality: 100 })
-    .timeout({ seconds: STICKER_PIPELINE_TIMEOUT_SECONDS })
-
-  Readable.fromWeb(fileResponse.body).pipe(stickerPipeline)
-
-  const stickerMessage = await context.replyWithSticker({ source: stickerPipeline })
-  await context.deleteMessage(loadingMessage.message_id).catch(() => {})
-
-  await $handleTaggingFileMessage(stickerMessage, requesterUserId)
-}
-
 bot.on('inline_query', $handleSearchInlineQuery)
 
 // Only allow to manage favorites and tags in the private chat with bot
@@ -691,10 +682,11 @@ bot.action(/^tagging:set-visibility:(.+?)$/, $handleTaggingSetVisibilityAction)
 bot.action('tagging:delete-tags', $handleTaggingDeleteTagsAction)
 bot.action('tagging:cancel', $handleTaggingCancelAction)
 
-bot.on(message('sticker'), (context) => $handleTaggingFileMessage(context.message, context.from.id))
-bot.on(message('animation'), (context) => $handleTaggingFileMessage(context.message, context.from.id))
-bot.on(message('photo'), $handlerBuilderFileMessage)
-bot.on(message('document'), $handlerBuilderFileMessage)
+bot.on(message('photo'), $handleTaggingFileMessage)
+bot.on(message('video'), $handleTaggingFileMessage)
+bot.on(message('video_note'), $handleTaggingFileMessage)
+bot.on(message('sticker'), $handleTaggingFileMessage)
+bot.on(message('animation'), $handleTaggingFileMessage)
 bot.on(message('text'), $handleTaggingTextMessage)
 
 bot.catch((err, context) => {
