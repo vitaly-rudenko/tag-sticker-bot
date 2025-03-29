@@ -654,8 +654,14 @@ async function $handleExportCommand(context: Context) {
     limit: 10_000,
   })
 
+  const favorites = await favoritesRepository.list({
+    userId: requesterUserId,
+    limit: 10_000,
+  })
+
   const rows: string[][] = [
     [
+      'Row Type',
       'Date',
       'Author User ID',
       'File Type',
@@ -672,6 +678,7 @@ async function $handleExportCommand(context: Context) {
 
   for (const tag of tags) {
     rows.push([
+      'Tag',
       formatDate(tag.createdAt),
       String(tag.authorUserId),
       tag.taggableFile.fileType,
@@ -683,6 +690,23 @@ async function $handleExportCommand(context: Context) {
       ('fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined) ?? '',
       tag.taggableFile.fileUniqueId,
       tag.taggableFile.fileId,
+    ])
+  }
+
+  for (const favorite of favorites) {
+    rows.push([
+      'Favorite',
+      '-',
+      '-',
+      favorite.fileType,
+      '-',
+      '-',
+      ('setName' in favorite ? favorite.setName : undefined) ?? '',
+      ('emoji' in favorite ? favorite.emoji : undefined) ?? '',
+      ('mimeType' in favorite ? favorite.mimeType : undefined) ?? '',
+      ('fileName' in favorite ? favorite.fileName : undefined) ?? '',
+      favorite.fileUniqueId,
+      favorite.fileId,
     ])
   }
 
