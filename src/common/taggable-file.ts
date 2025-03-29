@@ -25,6 +25,11 @@ export const taggableFileSchema = z.discriminatedUnion('fileType', [
     fileType: z.literal('video'),
     fileName: z.string(),
     mimeType: z.literal('video/mp4'),
+  }),
+  z.strictObject({
+    fileId: z.string(),
+    fileUniqueId: z.string(),
+    fileType: z.literal('video_note'),
   })
 ])
 
