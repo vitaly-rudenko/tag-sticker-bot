@@ -7,6 +7,7 @@ export const tagSchema = z.strictObject({
   value: z.string(),
   visibility: visibilitySchema,
   taggableFile: taggableFileSchema,
+  createdAt: z.date(),
 })
 
 export type Tag = z.infer<typeof tagSchema>

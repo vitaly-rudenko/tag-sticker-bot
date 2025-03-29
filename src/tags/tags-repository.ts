@@ -42,6 +42,54 @@ export class TagsRepository {
     )
   }
 
+  async list(input: { authorUserId: number; limit: number }): Promise<Tag[]> {
+    const { authorUserId, limit } = input
+
+    const { rows } = await this.#client.query<{
+      author_user_id: string
+      visibility: string
+      value: string
+      file_unique_id: string
+      file_id: string
+      file_type: string
+      set_name: string | null
+      emoji: string | null
+      mime_type: string | null
+      file_name: string | null
+      created_at: string
+    }>(
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, created_at
+       FROM tags
+       WHERE author_user_id = $2
+       ORDER BY created_at DESC
+       LIMIT $1;`,
+       [limit, authorUserId]
+    )
+
+    return rows.map(row => tagSchema.parse({
+      authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
+      value: row.value,
+      visibility: row.visibility,
+      taggableFile: {
+        fileUniqueId: row.file_unique_id,
+        fileId: row.file_id,
+        fileType: row.file_type,
+        ...row.file_type === 'sticker' && {
+          setName: row.set_name ?? undefined,
+          emoji: row.emoji ?? undefined,
+        },
+        ...row.file_type === 'animation' && {
+          mimeType: row.mime_type,
+        },
+        ...row.file_type === 'video' && {
+          mimeType: row.mime_type,
+          fileName: row.file_name,
+        },
+      },
+      createdAt: new Date(row.created_at),
+    }))
+  }
+
   async delete(input: { authorUserId: number; fileUniqueId: string }): Promise<void> {
     const { authorUserId, fileUniqueId } = input
 
@@ -81,8 +129,9 @@ export class TagsRepository {
       emoji: string | null
       mime_type: string | null
       file_name: string | null
+      created_at: string
     }>(
-      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, created_at
             , (author_user_id = $2) AS is_owner
             , ($4 = '' OR value ILIKE $4) AS is_exact_match
        FROM (
@@ -119,7 +168,8 @@ export class TagsRepository {
           mimeType: row.mime_type,
           fileName: row.file_name,
         },
-      }
+      },
+      createdAt: new Date(row.created_at),
     }))
   }
 

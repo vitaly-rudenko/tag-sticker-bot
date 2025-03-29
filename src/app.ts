@@ -14,6 +14,7 @@ import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
 import { type PhotoSize } from 'telegraf/types'
+import { stringify } from 'csv-stringify/sync'
 
 const isLocal = process.env.STAGE === 'local'
 
@@ -40,6 +41,7 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
 await bot.telegram.setMyCommands([
   { command: 'start', description: 'Get help' },
+  { command: 'export', description: 'Export your tags in a CSV format' },
 ])
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
@@ -638,6 +640,61 @@ async function $handleSearchInlineQuery(context: Context) {
   }
 }
 
+function formatDate(date: Date) {
+  return date.toISOString().replace('T', ' ').split('.')[0].split(':').slice(0, -1).join(':')
+}
+
+async function $handleExportCommand(context: Context) {
+  if (!context.message) return
+
+  const requesterUserId = context.message.from.id
+
+  const tags = await tagsRepository.list({
+    authorUserId: requesterUserId,
+    limit: 10_000,
+  })
+
+  const rows: string[][] = [
+    [
+      'Date',
+      'Author User ID',
+      'File Type',
+      'Visibility',
+      'Tag',
+      'Sticker Set Name',
+      'Sticker Emoji',
+      'Video MIME Type',
+      'Video Filename',
+      'File Unique ID',
+      'File ID',
+    ],
+  ]
+
+  for (const tag of tags) {
+    rows.push([
+      formatDate(tag.createdAt),
+      String(tag.authorUserId),
+      tag.taggableFile.fileType,
+      tag.visibility,
+      tag.value,
+      ('setName' in tag.taggableFile ? tag.taggableFile.setName : undefined) ?? '',
+      ('emoji' in tag.taggableFile ? tag.taggableFile.emoji : undefined) ?? '',
+      ('mimeType' in tag.taggableFile ? tag.taggableFile.mimeType : undefined) ?? '',
+      ('fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined) ?? '',
+      tag.taggableFile.fileUniqueId,
+      tag.taggableFile.fileId,
+    ])
+  }
+
+  const csv = stringify(rows)
+  const filename = `tags_${new Date().toISOString().split('.')[0].replaceAll(/[^\d]+/g, '-')}.csv`
+
+  await context.replyWithDocument(
+    { source: Buffer.from(csv), filename },
+    { caption: '✅ Your export is ready.' }
+  )
+}
+
 async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles: TaggableFile[]) {
   try {
     for (const taggableFile of taggableFiles) {
@@ -675,6 +732,7 @@ bot.use(async (context, next) => {
 
 bot.start($handleStartCommand)
 bot.command('version', $handleVersionCommand)
+bot.command('export', $handleExportCommand)
 
 bot.action('tagging:add-to-favorites', $handleTaggingAddToFavoritesAction)
 bot.action('tagging:delete-from-favorites', $handleTaggingDeleteFromFavoritesAction)

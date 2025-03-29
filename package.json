@@ -15,6 +15,7 @@
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
+    "csv-stringify": "^6.5.2",
     "markdown-escapes": "^2.0.1",
     "pg": "^8.13.3",
     "pino": "^9.6.0",
