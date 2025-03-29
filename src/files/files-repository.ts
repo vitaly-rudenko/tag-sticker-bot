@@ -24,8 +24,8 @@ export class FilesRepository {
       `INSERT INTO files (file_unique_id, file_id, file_type, set_name, emoji, mime_type, data, file_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (file_unique_id) DO UPDATE
-       SET file_type = $2
-         , file_id = $3
+       SET file_id = $2
+         , file_type = $3
          , set_name = $4
          , emoji = $5
          , mime_type = $6
