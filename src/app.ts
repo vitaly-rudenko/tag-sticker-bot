@@ -83,7 +83,7 @@ async function $handleStartCommand(context: Context) {
     '*Tagging*',
     `📝 Tag files: ${formatValue('funny dancing cat')}\\.`,
     `🔍 Search tags: "\`@${escapeMd('sttagbot')} cat\`"\\.`,
-    `💡 Your tags: "\`@${escapeMd('sttagbot')} !cat\`"`,
+    `💡 Your tags: "\`@${escapeMd('sttagbot')} !cat\`"\\.`,
     '',
     '*Favorites*',
     '❤️ Add files to favorites\\.',
