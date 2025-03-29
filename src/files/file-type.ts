@@ -1,1 +1,1 @@
-export type FileType = 'sticker' | 'animation'
+export type FileType = 'sticker' | 'animation' | 'photo' | 'video'

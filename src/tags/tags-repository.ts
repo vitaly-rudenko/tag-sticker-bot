@@ -16,8 +16,8 @@ export class TagsRepository {
     taggableFileSchema.parse(taggableFile) // validate
 
     await this.#client.query(
-      `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type, file_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (author_user_id, file_unique_id) DO UPDATE
        SET visibility = $3
          , value = $4
@@ -25,7 +25,8 @@ export class TagsRepository {
          , file_type = $6
          , set_name = $7
          , emoji = $8
-         , mime_type = $9;`,
+         , mime_type = $9
+         , file_name = $10;`,
       [
         authorUserId,
         taggableFile.fileUniqueId,
@@ -33,9 +34,10 @@ export class TagsRepository {
         value,
         taggableFile.fileId,
         taggableFile.fileType,
-        taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
-        taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
-        taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
+        'setName' in taggableFile ? taggableFile.setName : null,
+        'emoji' in taggableFile ? taggableFile.emoji : null,
+        'mimeType' in taggableFile ? taggableFile.mimeType : null,
+        'fileName' in taggableFile ? taggableFile.fileName : null,
       ],
     )
   }
@@ -78,8 +80,9 @@ export class TagsRepository {
       set_name: string | null
       emoji: string | null
       mime_type: string | null
+      file_name: string | null
     }>(
-      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name
             , (author_user_id = $2) AS is_owner
             , (value ILIKE $4) AS is_exact_match
        FROM (
@@ -111,6 +114,10 @@ export class TagsRepository {
         ...row.file_type === 'animation' && {
           mimeType: row.mime_type,
         },
+        ...row.file_type === 'video' && {
+          mimeType: row.mime_type,
+          fileName: row.file_name,
+        },
       }
     }))
   }
@@ -130,10 +137,10 @@ export class TagsRepository {
   }
 
   async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{
-    requesterTag?: {
+    requesterTag: {
       visibility: Visibility
       value: string
-    }
+    } | undefined
     publicTags: {
       total: number
       values: string[]

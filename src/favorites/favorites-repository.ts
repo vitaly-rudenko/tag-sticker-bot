@@ -12,22 +12,24 @@ export class FavoritesRepository {
     const { userId, taggableFile } = input
 
     await this.#client.query(
-      `INSERT INTO favorites (user_id, file_unique_id, file_id, file_type, set_name, emoji, mime_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO favorites (user_id, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (user_id, file_unique_id) DO UPDATE
        SET file_id = $3
          , file_type = $4
          , set_name = $5
          , emoji = $6
-         , mime_type = $7;`,
+         , mime_type = $7
+         , file_name = $8;`,
       [
         userId,
         taggableFile.fileUniqueId,
         taggableFile.fileId,
         taggableFile.fileType,
-        taggableFile.fileType === 'sticker' ? taggableFile.setName : null,
-        taggableFile.fileType === 'sticker' ? taggableFile.emoji : null,
-        taggableFile.fileType === 'animation' ? taggableFile.mimeType : null,
+        'setName' in taggableFile ? taggableFile.setName : null,
+        'emoji' in taggableFile ? taggableFile.emoji : null,
+        'mimeType' in taggableFile ? taggableFile.mimeType : null,
+        'fileName' in taggableFile ? taggableFile.fileName : null,
       ]
     )
   }
@@ -70,8 +72,16 @@ export class FavoritesRepository {
   async list(input: { userId: number; limit: number }): Promise<TaggableFile[]> {
     const { userId, limit } = input
 
-    const { rows } = await this.#client.query(
-      `SELECT file_unique_id, file_id, file_type, set_name, mime_type
+    const { rows } = await this.#client.query<{
+      file_unique_id: string
+      file_id: string
+      file_type: string
+      set_name: string | null
+      emoji: string | null
+      mime_type: string | null
+      file_name: string | null
+    }>(
+      `SELECT file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name
        FROM favorites
        WHERE user_id = $1
        LIMIT $2;`,
@@ -88,6 +98,10 @@ export class FavoritesRepository {
       },
       ...row.file_type === 'animation' && {
         mimeType: row.mime_type,
+      },
+      ...row.file_type === 'video' && {
+        mimeType: row.mime_type,
+        fileName: row.file_name,
       },
     }))
   }
