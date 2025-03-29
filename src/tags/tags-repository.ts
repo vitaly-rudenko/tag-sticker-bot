@@ -84,7 +84,7 @@ export class TagsRepository {
     }>(
       `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name
             , (author_user_id = $2) AS is_owner
-            , (value ILIKE $4) AS is_exact_match
+            , ($4 = '' OR value ILIKE $4) AS is_exact_match
        FROM (
          SELECT DISTINCT ON (file_unique_id) *
          FROM tags
@@ -92,7 +92,7 @@ export class TagsRepository {
          ${ownedOnly ? `AND author_user_id = $2` : `AND (author_user_id = $2 OR visibility = $5)`}
        ) AS filtered_tags
        ORDER BY (author_user_id = $2) DESC
-              , (value ILIKE $4) DESC
+              , ($4 = '' OR value ILIKE $4) DESC
               , created_at DESC
        LIMIT $1;`,
        ownedOnly

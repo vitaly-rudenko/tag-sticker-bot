@@ -1,12 +1,12 @@
 {
   "name": "tag-sticker-bot",
-  "version": "3.1.0",
+  "version": "3.1.1",
   "main": "src/app.ts",
   "type": "module",
   "scripts": {
     "start": "node --env-file=.env --experimental-strip-types src/app.ts | pino-pretty",
     "dev": "nodemon --exec 'npm start'",
-    "test": "node --env-file=.env --experimental-strip-types --test",
+    "test": "node --env-file=.env.test --experimental-strip-types --test",
     "lint": "tsc",
     "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts",
     "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts",
