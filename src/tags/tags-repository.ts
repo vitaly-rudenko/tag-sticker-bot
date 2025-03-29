@@ -88,7 +88,7 @@ export class TagsRepository {
        FROM (
          SELECT DISTINCT ON (file_unique_id) *
          FROM tags
-         WHERE value ILIKE $3
+         WHERE ($3 = '' OR value ILIKE $3)
          ${ownedOnly ? `AND author_user_id = $2` : `AND (author_user_id = $2 OR visibility = $5)`}
        ) AS filtered_tags
        ORDER BY (author_user_id = $2) DESC

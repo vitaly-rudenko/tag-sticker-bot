@@ -15,6 +15,8 @@ import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
 import { type PhotoSize } from 'telegraf/types'
 
+const isLocal = process.env.STAGE === 'local'
+
 process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception')
   process.exit(1)
@@ -77,7 +79,7 @@ async function $handleStartCommand(context: Context) {
     '🖼 Bot supports GIFs, stickers, photos, videos and video messages\\.',
     '',
     '*Tagging*',
-    '📝 Tag files: __**funny dancing cat**__\\.',
+    `📝 Tag files: ${formatValue('funny dancing cat')}\\.`,
     `🔍 Search tags: "\`@${escapeMd('sttagbot')} cat\`"\\.`,
     `💡 Your tags: "\`@${escapeMd('sttagbot')} !cat\`"`,
     '',
@@ -284,7 +286,7 @@ async function $handleTaggingAddToFavoritesAction(context: Context) {
   await context.sendMessage(
     [
       `❤️ Added ${formatFileType(taggableFile)} to favorites\\.`,
-      '🕒 It may take up to 10 minutes to see the changes\\.'
+      '🕒 It may take up to 5 minutes to see the changes\\.'
     ].join('\n'),
     {
       parse_mode: 'MarkdownV2',
@@ -312,7 +314,7 @@ async function $handleTaggingDeleteFromFavoritesAction(context: Context) {
   await context.sendMessage(
     [
       `💔 Deleted ${formatFileType(taggableFile)} from favorites\\.`,
-      '🕒 It may take up to 10 minutes to see the changes\\.'
+      '🕒 It may take up to 5 minutes to see the changes\\.'
     ].join('\n'),
     {
       parse_mode: 'MarkdownV2',
@@ -398,7 +400,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
     [
       `✅ ${capitalize(formatFileType(taggableFile))} is now searchable by: ${value_}\\.`,
       visibility === 'public' ? '🔓 Visibility: *public*\\.' : '🔒 Visibility: *private*\\.',
-      '🕒 It may take up to 10 minutes to see the changes\\.',
+      '🕒 It may take up to 5 minutes to see the changes\\.',
     ].join('\n'),
     {
       parse_mode: 'MarkdownV2',
@@ -499,7 +501,7 @@ async function $handleTaggingDeleteTagsAction(context: Context) {
   await context.sendMessage(
     [
       `🗑 Deleted your tag for this ${formatFileType(taggableFile)}\\.`,
-      '🕒 It may take up to 10 minutes to see the changes\\.'
+      '🕒 It may take up to 5 minutes to see the changes\\.'
     ].join('\n'),
     {
       parse_mode: 'MarkdownV2',
@@ -545,8 +547,7 @@ async function $handleSearchInlineQuery(context: Context) {
   const requesterUserId = context.inlineQuery.from.id
   const ownedOnly = context.inlineQuery.query.startsWith('!')
   const effectiveQuery = ownedOnly ? context.inlineQuery.query.slice(1) : context.inlineQuery.query
-
-  const isFavoritesQuery = effectiveQuery.length === 0
+  const isFavoritesQuery = context.inlineQuery.query === ''
 
   let taggableFiles: TaggableFile[]
   let isPersonal = false
@@ -554,7 +555,7 @@ async function $handleSearchInlineQuery(context: Context) {
   if (isFavoritesQuery) {
     isPersonal = true
     taggableFiles = await favoritesRepository.list({ userId: requesterUserId, limit: 50 })
-  } else if (effectiveQuery.length >= 2 && effectiveQuery.length <= 100) {
+  } else if (ownedOnly || effectiveQuery.length >= 2 && effectiveQuery.length <= 100) {
     const tags = await tagsRepository.search({
       query: effectiveQuery,
       requesterUserId,
@@ -615,7 +616,7 @@ async function $handleSearchInlineQuery(context: Context) {
         }
       }),
       {
-        cache_time: taggableFiles.length > 0 ? 10 * 60 : undefined, // 10 minutes in seconds, do not cache if no results
+        cache_time: isLocal ? undefined : taggableFiles.length > 0 ? 5 * 60 : undefined, // 5 minutes in seconds, do not cache if no results
         is_personal: isPersonal,
         button: {
           text: isFavoritesQuery
