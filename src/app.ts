@@ -76,7 +76,7 @@ async function $handleStartCommand(context: Context) {
   await context.reply([
     '👋 Hi, just send a file to start\\!',
     '',
-    '🖼 Bot supports GIFs, stickers, photos, videos and video messages\\.',
+    '🖼 Supports GIFs, stickers, photos, videos and video messages\\.',
     '',
     '*Tagging*',
     `📝 Tag files: ${formatValue('funny dancing cat')}\\.`,
