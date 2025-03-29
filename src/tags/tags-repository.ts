@@ -93,6 +93,7 @@ export class TagsRepository {
        ) AS filtered_tags
        ORDER BY (author_user_id = $2) DESC
               , (value ILIKE $4) DESC
+              , created_at DESC
        LIMIT $1;`,
        ownedOnly
         ? [limit, requesterUserId, fuzzyQuery, exactQuery]

@@ -88,6 +88,13 @@ describe('TagsRepository', () => {
         visibility: 'public',
       })
 
+      await tagsRepository.upsert({
+        authorUserId: authorUserId2,
+        taggableFile: taggableFile3,
+        value: 'Something else',
+        visibility: 'private',
+      })
+
       assert.deepEqual(
         (await tagsRepository.search({
           limit: 10,
@@ -110,6 +117,20 @@ describe('TagsRepository', () => {
         })).map(tag => tag.taggableFile.fileUniqueId),
         [
           taggableFile1.fileUniqueId,
+        ]
+      )
+
+      assert.deepEqual(
+        (await tagsRepository.search({
+          limit: 10,
+          ownedOnly: true,
+          query: '',
+          requesterUserId: authorUserId2,
+        })).map(tag => tag.taggableFile.fileUniqueId),
+        [
+          taggableFile3.fileUniqueId,
+          taggableFile1.fileUniqueId,
+          taggableFile2.fileUniqueId,
         ]
       )
 

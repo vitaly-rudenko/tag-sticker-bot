@@ -616,7 +616,7 @@ async function $handleSearchInlineQuery(context: Context) {
         }
       }),
       {
-        cache_time: isLocal ? undefined : taggableFiles.length > 0 ? 5 * 60 : undefined, // 5 minutes in seconds, do not cache if no results
+        cache_time: isLocal ? 0 : taggableFiles.length > 0 ? 5 * 60 : undefined, // 5 minutes in seconds, do not cache if no results
         is_personal: isPersonal,
         button: {
           text: isFavoritesQuery
