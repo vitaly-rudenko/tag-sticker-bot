@@ -696,11 +696,11 @@ async function $handleExportCommand(context: Context) {
   for (const favorite of favorites) {
     rows.push([
       'Favorite',
-      '-',
-      '-',
+      '',
+      '',
       favorite.fileType,
-      '-',
-      '-',
+      '',
+      '',
       ('setName' in favorite ? favorite.setName : undefined) ?? '',
       ('emoji' in favorite ? favorite.emoji : undefined) ?? '',
       ('mimeType' in favorite ? favorite.mimeType : undefined) ?? '',
