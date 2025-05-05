@@ -649,6 +649,8 @@ async function $handleExportCommand(context: Context) {
 
   const requesterUserId = context.message.from.id
 
+  const message = await context.reply('⏳ Export in progress...')
+
   const tags = await tagsRepository.list({
     authorUserId: requesterUserId,
     limit: 10_000,
@@ -658,6 +660,11 @@ async function $handleExportCommand(context: Context) {
     userId: requesterUserId,
     limit: 10_000,
   })
+
+  if (tags.length === 0 && favorites.length === 0) {
+    await bot.telegram.editMessageText(message.chat.id, message.message_id, undefined, '❌ Nothing to export.')
+    return
+  }
 
   const rows: string[][] = [
     [
@@ -673,10 +680,37 @@ async function $handleExportCommand(context: Context) {
       'Filename',
       'File Unique ID',
       'File ID',
+      'File URL',
     ],
   ]
 
+  const fileIdFileUrlMap: Record<string, string | undefined> = {}
+  async function getFileUrl(fileId: string) {
+    if (fileIdFileUrlMap[fileId]) {
+      return fileIdFileUrlMap[fileId]
+    }
+
+    try {
+      const fileUrl = (await bot.telegram.getFileLink(fileId)).toString()
+      fileIdFileUrlMap[fileId] = fileUrl
+      return fileUrl
+    } catch (error) {
+      logger.warn({ error }, 'Failed to get file link')
+      return undefined
+    }
+  }
+
+  let progress = 0
+  const total = tags.length + favorites.length
+  async function trackProgress() {
+    await bot.telegram.editMessageText(message.chat.id, message.message_id, undefined, `⏳ Export in progress... (${++progress}/${total})`).catch(() => {})
+  }
+
   for (const tag of tags) {
+    trackProgress()
+
+    const fileUrl = await getFileUrl(tag.taggableFile.fileId)
+
     rows.push([
       'Tag',
       formatDate(tag.createdAt),
@@ -690,10 +724,15 @@ async function $handleExportCommand(context: Context) {
       ('fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined) ?? '',
       tag.taggableFile.fileUniqueId,
       tag.taggableFile.fileId,
+      fileUrl ?? 'N/A',
     ])
   }
 
   for (const favorite of favorites) {
+    trackProgress()
+
+    const fileUrl = await getFileUrl(favorite.fileId)
+
     rows.push([
       'Favorite',
       '',
@@ -707,11 +746,14 @@ async function $handleExportCommand(context: Context) {
       ('fileName' in favorite ? favorite.fileName : undefined) ?? '',
       favorite.fileUniqueId,
       favorite.fileId,
+      fileUrl ?? 'N/A',
     ])
   }
 
   const csv = stringify(rows)
   const filename = `tags_${new Date().toISOString().split('.')[0].replaceAll(/[^\d]+/g, '-')}.csv`
+
+  bot.telegram.deleteMessage(message.chat.id, message.message_id).catch(() => {})
 
   await context.replyWithDocument(
     { source: Buffer.from(csv), filename },
