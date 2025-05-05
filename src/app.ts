@@ -678,9 +678,9 @@ async function $handleExportCommand(context: Context) {
       'Sticker Emoji',
       'File MIME Type',
       'Filename',
+      'File URL',
       'File Unique ID',
       'File ID',
-      'File URL',
     ],
   ]
 
@@ -722,9 +722,9 @@ async function $handleExportCommand(context: Context) {
       ('emoji' in tag.taggableFile ? tag.taggableFile.emoji : undefined) ?? '',
       ('mimeType' in tag.taggableFile ? tag.taggableFile.mimeType : undefined) ?? '',
       ('fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined) ?? '',
+      fileUrl ?? 'N/A',
       tag.taggableFile.fileUniqueId,
       tag.taggableFile.fileId,
-      fileUrl ?? 'N/A',
     ])
   }
 
@@ -744,9 +744,9 @@ async function $handleExportCommand(context: Context) {
       ('emoji' in favorite ? favorite.emoji : undefined) ?? '',
       ('mimeType' in favorite ? favorite.mimeType : undefined) ?? '',
       ('fileName' in favorite ? favorite.fileName : undefined) ?? '',
+      fileUrl ?? 'N/A',
       favorite.fileUniqueId,
       favorite.fileId,
-      fileUrl ?? 'N/A',
     ])
   }
 
