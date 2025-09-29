@@ -24,14 +24,10 @@ services:
       POSTGRES_USER: "tagstickerbot"
       POSTGRES_PASSWORD: "p4ssw0rd"
     volumes:
-      - "tsb_postgres_data:/var/lib/postgresql/data"
+      - "./local/postgres-data:/var/lib/postgresql/data"
     networks:
       - "global_network"
 
 networks:
   global_network:
     external: true
-
-volumes:
-  tsb_postgres_data:
-    driver: local
