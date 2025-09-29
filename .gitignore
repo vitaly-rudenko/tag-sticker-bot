@@ -149,3 +149,5 @@ results.csv
 results.json
 docker-compose.override.yml
 local/
+
+dump*.sql
