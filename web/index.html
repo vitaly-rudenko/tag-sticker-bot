@@ -13,10 +13,12 @@
     <div id="progress">Pending...</div>
 
     <script>
-     console.log('Hello world!')
-
       window.onload = async () => {
-        const userId = 1234567
+        const token = new URLSearchParams(location.search).get('token')
+        if (!token) {
+          throw new Error('Token was not provided')
+        }
+
         const apiUrl = 'http://localhost:3000'
 
         const MAX_SIZE = 1024 * 1024 * 1024 // 1GB in bytes
@@ -31,9 +33,7 @@
         async function downloadFile({ filename, fileUrl }) {
           const response = await fetch(fileUrl, {
             method: 'GET',
-            headers: {
-              'user-id': userId
-            }
+            headers: { token }
           })
           if (!response.ok) {
             throw new Error(`Failed to download file: ${response.status}`)
@@ -79,19 +79,6 @@
           ].join('. ')
         }
 
-        async function getFileDownloadUrl(fileId) {
-          const response = await fetch(apiUrl + '/files/' + fileId + '/downloads', {
-            method: 'POST',
-            headers: {
-              'user-id': userId,
-            }
-          })
-          if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
-
-          const { fileUrl } = await response.json()
-          return fileUrl
-        }
-
         function toFilename(text) {
           const allowedCharacters = [
             '1234567890',
@@ -120,9 +107,7 @@
 
         const response = await fetch(apiUrl + '/tags', {
           method: 'GET',
-          headers: {
-            'user-id': userId,
-          }
+          headers: { token }
         })
         if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
 
@@ -135,11 +120,8 @@
         for (const tag of tags) {
           console.log('Tag:', tag)
 
-          // const fileUrl = await getFileDownloadUrl(tag.taggableFile.fileId)
-          // console.log('File url:', fileUrl)
-
           const extension = {
-            'sticker': 'webm',
+            'sticker': 'webp',
             'photo': 'jpg',
             'animation_video/mp4': 'mp4',
             'animation_image/gif': 'gif',

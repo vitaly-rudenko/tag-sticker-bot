@@ -1,8 +1,9 @@
 import pg from 'pg'
 import fs from 'fs'
 import cors from 'cors'
-import express from 'express'
+import express, { type ErrorRequestHandler } from 'express'
 import https from 'https'
+import jwt from 'jsonwebtoken'
 import { Context, Markup, Telegraf } from 'telegraf'
 import { message } from 'telegraf/filters'
 import { type TaggableFile } from './common/taggable-file.ts'
@@ -19,6 +20,7 @@ import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts
 import { type PhotoSize } from 'telegraf/types'
 import { stringify } from 'csv-stringify/sync'
 import path from 'path'
+import { requireNonNullable } from './utils/require-non-nullable.ts'
 
 const isLocal = process.env.STAGE === 'local'
 
@@ -665,7 +667,7 @@ function formatDate(date: Date) {
   return date.toISOString().replace('T', ' ').split('.')[0].split(':').slice(0, -1).join(':')
 }
 
-async function $handleExportCommand(context: Context) {
+async function $handleExportCsvCommand(context: Context) {
   if (!context.message) return
 
   const requesterUserId = context.message.from.id
@@ -789,6 +791,30 @@ async function $handleExportCommand(context: Context) {
   await context.replyWithDocument({ source: Buffer.from(csv), filename }, { caption: '✅ Your export is ready.' })
 }
 
+const jwtSecret = process.env.JWT_SECRET!
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET is not defined')
+}
+
+type TokenPayload = {
+  userId: number
+}
+
+async function $handleExportZipCommand(context: Context) {
+  if (!context.message) return
+
+  const requesterUserId = context.message.from.id
+
+  const token = jwt.sign({ userId: requesterUserId } satisfies TokenPayload, jwtSecret, { expiresIn: '60 minutes' })
+
+  const url = new URL('http://localhost:3000')
+  url.searchParams.set('token', token)
+
+  await context.reply(
+    ['🔗 Open this link to start the export:', url.toString(), '', '⚠️ The link will expire in 60 minutes.'].join('\n'),
+  )
+}
+
 async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles: TaggableFile[]) {
   try {
     for (const taggableFile of taggableFiles) {
@@ -826,7 +852,8 @@ bot.use(async (context, next) => {
 
 bot.start($handleStartCommand)
 bot.command('version', $handleVersionCommand)
-bot.command('export', $handleExportCommand)
+bot.command('export_csv', $handleExportCsvCommand)
+bot.command('export_zip', $handleExportZipCommand)
 
 bot.action('tagging:add-to-favorites', $handleTaggingAddToFavoritesAction)
 bot.action('tagging:delete-from-favorites', $handleTaggingDeleteFromFavoritesAction)
@@ -871,16 +898,28 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-app.get('/', async (req, res) => {
+app.get('/', async (_req, res) => {
   res.sendFile(path.join(import.meta.dirname, '../web/index.html'))
 })
 
-app.use((req, res, next) => {
-  // TODO: auth
-  req.requesterUserId = req.header('user-id')
-  if (!req.requesterUserId) {
-    throw new Error('User ID header not provided!')
+declare module 'express-serve-static-core' {
+  interface Request {
+    requesterUserId?: number
   }
+}
+
+app.use((req, _res, next) => {
+  const token = req.header('token')
+  if (!token) {
+    throw new Error('Token was not provided')
+  }
+
+  const { userId } = jwt.verify(token, jwtSecret) as TokenPayload
+  if (!userId) {
+    throw new Error('User ID is not present in the token')
+  }
+
+  req.requesterUserId = userId
 
   next()
 })
@@ -892,14 +931,14 @@ app.get('/files/:fileId/download', async (req, res) => {
   }
 
   const fileUrl = (await bot.telegram.getFileLink(fileId)).toString()
-  https.get(fileUrl, (proxyRes) => proxyRes.pipe(res));
+  https.get(fileUrl, proxyRes => proxyRes.pipe(res))
 })
 
 app.get('/tags', async (req, res) => {
   // TODO: pagination
 
   const tags = await tagsRepository.list({
-    authorUserId: req.requesterUserId,
+    authorUserId: requireNonNullable(req.requesterUserId),
     limit: 10_000,
   })
 
@@ -929,7 +968,7 @@ app.get('/favorites', async (req, res) => {
   // TODO: pagination
 
   const favorites = await favoritesRepository.list({
-    userId: req.requesterUserId,
+    userId: requireNonNullable(req.requesterUserId),
     limit: 10_000,
   })
 
@@ -950,9 +989,9 @@ app.get('/favorites', async (req, res) => {
   })
 })
 
-app.use((err, req, res, next) => {
+app.use(((err, _req, res, _next) => {
   // TODO: error handling
-  logger.error({ err }, 'Unexpected server error')
+  logger.error({ err }, `Unexpected server error: ${err.message}`)
 
   res.status(500).json({
     error: {
@@ -960,7 +999,7 @@ app.use((err, req, res, next) => {
       message: 'Unexpected server error',
     },
   })
-})
+}) satisfies ErrorRequestHandler)
 
 const port = Number(process.env.PORT) || 3000
 app.listen(port, () => logger.info({}, `Server started on ${port}!`))
