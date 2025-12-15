@@ -784,7 +784,7 @@ async function $handleExportCsvCommand(context: Context) {
   const filename = `tags_${new Date()
     .toISOString()
     .split('.')[0]
-    .replaceAll(/[^\d]+/g, '-')}.csv`
+    .replaceAll(/[^\d]+/g, '_')}.csv`
 
   bot.telegram.deleteMessage(message.chat.id, message.message_id).catch(() => {})
 
@@ -898,6 +898,9 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
+app.get('/icon.svg', (_req, res) => {
+  res.sendStatus(404)
+})
 app.get('/', async (_req, res) => {
   res.sendFile(path.join(import.meta.dirname, '../web/index.html'))
 })
@@ -989,9 +992,8 @@ app.get('/favorites', async (req, res) => {
   })
 })
 
-app.use(((err, _req, res, _next) => {
-  // TODO: error handling
-  logger.error({ err }, `Unexpected server error: ${err.message}`)
+app.use(((err, req, res, _next) => {
+  logger.error({ err, url: req.url }, `Unexpected server error: ${err.message}`)
 
   res.status(500).json({
     error: {

@@ -13,6 +13,10 @@
     <div id="progress">Pending...</div>
 
     <script>
+      // TODO: limit file size? To avoid accidentally downloading gigabyte videos?
+      // TODO: export favorites too? Perhaps in a separate ZIP at the end
+      // TODO: better UI
+
       window.onload = async () => {
         const token = new URLSearchParams(location.search).get('token')
         if (!token) {
@@ -52,6 +56,8 @@
           currentSize += blob.size
         }
 
+        const zipPrefix = `tags_${new Date().toISOString().split('.')[0].replaceAll(/[^\d]+/g, '_')}`
+
         async function finalizeZipIfNecessary() {
           if (currentSize === 0) return
 
@@ -59,13 +65,10 @@
 
           const link = document.createElement('a');
           link.href = URL.createObjectURL(blob);
-          link.download = `sttagbot_export_${part}.zip`;
+          link.download = `${zipPrefix}${part > 1 ? `_${part}` : ''}.zip`
           link.click();
 
           URL.revokeObjectURL(link.href);
-
-          // To avoid treating rapid downloads as spam
-          await new Promise(resolve => setTimeout(resolve, 100));
         }
 
         async function handleProgress() {
@@ -74,9 +77,9 @@
 
           progressEl.innerText = [
             `Part: ${part}`,
-            `Size: ${currentSize}`,
-            `Tags: ${tagsProcessed}/${tagsTotal}`,
-          ].join('. ')
+            `size: ${currentSize / 1_000_000} mb`,
+            `tags: ${tagsProcessed} of ${tagsTotal} (${((tagsProcessed / tagsTotal * 100) || 0).toFixed(1)}%).`,
+          ].join(', ')
         }
 
         function toFilename(text) {
