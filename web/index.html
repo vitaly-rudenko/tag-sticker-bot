@@ -31,10 +31,10 @@
 
         let zip = new window.JSZip()
         let currentSize = 0
-        let part = 1;
+        let part = 1
 
-        let tagsProcessed = 0;
-        let tagsTotal = 0;
+        let tagsProcessed = 0
+        let tagsTotal = 0
 
         async function downloadFile({ filename, fileUrl }) {
           const response = await fetch(fileUrl, {
@@ -79,7 +79,7 @@
 
           progressEl.innerText = [
             `Part: ${part}`,
-            `size: ${currentSize / 1_000_000} mb`,
+            `size: ${(currentSize / 1_000_000).toFixed(1)} mb`,
             `tags: ${tagsProcessed} of ${tagsTotal} (${((tagsProcessed / tagsTotal * 100) || 0).toFixed(1)}%).`,
           ].join(', ')
         }
