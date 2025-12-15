@@ -1,0 +1,172 @@
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <title>@sttagbot</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.js" integrity="sha512-3FKAKNDHbfUwAgW45wNAvfgJDDdNoTi5PZWU7ak3Xm0X8u0LbDBWZEyPklRebTZ8r+p0M2KIJWDYZQjDPyYQEA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  </head>
+  <body>
+    <div id="progress">Pending...</div>
+
+    <script>
+     console.log('Hello world!')
+
+      window.onload = async () => {
+        const userId = 1234567
+        const apiUrl = 'http://localhost:3000'
+
+        const MAX_SIZE = 1024 * 1024 * 1024 // 1GB in bytes
+
+        let zip = new window.JSZip()
+        let currentSize = 0
+        let part = 1;
+
+        let tagsProcessed = 0;
+        let tagsTotal = 0;
+
+        async function downloadFile({ filename, fileUrl }) {
+          const response = await fetch(fileUrl, {
+            method: 'GET',
+            headers: {
+              'user-id': userId
+            }
+          })
+          if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.status}`)
+          }
+
+          const blob = await response.blob()
+
+          if (currentSize > 0 && currentSize + blob.size > MAX_SIZE) {
+            await finalizeZipIfNecessary()
+            zip = new window.JSZip()
+            currentSize = 0
+            part++
+          }
+
+          zip.file(filename, blob)
+          currentSize += blob.size
+        }
+
+        async function finalizeZipIfNecessary() {
+          if (currentSize === 0) return
+
+          const blob = await zip.generateAsync({ type: 'blob' });
+
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = `sttagbot_export_${part}.zip`;
+          link.click();
+
+          URL.revokeObjectURL(link.href);
+
+          // To avoid treating rapid downloads as spam
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        async function handleProgress() {
+          const progressEl = document.getElementById('progress')
+          if (!progressEl) throw new Error('Could not find progress element')
+
+          progressEl.innerText = [
+            `Part: ${part}`,
+            `Size: ${currentSize}`,
+            `Tags: ${tagsProcessed}/${tagsTotal}`,
+          ].join('. ')
+        }
+
+        async function getFileDownloadUrl(fileId) {
+          const response = await fetch(apiUrl + '/files/' + fileId + '/downloads', {
+            method: 'POST',
+            headers: {
+              'user-id': userId,
+            }
+          })
+          if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+
+          const { fileUrl } = await response.json()
+          return fileUrl
+        }
+
+        function toFilename(text) {
+          const allowedCharacters = [
+            '1234567890',
+            '- ',
+            'qwertyuiopasdfghjklzxcvbnm',
+            'QWERTYUIOPASDFGHJKLZXCVBNM',
+            'ґйцукенгшщзхїфівапролджєячсмитьбю',
+            'ҐЙЦУКЕНГШЩЗХЇФІВАПРОЛДЖЄЯЧСМИТЬБЮ',
+            'ыъэё',
+            'ЫЪЭЁ',
+          ].join('')
+
+          let filename = ''
+          for (const character of text) {
+            if (allowedCharacters.includes(character)) {
+              filename += character
+            } else {
+              filename += ' '
+            }
+          }
+
+          return filename.trim().replace(/ +/g, '_')
+        }
+
+        handleProgress()
+
+        const response = await fetch(apiUrl + '/tags', {
+          method: 'GET',
+          headers: {
+            'user-id': userId,
+          }
+        })
+        if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+
+        const { items: tags } = await response.json()
+        tagsTotal = tags.length
+        const filenames = {}
+
+        handleProgress()
+
+        for (const tag of tags) {
+          console.log('Tag:', tag)
+
+          // const fileUrl = await getFileDownloadUrl(tag.taggableFile.fileId)
+          // console.log('File url:', fileUrl)
+
+          const extension = {
+            'sticker': 'webm',
+            'photo': 'jpg',
+            'animation_video/mp4': 'mp4',
+            'animation_image/gif': 'gif',
+            'video_video/mp4': 'mp4',
+            'video_note': 'mp4',
+          }[[tag.taggableFile.fileType, tag.taggableFile.mimeType].filter(Boolean).join('_')] || 'unknown'
+
+          let filename
+          let copy = 1
+          do {
+            filename = `${(toFilename(tag.value) || '__unknown__').slice(0, 250)}${copy > 1 ? `_${copy}` : ''}.${extension}`
+            copy++
+          } while (filenames[filename])
+          filenames[filename] = true
+
+          console.log('Filename:', filename)
+
+          const fileUrl = apiUrl + '/files/' + tag.taggableFile.fileId + '/download'
+
+          await downloadFile({ filename, fileUrl })
+          tagsProcessed++
+          handleProgress()
+        }
+
+        await finalizeZipIfNecessary()
+        handleProgress()
+      }
+    </script>
+  </body>
+</html>
