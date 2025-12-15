@@ -18,6 +18,10 @@
       // TODO: better UI
       // TODO: current file name in progress
       // TODO: more whitelisted characters, use whitespace instead of underscore for filenames
+      // TODO: animated gifs should be WEBM, not WEBP (can we get this info somehow?)
+      // TODO: use folders inside zip for different file types and sticker sets, and maybe even group by tag date
+      // TODO: add tag date to filename? might cause filename not to fit
+      // TODO: remove duplicated words from filename if it doesn't fit into the limit
 
       window.onload = async () => {
         const token = new URLSearchParams(location.search).get('token')
