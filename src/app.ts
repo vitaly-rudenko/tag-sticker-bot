@@ -791,6 +791,11 @@ async function $handleExportCsvCommand(context: Context) {
   await context.replyWithDocument({ source: Buffer.from(csv), filename }, { caption: '✅ Your export is ready.' })
 }
 
+const appUrl = process.env.APP_URL!
+if (!appUrl) {
+  throw new Error('APP_URL is not defined')
+}
+
 const jwtSecret = process.env.JWT_SECRET!
 if (!jwtSecret) {
   throw new Error('JWT_SECRET is not defined')
@@ -807,7 +812,7 @@ async function $handleExportZipCommand(context: Context) {
 
   const token = jwt.sign({ userId: requesterUserId } satisfies TokenPayload, jwtSecret, { expiresIn: '60 minutes' })
 
-  const url = new URL('http://localhost:3000')
+  const url = new URL(appUrl)
   url.searchParams.set('token', token)
 
   await context.reply(

@@ -23,7 +23,9 @@
           throw new Error('Token was not provided')
         }
 
-        const apiUrl = 'http://localhost:3000'
+        const apiUrl = location.hostname === 'localhost'
+          ? 'http://localhost:3000'
+          : 'https://sttagbot.vitaly-rudenko.com'
 
         const MAX_SIZE = 1024 * 1024 * 1024 // 1GB in bytes
 
