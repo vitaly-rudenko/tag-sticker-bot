@@ -129,12 +129,19 @@
 
         const extension = {
           'sticker': 'webp',
+          'sticker_animated': 'tgs',
+          'sticker_video': 'webm',
           'photo': 'jpg',
           'animation_video/mp4': 'mp4',
           'animation_image/gif': 'gif',
           'video_video/mp4': 'mp4',
           'video_note': 'mp4',
-        }[[tag.taggableFile.fileType, tag.taggableFile.mimeType].filter(Boolean).join('_')]
+        }[[
+          tag.taggableFile.fileType,
+          tag.taggableFile.mimeType,
+          tag.taggableFile.isVideo && 'video',
+          tag.taggableFile.isAnimated && 'animated',
+        ].filter(Boolean).join('_')]
         if (!extension) {
           throw new Error('Could not get extension for tag')
         }
@@ -142,7 +149,7 @@
         let filename
         let copy = 1
         do {
-          filename = `${(toFilename(tag.value) || '__unknown__').slice(0, 250)}${copy > 1 ? `_${copy}` : ''}.${extension}`
+          filename = `${(toFilename(tag.value) || '__unknown__').slice(0, 240)}${copy > 1 ? ` (${copy})` : ''}.${extension}`
           copy++
         } while (filenames[filename])
         filenames[filename] = true
