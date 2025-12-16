@@ -135,6 +135,8 @@ async function $handleTaggingFileMessage(context: Context) {
           fileType: 'sticker',
           setName: context.message.sticker.set_name,
           emoji: context.message.sticker.emoji,
+          isVideo: context.message.sticker.is_video,
+          isAnimated: context.message.sticker.is_animated,
         }
       : 'animation' in context.message
         ? {
@@ -190,6 +192,8 @@ async function $handleTaggingFileMessage(context: Context) {
     mimeType: 'mimeType' in taggableFile ? taggableFile.mimeType : undefined,
     fileName: 'fileName' in taggableFile ? taggableFile.fileName : undefined,
     emoji: 'emoji' in taggableFile ? taggableFile.emoji : undefined,
+    isVideo: 'isVideo' in taggableFile ? taggableFile.isVideo : false,
+    isAnimated: 'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
     data:
       'sticker' in context.message
         ? context.message.sticker
@@ -971,6 +975,8 @@ app.get('/tags', async (req, res) => {
         emoji: 'emoji' in tag.taggableFile ? tag.taggableFile.emoji : undefined,
         mimeType: 'mimeType' in tag.taggableFile ? tag.taggableFile.mimeType : undefined,
         fileName: 'fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined,
+        isVideo: 'isVideo' in tag.taggableFile ? tag.taggableFile.isVideo : undefined,
+        isAnimated: 'isAnimated' in tag.taggableFile ? tag.taggableFile.isAnimated : undefined,
       },
     })),
   })
@@ -997,6 +1003,8 @@ app.get('/favorites', async (req, res) => {
       emoji: 'emoji' in favorite ? favorite.emoji : undefined,
       mimeType: 'mimeType' in favorite ? favorite.mimeType : undefined,
       fileName: 'fileName' in favorite ? favorite.fileName : undefined,
+      isVideo: 'isVideo' in favorite ? favorite.isVideo : undefined,
+      isAnimated: 'isAnimated' in favorite ? favorite.isAnimated : undefined,
     })),
   })
 })

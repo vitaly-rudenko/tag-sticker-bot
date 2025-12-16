@@ -48,6 +48,8 @@ describe('TagsRepository', () => {
         fileType: 'sticker',
         fileUniqueId: `fake-file-unique-id-${nextId()}-3`,
         setName: 'fake-set-name',
+        isVideo: false,
+        isAnimated: true,
       }
 
       // Sticker 1

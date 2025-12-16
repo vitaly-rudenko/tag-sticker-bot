@@ -16,8 +16,8 @@ export class TagsRepository {
     taggableFileSchema.parse(taggableFile) // validate
 
     await this.#client.query(
-      `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type, file_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO tags (author_user_id, file_unique_id, visibility, value, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        ON CONFLICT (author_user_id, file_unique_id) DO UPDATE
        SET visibility = $3
          , value = $4
@@ -26,7 +26,9 @@ export class TagsRepository {
          , set_name = $7
          , emoji = $8
          , mime_type = $9
-         , file_name = $10;`,
+         , file_name = $10
+         , is_video = $11
+         , is_animated = $12;`,
       [
         authorUserId,
         taggableFile.fileUniqueId,
@@ -38,6 +40,8 @@ export class TagsRepository {
         'emoji' in taggableFile ? taggableFile.emoji : null,
         'mimeType' in taggableFile ? taggableFile.mimeType : null,
         'fileName' in taggableFile ? taggableFile.fileName : null,
+        'isVideo' in taggableFile ? taggableFile.isVideo : false,
+        'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
       ],
     )
   }
@@ -56,9 +60,11 @@ export class TagsRepository {
       emoji: string | null
       mime_type: string | null
       file_name: string | null
+      is_video: boolean
+      is_animated: boolean
       created_at: string
     }>(
-      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, created_at
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
        FROM tags
        WHERE author_user_id = $2
        ORDER BY created_at DESC
@@ -77,6 +83,8 @@ export class TagsRepository {
         ...row.file_type === 'sticker' && {
           setName: row.set_name ?? undefined,
           emoji: row.emoji ?? undefined,
+          isVideo: row.is_video,
+          isAnimated: row.is_animated,
         },
         ...row.file_type === 'animation' && {
           mimeType: row.mime_type,
@@ -129,9 +137,11 @@ export class TagsRepository {
       emoji: string | null
       mime_type: string | null
       file_name: string | null
+      is_video: boolean
+      is_animated: boolean
       created_at: string
     }>(
-      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, created_at
+      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
             , (author_user_id = $2) AS is_owner
             , ($4 = '' OR value ILIKE $4) AS is_exact_match
        FROM (
@@ -160,6 +170,8 @@ export class TagsRepository {
         ...row.file_type === 'sticker' && {
           setName: row.set_name ?? undefined,
           emoji: row.emoji ?? undefined,
+          isVideo: row.is_video,
+          isAnimated: row.is_animated,
         },
         ...row.file_type === 'animation' && {
           mimeType: row.mime_type,

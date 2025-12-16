@@ -12,15 +12,17 @@ export class FavoritesRepository {
     const { userId, taggableFile } = input
 
     await this.#client.query(
-      `INSERT INTO favorites (user_id, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO favorites (user_id, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (user_id, file_unique_id) DO UPDATE
        SET file_id = $3
          , file_type = $4
          , set_name = $5
          , emoji = $6
          , mime_type = $7
-         , file_name = $8;`,
+         , file_name = $8
+         , is_video = $9
+         , is_animated = $10;`,
       [
         userId,
         taggableFile.fileUniqueId,
@@ -30,6 +32,8 @@ export class FavoritesRepository {
         'emoji' in taggableFile ? taggableFile.emoji : null,
         'mimeType' in taggableFile ? taggableFile.mimeType : null,
         'fileName' in taggableFile ? taggableFile.fileName : null,
+        'isVideo' in taggableFile ? taggableFile.isVideo : false,
+        'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
       ]
     )
   }
@@ -80,8 +84,10 @@ export class FavoritesRepository {
       emoji: string | null
       mime_type: string | null
       file_name: string | null
+      is_video: boolean
+      is_animated: boolean
     }>(
-      `SELECT file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name
+      `SELECT file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated
        FROM favorites
        WHERE user_id = $1
        LIMIT $2;`,
@@ -95,6 +101,8 @@ export class FavoritesRepository {
       ...row.file_type === 'sticker' && {
         emoji: row.emoji,
         setName: row.set_name,
+        isVideo: row.is_video,
+        isAnimated: row.is_animated,
       },
       ...row.file_type === 'animation' && {
         mimeType: row.mime_type,

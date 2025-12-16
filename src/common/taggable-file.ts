@@ -7,6 +7,8 @@ export const taggableFileSchema = z.discriminatedUnion('fileType', [
     fileType: z.literal('sticker'),
     setName: z.string().optional(),
     emoji: z.string().optional(),
+    isVideo: z.boolean(),
+    isAnimated: z.boolean(),
   }),
   z.strictObject({
     fileId: z.string(),
