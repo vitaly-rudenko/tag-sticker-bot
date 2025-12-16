@@ -1,165 +1,165 @@
-
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>@sttagbot</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.js" integrity="sha512-3FKAKNDHbfUwAgW45wNAvfgJDDdNoTi5PZWU7ak3Xm0X8u0LbDBWZEyPklRebTZ8r+p0M2KIJWDYZQjDPyYQEA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-  </head>
-  <body>
-    <div id="progress">Pending...</div>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>@sttagbot</title>
 
-    <script>
-      // TODO: limit file size? To avoid accidentally downloading gigabyte videos?
-      // TODO: export favorites too? Perhaps in a separate ZIP at the end
-      // TODO: better UI
-      // TODO: current file name in progress
-      // TODO: more whitelisted characters, use whitespace instead of underscore for filenames
-      // TODO: animated gifs should be WEBM, not WEBP (can we get this info somehow?)
-      // TODO: use folders inside zip for different file types and sticker sets, and maybe even group by tag date
-      // TODO: add tag date to filename? might cause filename not to fit
-      // TODO: remove duplicated words from filename if it doesn't fit into the limit
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.js"
+    integrity="sha512-3FKAKNDHbfUwAgW45wNAvfgJDDdNoTi5PZWU7ak3Xm0X8u0LbDBWZEyPklRebTZ8r+p0M2KIJWDYZQjDPyYQEA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
 
-      window.onload = async () => {
-        const token = new URLSearchParams(location.search).get('token')
-        if (!token) {
-          throw new Error('Token was not provided')
+<body>
+  <div id="progress">Pending...</div>
+
+  <script>
+    // TODO: limit file size? To avoid accidentally downloading gigabyte videos?
+    // TODO: export favorites too? Perhaps in a separate ZIP at the end
+    // TODO: better UI
+    // TODO: current file name in progress
+    // TODO: more whitelisted characters, use whitespace instead of underscore for filenames
+    // TODO: animated gifs should be WEBM, not WEBP (can we get this info somehow?)
+    // TODO: use folders inside zip for different file types and sticker sets, and maybe even group by tag date
+    // TODO: add tag date to filename? might cause filename not to fit
+    // TODO: remove duplicated words from filename if it doesn't fit into the limit
+
+    window.onload = async () => {
+      const token = new URLSearchParams(location.search).get('token')
+      if (!token) {
+        throw new Error('Token was not provided')
+      }
+
+      const apiUrl = location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://sttagbot.vitaly-rudenko.com'
+
+      const MAX_SIZE = 1024 * 1024 * 1024 // 1GB in bytes
+
+      let zip = new window.JSZip()
+      let currentSize = 0
+      let part = 1
+
+      let tagsProcessed = 0
+      let tagsTotal = 0
+
+      async function downloadFile({filename, fileUrl}) {
+        const response = await fetch(fileUrl, {method: 'GET', headers: {token}})
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status}`)
         }
 
-        const apiUrl = location.hostname === 'localhost'
-          ? 'http://localhost:3000'
-          : 'https://sttagbot.vitaly-rudenko.com'
+        const blob = await response.blob()
+        if (currentSize > 0 && currentSize + blob.size > MAX_SIZE) {
+          await finalizeZipIfNecessary()
+          zip = new window.JSZip()
+          currentSize = 0
+          part++
+        }
 
-        const MAX_SIZE = 1024 * 1024 * 1024 // 1GB in bytes
+        zip.file(filename, blob)
+        currentSize += blob.size
+      }
 
-        let zip = new window.JSZip()
-        let currentSize = 0
-        let part = 1
+      const zipPrefix = `tags_${new Date().toISOString().split('.')[0].replaceAll(/[^\d]+/g, '_')}`
 
-        let tagsProcessed = 0
-        let tagsTotal = 0
+      async function finalizeZipIfNecessary() {
+        if (currentSize === 0) return
 
-        async function downloadFile({ filename, fileUrl }) {
-          const response = await fetch(fileUrl, {
-            method: 'GET',
-            headers: { token }
-          })
-          if (!response.ok) {
-            throw new Error(`Failed to download file: ${response.status}`)
+        const blob = await zip.generateAsync({type: 'blob'});
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${zipPrefix}${part > 1 ? `_${part}` : ''}.zip`
+        link.click();
+
+        URL.revokeObjectURL(link.href);
+      }
+
+      async function handleProgress() {
+        const progressEl = document.getElementById('progress')
+        if (!progressEl) throw new Error('Could not find progress element')
+
+        progressEl.innerText = [
+          `Part: ${part}`,
+          `size: ${(currentSize / 1_000_000).toFixed(1)} mb`,
+          `tags: ${tagsProcessed} of ${tagsTotal} (${((tagsProcessed / tagsTotal * 100) || 0).toFixed(1)}%).`,
+        ].join(', ')
+      }
+
+      function toFilename(text) {
+        const allowedCharacters = [
+          '1234567890',
+          '- ',
+          'qwertyuiopasdfghjklzxcvbnm',
+          'QWERTYUIOPASDFGHJKLZXCVBNM',
+          'ґйцукенгшщзхїфівапролджєячсмитьбю',
+          'ҐЙЦУКЕНГШЩЗХЇФІВАПРОЛДЖЄЯЧСМИТЬБЮ',
+          'ыъэё',
+          'ЫЪЭЁ',
+        ].join('')
+
+        let filename = ''
+        for (const character of text) {
+          if (allowedCharacters.includes(character)) {
+            filename += character
+          } else {
+            filename += ' '
           }
-
-          const blob = await response.blob()
-
-          if (currentSize > 0 && currentSize + blob.size > MAX_SIZE) {
-            await finalizeZipIfNecessary()
-            zip = new window.JSZip()
-            currentSize = 0
-            part++
-          }
-
-          zip.file(filename, blob)
-          currentSize += blob.size
         }
 
-        const zipPrefix = `tags_${new Date().toISOString().split('.')[0].replaceAll(/[^\d]+/g, '_')}`
+        return filename.replace(/ +/g, ' ').trim()
+      }
 
-        async function finalizeZipIfNecessary() {
-          if (currentSize === 0) return
+      handleProgress()
 
-          const blob = await zip.generateAsync({ type: 'blob' });
+      const response = await fetch(apiUrl + '/tags', {method: 'GET', headers: {token}})
+      if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
 
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `${zipPrefix}${part > 1 ? `_${part}` : ''}.zip`
-          link.click();
+      const {items: tags} = await response.json()
+      tagsTotal = tags.length
+      const filenames = {}
 
-          URL.revokeObjectURL(link.href);
+      handleProgress()
+
+      for (const tag of tags) {
+        console.log('Tag:', tag)
+
+        const extension = {
+          'sticker': 'webp',
+          'photo': 'jpg',
+          'animation_video/mp4': 'mp4',
+          'animation_image/gif': 'gif',
+          'video_video/mp4': 'mp4',
+          'video_note': 'mp4',
+        }[[tag.taggableFile.fileType, tag.taggableFile.mimeType].filter(Boolean).join('_')]
+        if (!extension) {
+          throw new Error('Could not get extension for tag')
         }
 
-        async function handleProgress() {
-          const progressEl = document.getElementById('progress')
-          if (!progressEl) throw new Error('Could not find progress element')
+        let filename
+        let copy = 1
+        do {
+          filename = `${(toFilename(tag.value) || '__unknown__').slice(0, 250)}${copy > 1 ? `_${copy}` : ''}.${extension}`
+          copy++
+        } while (filenames[filename])
+        filenames[filename] = true
 
-          progressEl.innerText = [
-            `Part: ${part}`,
-            `size: ${(currentSize / 1_000_000).toFixed(1)} mb`,
-            `tags: ${tagsProcessed} of ${tagsTotal} (${((tagsProcessed / tagsTotal * 100) || 0).toFixed(1)}%).`,
-          ].join(', ')
-        }
+        console.log('Filename:', filename)
 
-        function toFilename(text) {
-          const allowedCharacters = [
-            '1234567890',
-            '- ',
-            'qwertyuiopasdfghjklzxcvbnm',
-            'QWERTYUIOPASDFGHJKLZXCVBNM',
-            'ґйцукенгшщзхїфівапролджєячсмитьбю',
-            'ҐЙЦУКЕНГШЩЗХЇФІВАПРОЛДЖЄЯЧСМИТЬБЮ',
-            'ыъэё',
-            'ЫЪЭЁ',
-          ].join('')
+        const fileUrl = apiUrl + '/files/' + tag.taggableFile.fileId + '/download'
+        await downloadFile({filename, fileUrl})
 
-          let filename = ''
-          for (const character of text) {
-            if (allowedCharacters.includes(character)) {
-              filename += character
-            } else {
-              filename += ' '
-            }
-          }
-
-          return filename.trim().replace(/ +/g, '_')
-        }
-
-        handleProgress()
-
-        const response = await fetch(apiUrl + '/tags', {
-          method: 'GET',
-          headers: { token }
-        })
-        if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
-
-        const { items: tags } = await response.json()
-        tagsTotal = tags.length
-        const filenames = {}
-
-        handleProgress()
-
-        for (const tag of tags) {
-          console.log('Tag:', tag)
-
-          const extension = {
-            'sticker': 'webp',
-            'photo': 'jpg',
-            'animation_video/mp4': 'mp4',
-            'animation_image/gif': 'gif',
-            'video_video/mp4': 'mp4',
-            'video_note': 'mp4',
-          }[[tag.taggableFile.fileType, tag.taggableFile.mimeType].filter(Boolean).join('_')] || 'unknown'
-
-          let filename
-          let copy = 1
-          do {
-            filename = `${(toFilename(tag.value) || '__unknown__').slice(0, 250)}${copy > 1 ? `_${copy}` : ''}.${extension}`
-            copy++
-          } while (filenames[filename])
-          filenames[filename] = true
-
-          console.log('Filename:', filename)
-
-          const fileUrl = apiUrl + '/files/' + tag.taggableFile.fileId + '/download'
-
-          await downloadFile({ filename, fileUrl })
-          tagsProcessed++
-          handleProgress()
-        }
-
-        await finalizeZipIfNecessary()
+        tagsProcessed++
         handleProgress()
       }
-    </script>
-  </body>
+
+      await finalizeZipIfNecessary()
+      handleProgress()
+    }
+  </script>
+</body>
+
 </html>
