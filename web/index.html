@@ -213,8 +213,10 @@
     }
 
     window.onload = async () => {
-      const token = new URLSearchParams(location.search).get('token')
-      if (!token) {
+      onProgress({status: 'pending'})
+
+      const refreshToken = new URLSearchParams(location.search).get('token')
+      if (!refreshToken) {
         throw new Error('Token was not provided')
       }
 
@@ -222,15 +224,21 @@
         ? 'http://localhost:3000'
         : 'https://sttagbot.vitaly-rudenko.com'
 
-      onProgress({status: 'pending'})
+      const response = await fetch(apiUrl + '/exchange_token', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: refreshToken})
+      })
+      if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+      const {token: accessToken} = await response.json()
 
       const zipper = new Zipper({
         name: `sttagbot_${new Date().toISOString().split('T')[0].replaceAll('-', '_')}`,
         maxSizeBytes: 500_000_000,
       })
 
-      await exportTags({apiUrl, token, zipper, onProgress})
-      await exportFavorites({apiUrl, token, zipper, onProgress})
+      await exportTags({apiUrl, token: accessToken, zipper, onProgress})
+      await exportFavorites({apiUrl, token: accessToken, zipper, onProgress})
 
       await zipper.end()
 

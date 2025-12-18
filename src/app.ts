@@ -808,6 +808,7 @@ if (!jwtSecret) {
 
 type TokenPayload = {
   userId: number
+  type: 'refresh' | 'access'
 }
 
 async function $handleExportZipCommand(context: Context) {
@@ -815,16 +816,21 @@ async function $handleExportZipCommand(context: Context) {
 
   const requesterUserId = context.message.from.id
 
-  // TODO: exchange token: initial token is very short lived, exchanged for a long living token for download process
-  const token = jwt.sign({ userId: requesterUserId } satisfies TokenPayload, jwtSecret, { expiresIn: '60 minutes' })
+  const token = jwt.sign({ userId: requesterUserId, type: 'refresh' } satisfies TokenPayload, jwtSecret, {
+    expiresIn: '5 minutes',
+  })
 
   const url = new URL(appUrl)
   url.searchParams.set('token', token)
 
   // TODO: Use reply button instead of sharing the link directly
-  // TODO: Warn user not to share the link
   await context.reply(
-    ['🔗 Open this link to start the export:', url.toString(), '', '⚠️ The link will expire in 60 minutes.'].join('\n'),
+    [
+      '🔗 Open this link to start the export:',
+      url.toString(),
+      '',
+      '⚠️ The link expires in 5 minutes. Do not share it!',
+    ].join('\n'),
   )
 }
 
@@ -924,15 +930,31 @@ declare module 'express-serve-static-core' {
   }
 }
 
+app.post('/exchange_token', async (req, res) => {
+  const { userId, type } = jwt.verify(req.body.token, jwtSecret) as TokenPayload
+  if (!userId) {
+    throw new Error('User ID is not present in the token')
+  }
+  if (type !== 'refresh') {
+    throw new Error('Invalid token type')
+  }
+
+  const token = jwt.sign({ userId, type: 'access' } satisfies TokenPayload, jwtSecret, { expiresIn: '60 minutes' })
+  res.json({ token })
+})
+
 app.use((req, _res, next) => {
   const token = req.header('token')
   if (!token) {
     throw new Error('Token was not provided')
   }
 
-  const { userId } = jwt.verify(token, jwtSecret) as TokenPayload
+  const { userId, type } = jwt.verify(token, jwtSecret) as TokenPayload
   if (!userId) {
     throw new Error('User ID is not present in the token')
+  }
+  if (type !== 'access') {
+    throw new Error('Invalid token type')
   }
 
   req.requesterUserId = userId
