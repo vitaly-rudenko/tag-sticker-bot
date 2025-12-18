@@ -913,6 +913,8 @@ bot
     process.exit(1)
   })
 
+// TODO: Extract into a separate module
+// TODO: Add basic rate limiting
 const app = express()
 app.use(express.json())
 app.use(cors())
