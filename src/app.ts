@@ -786,7 +786,7 @@ async function $handleExportCsvCommand(context: Context) {
   }
 
   const csv = stringify(rows)
-  const filename = `tags_${new Date()
+  const filename = `sttagbot_${new Date()
     .toISOString()
     .split('.')[0]
     .replaceAll(/[^\d]+/g, '_')}.csv`
@@ -996,15 +996,17 @@ app.get('/favorites', async (req, res) => {
       total: favorites.length,
     },
     items: favorites.map(favorite => ({
-      fileId: favorite.fileId,
-      fileUniqueId: favorite.fileUniqueId,
-      fileType: favorite.fileType,
-      setName: 'setName' in favorite ? favorite.setName : undefined,
-      emoji: 'emoji' in favorite ? favorite.emoji : undefined,
-      mimeType: 'mimeType' in favorite ? favorite.mimeType : undefined,
-      fileName: 'fileName' in favorite ? favorite.fileName : undefined,
-      isVideo: 'isVideo' in favorite ? favorite.isVideo : undefined,
-      isAnimated: 'isAnimated' in favorite ? favorite.isAnimated : undefined,
+      taggableFile: {
+        fileId: favorite.fileId,
+        fileUniqueId: favorite.fileUniqueId,
+        fileType: favorite.fileType,
+        setName: 'setName' in favorite ? favorite.setName : undefined,
+        emoji: 'emoji' in favorite ? favorite.emoji : undefined,
+        mimeType: 'mimeType' in favorite ? favorite.mimeType : undefined,
+        fileName: 'fileName' in favorite ? favorite.fileName : undefined,
+        isVideo: 'isVideo' in favorite ? favorite.isVideo : undefined,
+        isAnimated: 'isAnimated' in favorite ? favorite.isAnimated : undefined,
+      },
     })),
   })
 })
