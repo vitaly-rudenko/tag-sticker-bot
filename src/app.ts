@@ -48,7 +48,7 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 await bot.telegram.setMyCommands([
   { command: 'start', description: 'Get help' },
   { command: 'export_csv', description: 'Export your tags and favorites in a CSV format' },
-  // { command: 'export_zip', description: 'Export your tags and favorites in a ZIP format (including media)' },
+  { command: 'export_zip', description: 'Export your tags and favorites in a ZIP format' },
 ])
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
