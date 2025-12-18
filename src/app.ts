@@ -817,19 +817,18 @@ async function $handleExportZipCommand(context: Context) {
   const requesterUserId = context.message.from.id
 
   const token = jwt.sign({ userId: requesterUserId, type: 'refresh' } satisfies TokenPayload, jwtSecret, {
-    expiresIn: '5 minutes',
+    expiresIn: '60 seconds',
   })
 
   const url = new URL(appUrl)
   url.searchParams.set('token', token)
 
-  // TODO: Use reply button instead of sharing the link directly
   await context.reply(
     [
       '🔗 Open this link to start the export:',
       url.toString(),
       '',
-      '⚠️ The link expires in 5 minutes. Do not share it!',
+      '⚠️ The link expires in 60 seconds. Do not share it!',
     ].join('\n'),
   )
 }
