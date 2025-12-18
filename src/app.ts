@@ -679,15 +679,8 @@ async function $handleExportCsvCommand(context: Context) {
 
   const message = await context.reply('⏳ Export in progress...')
 
-  const tags = await tagsRepository.list({
-    authorUserId: requesterUserId,
-    limit: 10_000,
-  })
-
-  const favorites = await favoritesRepository.list({
-    userId: requesterUserId,
-    limit: 10_000,
-  })
+  const tags = await tagsRepository.list({ authorUserId: requesterUserId, limit: 10_000 })
+  const favorites = await favoritesRepository.list({ userId: requesterUserId, limit: 10_000 })
 
   if (tags.length === 0 && favorites.length === 0) {
     await bot.telegram.editMessageText(message.chat.id, message.message_id, undefined, '❌ Nothing to export.')
