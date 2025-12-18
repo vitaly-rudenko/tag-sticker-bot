@@ -71,7 +71,7 @@
 
     class Zipper {
       #zip = new window.JSZip()
-      #part = 0
+      #part = 1
       #currentSizeBytes = 0
       #maxSizeBytes = 0
       #name = ''
@@ -138,8 +138,8 @@
         `Part: ${zipper?.part ?? '?'}`,
         `, size: ${((zipper?.currentSizeBytes ?? 0) / 1_000_000).toFixed(1)} mb`,
         `, files: ${processed} of ${total ?? '?'} (${((processed / (total ?? 0) * 100) || 0).toFixed(1)}%).`,
-        'Please, keep this page opened!',
-      ].join(' ')
+        ' Please, keep this page open!',
+      ].join('')
     }
 
     async function exportTags({apiUrl, token, zipper, onProgress}) {
@@ -159,8 +159,8 @@
 
         let path, attempt = 1
         do {
-          const filename = (sanitizeFilename(tag.value) || 'unknown tag').slice(0, 240)
-          const suffix = attempt > 1 ? ` (${attempt})` : ''
+          const filename = (sanitizeFilename(tag.value) || 'tag').slice(0, 240)
+          const suffix = attempt > 1 ? ` ${attempt}` : ''
 
           path = `tags/${filename}${suffix}.${extension}`
           attempt++
@@ -226,7 +226,7 @@
 
       const zipper = new Zipper({
         name: `sttagbot_${new Date().toISOString().split('T')[0].replaceAll('-', '_')}`,
-        maxSizeBytes: 256 * 1024 * 1024,
+        maxSizeBytes: 500_000_000,
       })
 
       await exportTags({apiUrl, token, zipper, onProgress})
