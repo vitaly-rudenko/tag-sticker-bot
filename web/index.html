@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>@sttagbot</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.js"
+    integrity="sha512-3FKAKNDHbfUwAgW45wNAvfgJDDdNoTi5PZWU7ak3Xm0X8u0LbDBWZEyPklRebTZ8r+p0M2KIJWDYZQjDPyYQEA=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+  <div id="progress">Pending...</div>
+
+  <script>
+    // TODO: limit individual file size to avoid accidentally downloading huge files?
+
+    function sanitizeFilename(filename) {
+      const allowedCharacters = [
+        '1234567890',
+        ' ~!@$%&*()_+-={};\'",.?<>',
+        'qwertyuiopasdfghjklzxcvbnm',
+        'QWERTYUIOPASDFGHJKLZXCVBNM',
+        'ґйцукенгшщзхїфівапролджєячсмитьбю',
+        'ҐЙЦУКЕНГШЩЗХЇФІВАПРОЛДЖЄЯЧСМИТЬБЮ',
+        'ыъэё',
+        'ЫЪЭЁ',
+      ].join('')
+
+      let result = ''
+      for (const character of filename) {
+        if (allowedCharacters.includes(character)) {
+          result += character
+        } else {
+          result += ' '
+        }
+      }
+
+      return result.replace(/ +/g, ' ').trim()
+    }
+
+    function getTaggableFileExtension(taggableFile) {
+      const extension = {
+        'sticker': 'webp',
+        'sticker_animated': 'tgs',
+        'sticker_video': 'webm',
+        'photo': 'jpg',
+        'animation_video/mp4': 'mp4',
+        'animation_image/gif': 'gif',
+        'video_video/mp4': 'mp4',
+        'video_note': 'mp4',
+      }[[
+        taggableFile.fileType,
+        taggableFile.mimeType,
+        taggableFile.isVideo && 'video',
+        taggableFile.isAnimated && 'animated',
+      ].filter(Boolean).join('_')]
+
+      if (!extension) {
+        throw new Error(`Could not get extension for taggable file: ${JSON.stringify(taggableFile)}`)
+      }
+
+      return extension
+    }
+
+    class Zipper {
+      #zip = new window.JSZip()
+      #part = 1
+      #currentSizeBytes = 0
+      #maxSizeBytes = 0
+      #name = ''
+
+      constructor({name, maxSizeBytes}) {
+        this.#name = name
+        this.#maxSizeBytes = maxSizeBytes
+      }
+
+      async addFile({path, blob}) {
+        if (this.#currentSizeBytes > 0 && this.#currentSizeBytes + blob.size > this.#maxSizeBytes) {
+          await this.#finalizeZipIfNecessary()
+
+          this.#zip = new window.JSZip()
+          this.#currentSizeBytes = 0
+          this.#part++
+        }
+
+        this.#zip.file(path, blob)
+        this.#currentSizeBytes += blob.size
+      }
+
+      async end() {
+        await this.#finalizeZipIfNecessary()
+      }
+
+      async #finalizeZipIfNecessary() {
+        if (this.#currentSizeBytes === 0) return
+
+        const blob = await this.#zip.generateAsync({type: 'blob'});
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${this.#name}${this.#part > 1 ? `_${this.#part}` : ''}.zip`
+        link.click();
+
+        URL.revokeObjectURL(link.href);
+      }
+
+      get part() {
+        return this.#part
+      }
+
+      get currentSizeBytes() {
+        return this.#currentSizeBytes
+      }
+    }
+
+    function onProgress({processed = 0, total, zipper, status} = {}) {
+      const progressEl = document.getElementById('progress')
+      if (!progressEl) throw new Error('Could not find progress element')
+
+      if (status === 'completed') {
+        progressEl.innerText = 'Completed!'
+        return
+      }
+
+      if (status === 'pending') {
+        progressEl.innerText = 'Pending...'
+        return
+      }
+
+      progressEl.innerText = [
+        `Part: ${zipper?.part ?? '?'}`,
+        `, size: ${((zipper?.currentSizeBytes ?? 0) / 1_000_000).toFixed(1)} mb`,
+        `, files: ${processed} of ${total ?? '?'} (${((processed / (total ?? 0) * 100) || 0).toFixed(1)}%).`,
+        ' Please, keep this page open!',
+      ].join('')
+    }
+
+    async function exportTags({apiUrl, token, zipper, onProgress}) {
+      const response = await fetch(apiUrl + '/tags', {method: 'GET', headers: {token}})
+      if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+      const {items: tags} = await response.json()
+
+      let processed = 0
+      const total = tags.length
+
+      onProgress({processed, total, zipper})
+
+      const paths = new Set()
+      for (const tag of tags) {
+        const extension = getTaggableFileExtension(tag.taggableFile)
+        const url = apiUrl + '/files/' + tag.taggableFile.fileId + '/download'
+
+        let path, attempt = 1
+        do {
+          const filename = (sanitizeFilename(tag.value) || 'tag').slice(0, 240)
+          const suffix = attempt > 1 ? ` ${attempt}` : ''
+
+          path = `tags/${filename}${suffix}.${extension}`
+          attempt++
+        } while (paths.has(path))
+        paths.add(path)
+
+
+        const response = await fetch(url, {method: 'GET', headers: {token}})
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status}`)
+        }
+        const blob = await response.blob()
+
+        await zipper.addFile({path, blob})
+
+        processed++
+        onProgress({processed, total, zipper})
+      }
+    }
+
+    async function exportFavorites({apiUrl, token, zipper, onProgress}) {
+      const response = await fetch(apiUrl + '/favorites', {method: 'GET', headers: {token}})
+      if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+      const {items: favorites} = await response.json()
+
+      let processed = 0
+      const total = favorites.length
+
+      onProgress({processed, total, zipper})
+
+      let index = 1
+      for (const favorite of favorites) {
+        const extension = getTaggableFileExtension(favorite.taggableFile)
+        const url = apiUrl + '/files/' + favorite.taggableFile.fileId + '/download'
+
+        const path = `favorites/favorite ${index}.${extension}`
+        index++
+
+        const response = await fetch(url, {method: 'GET', headers: {token}})
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status}`)
+        }
+        const blob = await response.blob()
+
+        await zipper.addFile({path, blob})
+
+        processed++
+        onProgress({processed, total, zipper})
+      }
+    }
+
+    window.onload = async () => {
+      onProgress({status: 'pending'})
+
+      const refreshToken = new URLSearchParams(location.search).get('token')
+      if (!refreshToken) {
+        throw new Error('Token was not provided')
+      }
+
+      const apiUrl = location.hostname === 'localhost'
+        ? 'http://localhost:3000'
+        : 'https://sttagbot.vitaly-rudenko.com'
+
+      const response = await fetch(apiUrl + '/exchange_token', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({token: refreshToken})
+      })
+      if (!response.ok) throw new Error(`Response not OK: ${response.status}`)
+      const {token: accessToken} = await response.json()
+
+      const zipper = new Zipper({
+        name: `sttagbot_${new Date().toISOString().split('T')[0].replaceAll('-', '_')}`,
+        maxSizeBytes: 500_000_000,
+      })
+
+      await exportTags({apiUrl, token: accessToken, zipper, onProgress})
+      await exportFavorites({apiUrl, token: accessToken, zipper, onProgress})
+
+      await zipper.end()
+
+      onProgress({status: 'completed'})
+    }
+  </script>
+</body>
+
+</html>

@@ -17,12 +17,14 @@ export class FilesRepository {
     mimeType: string | undefined
     data: object
     fileName: string | undefined
+    isVideo: boolean
+    isAnimated: boolean
   }): Promise<void> {
-    const { fileUniqueId, fileId, fileType, setName, emoji, mimeType, data, fileName } = input
+    const { fileUniqueId, fileId, fileType, setName, emoji, mimeType, data, fileName, isVideo, isAnimated } = input
 
     await this.#client.query(
-      `INSERT INTO files (file_unique_id, file_id, file_type, set_name, emoji, mime_type, data, file_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO files (file_unique_id, file_id, file_type, set_name, emoji, mime_type, data, file_name, is_video, is_animated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (file_unique_id) DO UPDATE
        SET file_id = $2
          , file_type = $3
@@ -30,8 +32,10 @@ export class FilesRepository {
          , emoji = $5
          , mime_type = $6
          , data = $7
-         , file_name = $8;`,
-      [fileUniqueId, fileId, fileType, setName, emoji, mimeType, data, fileName],
+         , file_name = $8
+         , is_video = $9
+         , is_animated = $10;`,
+      [fileUniqueId, fileId, fileType, setName, emoji, mimeType, data, fileName, isVideo, isAnimated],
     )
   }
 

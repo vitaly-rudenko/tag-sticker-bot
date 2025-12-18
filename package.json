@@ -1,6 +1,6 @@
 {
   "name": "tag-sticker-bot",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "main": "src/app.ts",
   "type": "module",
   "scripts": {
@@ -15,7 +15,10 @@
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
     "csv-stringify": "^6.5.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "markdown-escapes": "^2.0.1",
     "pg": "^8.13.3",
     "pino": "^9.6.0",
@@ -26,10 +29,13 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.13.10",
     "@types/pg": "^8.11.11",
     "csv-parse": "^5.6.0",
-    "nodemon": "^2.0.20",
+    "nodemon": "^3.1.11",
     "tsc": "^2.0.4",
     "typescript": "^5.8.2"
   },
