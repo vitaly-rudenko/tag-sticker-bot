@@ -816,6 +816,14 @@ async function $handleExportZipCommand(context: Context) {
 
   const requesterUserId = context.message.from.id
 
+  const tags = await tagsRepository.list({ authorUserId: requesterUserId, limit: 1 })
+  const favorites = await favoritesRepository.list({ userId: requesterUserId, limit: 1 })
+
+  if (tags.length === 0 && favorites.length === 0) {
+    await context.reply('❌ Nothing to export.')
+    return
+  }
+
   const token = jwt.sign({ userId: requesterUserId, type: 'refresh' } satisfies TokenPayload, jwtSecret, {
     expiresIn: '60 seconds',
   })
