@@ -136,7 +136,7 @@
 
       progressEl.innerText = [
         `Part: ${zipper?.part ?? '?'}`,
-        `, size: ${((zipper?.currentSize ?? 0) / 1_000_000).toFixed(1)} mb`,
+        `, size: ${((zipper?.currentSizeBytes ?? 0) / 1_000_000).toFixed(1)} mb`,
         `, files: ${processed} of ${total ?? '?'} (${((processed / (total ?? 0) * 100) || 0).toFixed(1)}%).`,
         'Please, keep this page opened!',
       ].join(' ')
