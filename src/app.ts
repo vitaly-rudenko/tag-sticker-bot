@@ -397,9 +397,10 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   const requesterUserId = context.message.from.id
 
   const userSession = await userSessionsRepository.get({ userId: requesterUserId })
-  if (!userSession?.tagging || !userSession.tagging.instructionsMessageId) return
+  if (!userSession?.tagging) return
 
-  const { visibility, taggableFile, taggableFileMessageId, instructionsMessageId } = userSession.tagging
+  const { visibility, taggableFile, taggableFileMessageId, promptMessageId, instructionsMessageId } =
+    userSession.tagging
 
   const text = context.message.text
   if (text.startsWith('/')) return next()
@@ -412,6 +413,10 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   if (value.length > 200) {
     await context.sendMessage('❌ Tag must not be longer than 200 characters.')
     return
+  }
+
+  if (promptMessageId) {
+    await context.deleteMessage(promptMessageId).catch(() => {})
   }
 
   if (instructionsMessageId) {
