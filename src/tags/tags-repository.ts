@@ -2,6 +2,7 @@ import { type Client } from 'pg'
 import { type Tag, tagSchema } from './tag.ts'
 import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.ts'
 import { visibilitySchema, type Visibility } from './visibility.ts'
+import { prepareQuery } from '../utils/prepare-query.ts'
 
 export class TagsRepository {
   #client: Client
@@ -10,7 +11,12 @@ export class TagsRepository {
     this.#client = input.client
   }
 
-  async upsert(input: { authorUserId: number; taggableFile: TaggableFile; visibility: Visibility; value: string }): Promise<void> {
+  async upsert(input: {
+    authorUserId: number
+    taggableFile: TaggableFile
+    visibility: Visibility
+    value: string
+  }): Promise<void> {
     const { authorUserId, taggableFile, visibility, value } = input
 
     taggableFileSchema.parse(taggableFile) // validate
@@ -69,33 +75,35 @@ export class TagsRepository {
        WHERE author_user_id = $2
        ORDER BY created_at DESC
        LIMIT $1;`,
-       [limit, authorUserId]
+      [limit, authorUserId],
     )
 
-    return rows.map(row => tagSchema.parse({
-      authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
-      value: row.value,
-      visibility: row.visibility,
-      taggableFile: {
-        fileUniqueId: row.file_unique_id,
-        fileId: row.file_id,
-        fileType: row.file_type,
-        ...row.file_type === 'sticker' && {
-          setName: row.set_name ?? undefined,
-          emoji: row.emoji ?? undefined,
-          isVideo: row.is_video,
-          isAnimated: row.is_animated,
+    return rows.map(row =>
+      tagSchema.parse({
+        authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
+        value: row.value,
+        visibility: row.visibility,
+        taggableFile: {
+          fileUniqueId: row.file_unique_id,
+          fileId: row.file_id,
+          fileType: row.file_type,
+          ...(row.file_type === 'sticker' && {
+            setName: row.set_name ?? undefined,
+            emoji: row.emoji ?? undefined,
+            isVideo: row.is_video,
+            isAnimated: row.is_animated,
+          }),
+          ...(row.file_type === 'animation' && {
+            mimeType: row.mime_type,
+          }),
+          ...(row.file_type === 'video' && {
+            mimeType: row.mime_type,
+            fileName: row.file_name,
+          }),
         },
-        ...row.file_type === 'animation' && {
-          mimeType: row.mime_type,
-        },
-        ...row.file_type === 'video' && {
-          mimeType: row.mime_type,
-          fileName: row.file_name,
-        },
-      },
-      createdAt: new Date(row.created_at),
-    }))
+        createdAt: new Date(row.created_at),
+      }),
+    )
   }
 
   async delete(input: { authorUserId: number; fileUniqueId: string }): Promise<void> {
@@ -115,12 +123,18 @@ export class TagsRepository {
     await this.#client.query(
       `DELETE FROM tags
        WHERE file_id = $1;`,
-      [fileId]
+      [fileId],
     )
   }
 
-  async search(input: { query: string; requesterUserId: number; ownedOnly: boolean; limit: number }): Promise<Tag[]> {
-    const { query, requesterUserId, ownedOnly, limit } = input
+  async search(input: {
+    query: string
+    requesterUserId: number
+    ownedOnly: boolean
+    limit: number
+    offset?: number
+  }): Promise<Tag[]> {
+    const { query, requesterUserId, ownedOnly, limit, offset = 0 } = input
 
     const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
     const exactQuery = `%${escapedQuery}%` // "%hello world%"
@@ -141,48 +155,58 @@ export class TagsRepository {
       is_animated: boolean
       created_at: string
     }>(
-      `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
-            , (author_user_id = $2) AS is_owner
-            , ($4 = '' OR value ILIKE $4) AS is_exact_match
-       FROM (
-         SELECT DISTINCT ON (file_unique_id) *
-         FROM tags
-         WHERE ($3 = '' OR value ILIKE $3)
-         ${ownedOnly ? `AND author_user_id = $2` : `AND (author_user_id = $2 OR visibility = $5)`}
-       ) AS filtered_tags
-       ORDER BY (author_user_id = $2) DESC
-              , ($4 = '' OR value ILIKE $4) DESC
-              , created_at DESC
-       LIMIT $1;`,
-       ownedOnly
-        ? [limit, requesterUserId, fuzzyQuery, exactQuery]
-        : [limit, requesterUserId, fuzzyQuery, exactQuery, 'public' satisfies Visibility]
+      ...prepareQuery(
+        `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
+              , (author_user_id = :authorUserId) AS is_owner
+              , (:exactQuery = '' OR value ILIKE :exactQuery) AS is_exact_match
+         FROM (
+           SELECT DISTINCT ON (file_unique_id) *
+           FROM tags
+           WHERE (:fuzzyQuery = '' OR value ILIKE :fuzzyQuery)
+           ${ownedOnly ? `AND author_user_id = :authorUserId` : `AND (author_user_id = :authorUserId OR visibility = :publicVisibility)`}
+         ) AS filtered_tags
+         ORDER BY (author_user_id = :authorUserId) DESC
+                , (:exactQuery = '' OR value ILIKE :exactQuery) DESC
+                , created_at DESC
+         LIMIT :limit
+         OFFSET :offset;`,
+        {
+          limit,
+          offset,
+          authorUserId: requesterUserId,
+          fuzzyQuery,
+          exactQuery,
+          publicVisibility: 'public' satisfies Visibility,
+        },
+      ),
     )
 
-    return rows.map(row => tagSchema.parse({
-      authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
-      value: row.value,
-      visibility: row.visibility,
-      taggableFile: {
-        fileUniqueId: row.file_unique_id,
-        fileId: row.file_id,
-        fileType: row.file_type,
-        ...row.file_type === 'sticker' && {
-          setName: row.set_name ?? undefined,
-          emoji: row.emoji ?? undefined,
-          isVideo: row.is_video,
-          isAnimated: row.is_animated,
+    return rows.map(row =>
+      tagSchema.parse({
+        authorUserId: Number(row.author_user_id), // Postgres driver returns BIGINTs as strings
+        value: row.value,
+        visibility: row.visibility,
+        taggableFile: {
+          fileUniqueId: row.file_unique_id,
+          fileId: row.file_id,
+          fileType: row.file_type,
+          ...(row.file_type === 'sticker' && {
+            setName: row.set_name ?? undefined,
+            emoji: row.emoji ?? undefined,
+            isVideo: row.is_video,
+            isAnimated: row.is_animated,
+          }),
+          ...(row.file_type === 'animation' && {
+            mimeType: row.mime_type,
+          }),
+          ...(row.file_type === 'video' && {
+            mimeType: row.mime_type,
+            fileName: row.file_name,
+          }),
         },
-        ...row.file_type === 'animation' && {
-          mimeType: row.mime_type,
-        },
-        ...row.file_type === 'video' && {
-          mimeType: row.mime_type,
-          fileName: row.file_name,
-        },
-      },
-      createdAt: new Date(row.created_at),
-    }))
+        createdAt: new Date(row.created_at),
+      }),
+    )
   }
 
   async exists(input: { authorUserId: number; fileUniqueId: string }): Promise<boolean> {
@@ -193,17 +217,19 @@ export class TagsRepository {
        FROM tags
        WHERE author_user_id = $1
          AND file_unique_id = $2;`,
-      [authorUserId, fileUniqueId]
+      [authorUserId, fileUniqueId],
     )
 
     return rows.length > 0
   }
 
   async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{
-    requesterTag: {
-      visibility: Visibility
-      value: string
-    } | undefined
+    requesterTag:
+      | {
+          visibility: Visibility
+          value: string
+        }
+      | undefined
     publicTags: {
       total: number
       values: string[]
@@ -220,7 +246,7 @@ export class TagsRepository {
        WHERE file_unique_id = $1
          AND author_user_id = $2
        LIMIT 1;`,
-      [fileUniqueId, requesterUserId]
+      [fileUniqueId, requesterUserId],
     )
 
     const { rows: publicRows } = await this.#client.query<{
@@ -240,16 +266,18 @@ export class TagsRepository {
     )
 
     return {
-      requesterTag: requesterRows.length > 0
-        ? {
-          visibility: visibilitySchema.parse(requesterRows[0].visibility),
-          value: requesterRows[0].value,
-        }
-        : undefined,
+      requesterTag:
+        requesterRows.length > 0
+          ? {
+              visibility: visibilitySchema.parse(requesterRows[0].visibility),
+              value: requesterRows[0].value,
+            }
+          : undefined,
       publicTags: {
         total: publicRows.at(0)?.total ?? 0,
         values: publicRows.at(0)?.values ?? [],
-      }
+      },
     }
   }
 }
+

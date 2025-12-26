@@ -1,5 +1,6 @@
 import { type Client } from 'pg'
 import { type TaggableFile, taggableFileSchema } from '../common/taggable-file.ts'
+import { prepareQuery } from '../utils/prepare-query.ts'
 
 export class FavoritesRepository {
   #client: Client
@@ -34,7 +35,7 @@ export class FavoritesRepository {
         'fileName' in taggableFile ? taggableFile.fileName : null,
         'isVideo' in taggableFile ? taggableFile.isVideo : false,
         'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
-      ]
+      ],
     )
   }
 
@@ -45,7 +46,7 @@ export class FavoritesRepository {
       `DELETE FROM favorites
        WHERE user_id = $1
          AND file_unique_id = $2;`,
-      [userId, fileUniqueId]
+      [userId, fileUniqueId],
     )
   }
 
@@ -55,7 +56,7 @@ export class FavoritesRepository {
     await this.#client.query(
       `DELETE FROM favorites
        WHERE file_id = $1;`,
-      [fileId]
+      [fileId],
     )
   }
 
@@ -67,14 +68,14 @@ export class FavoritesRepository {
        FROM favorites
        WHERE user_id = $1
          AND file_unique_id = $2;`,
-      [userId, fileUniqueId]
+      [userId, fileUniqueId],
     )
 
     return rows.length > 0
   }
 
-  async list(input: { userId: number; limit: number }): Promise<TaggableFile[]> {
-    const { userId, limit } = input
+  async list(input: { userId: number; limit: number; offset?: number }): Promise<TaggableFile[]> {
+    const { userId, limit, offset = 0 } = input
 
     const { rows } = await this.#client.query<{
       file_unique_id: string
@@ -87,30 +88,36 @@ export class FavoritesRepository {
       is_video: boolean
       is_animated: boolean
     }>(
-      `SELECT file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated
-       FROM favorites
-       WHERE user_id = $1
-       LIMIT $2;`,
-      [userId, limit]
+      ...prepareQuery(
+        `SELECT file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated
+         FROM favorites
+         WHERE user_id = :userId
+         LIMIT :limit
+         OFFSET :offset;`,
+        { userId, limit, offset },
+      ),
     )
 
-    return rows.map(row => taggableFileSchema.parse({
-      fileUniqueId: row.file_unique_id,
-      fileId: row.file_id,
-      fileType: row.file_type,
-      ...row.file_type === 'sticker' && {
-        emoji: row.emoji,
-        setName: row.set_name,
-        isVideo: row.is_video,
-        isAnimated: row.is_animated,
-      },
-      ...row.file_type === 'animation' && {
-        mimeType: row.mime_type,
-      },
-      ...row.file_type === 'video' && {
-        mimeType: row.mime_type,
-        fileName: row.file_name,
-      },
-    }))
+    return rows.map(row =>
+      taggableFileSchema.parse({
+        fileUniqueId: row.file_unique_id,
+        fileId: row.file_id,
+        fileType: row.file_type,
+        ...(row.file_type === 'sticker' && {
+          emoji: row.emoji,
+          setName: row.set_name,
+          isVideo: row.is_video,
+          isAnimated: row.is_animated,
+        }),
+        ...(row.file_type === 'animation' && {
+          mimeType: row.mime_type,
+        }),
+        ...(row.file_type === 'video' && {
+          mimeType: row.mime_type,
+          fileName: row.file_name,
+        }),
+      }),
+    )
   }
 }
+
