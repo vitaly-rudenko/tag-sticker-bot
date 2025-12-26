@@ -1,6 +1,6 @@
 {
   "name": "tag-sticker-bot",
-  "version": "3.2.0",
+  "version": "3.2.1",
   "main": "src/app.ts",
   "type": "module",
   "scripts": {
