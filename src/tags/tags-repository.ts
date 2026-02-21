@@ -3,6 +3,8 @@ import { type Tag, tagSchema } from './tag.ts'
 import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.ts'
 import { visibilitySchema, type Visibility } from './visibility.ts'
 import { prepareQuery } from '../utils/prepare-query.ts'
+import { escapeRegex } from '../utils/escape-regex.ts'
+import { escapeLikeQuery } from '../utils/escape-like-query.ts'
 
 export class TagsRepository {
   #client: Client
@@ -136,9 +138,63 @@ export class TagsRepository {
   }): Promise<Tag[]> {
     const { query, requesterUserId, ownedOnly, limit, offset = 0 } = input
 
-    const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
-    const exactQuery = `%${escapedQuery}%` // "%hello world%"
-    const fuzzyQuery = `%${escapedQuery.replaceAll(' ', '%')}%` // "%hello%world%"
+    const words = query.trim().split(/\s+/).filter(Boolean)
+
+    // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
+
+    const wholeExactQuery =
+      words.join(' ').length >= 3
+        ? `\\m${words.map(w => escapeRegex(w)).join(' ')}\\M` // \mhello world\M
+        : ''
+
+    const wholeOrderedQuery =
+      words.length > 1 && words.join(' ').length >= 3
+        ? `\\m${words.map(w => escapeRegex(w)).join('\\M.*\\m')}\\M` // \mhello\M.*\mworld\M
+        : ''
+
+    const prefixOrderedQuery =
+      words.join(' ').length >= 3
+        ? `\\m${words.map(w => escapeRegex(w)).join('.*\\m')}` // \mhello.*\mworld
+        : ''
+
+    const prefixUnorderedQueries =
+      words.length > 1 && words.filter(w => w.length >= 3).length > 0
+        ? words.filter(w => w.length >= 3).map(word => `\\m${escapeRegex(word)}`) // \mhello, \mworld
+        : []
+
+    const wholeExactClause = wholeExactQuery.length > 0 ? 'value ~* :wholeExactQuery' : undefined
+    const wholeOrderedClause = wholeOrderedQuery.length > 0 ? 'value ~* :wholeOrderedQuery' : undefined
+    const prefixOrderedClause = prefixOrderedQuery.length > 0 ? 'value ~* :prefixOrderedQuery' : undefined
+    const prefixUnorderedClause =
+      prefixUnorderedQueries.length > 0
+        ? prefixUnorderedQueries.map((_, i) => `value ~* :prefixUnorderedQuery${i + 1}`).join(' AND ')
+        : undefined
+
+    const clauses = [prefixUnorderedClause, prefixOrderedClause, wholeOrderedClause, wholeExactClause].filter(Boolean)
+
+    // User provided a query, but we can't fulfill the request
+    if (words.length > 0 && clauses.length === 0) {
+      return []
+    }
+
+    const source =
+      clauses.length > 0
+        ? `SELECT DISTINCT ON (file_unique_id) *
+           FROM (
+             ${clauses
+               .map(
+                 (clause, rank) =>
+                   `SELECT *, ${rank} AS rank
+                    FROM tags
+                    WHERE ${clause}
+                      AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}`,
+               )
+               .join(' UNION ALL ')}
+           )
+           ORDER BY file_unique_id, rank DESC`
+        : `SELECT DISTINCT ON (file_unique_id) *, 0 AS rank
+           FROM tags
+           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}`
 
     const { rows } = await this.#client.query<{
       author_user_id: string
@@ -156,17 +212,21 @@ export class TagsRepository {
       created_at: string
     }>(
       ...prepareQuery(
-        `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
-              , (author_user_id = :authorUserId) AS is_owner
-              , (:exactQuery = '' OR value ILIKE :exactQuery) AS is_exact_match
-         FROM (
-           SELECT DISTINCT ON (file_unique_id) *
-           FROM tags
-           WHERE (:fuzzyQuery = '' OR value ILIKE :fuzzyQuery)
-           ${ownedOnly ? `AND author_user_id = :authorUserId` : `AND (author_user_id = :authorUserId OR visibility = :publicVisibility)`}
-         ) AS filtered_tags
-         ORDER BY (author_user_id = :authorUserId) DESC
-                , (:exactQuery = '' OR value ILIKE :exactQuery) DESC
+        `SELECT author_user_id
+              , visibility
+              , value
+              , file_unique_id
+              , file_id
+              , file_type
+              , set_name
+              , emoji
+              , mime_type
+              , file_name
+              , is_video
+              , is_animated
+              , created_at
+         FROM ${source}
+         ORDER BY rank DESC
                 , created_at DESC
          LIMIT :limit
          OFFSET :offset;`,
@@ -174,9 +234,16 @@ export class TagsRepository {
           limit,
           offset,
           authorUserId: requesterUserId,
-          fuzzyQuery,
-          exactQuery,
-          publicVisibility: 'public' satisfies Visibility,
+          wholeExactQuery,
+          wholeOrderedQuery,
+          prefixOrderedQuery,
+          ...prefixUnorderedQueries.reduce(
+            (replacements, query, i) => {
+              replacements[`prefixUnorderedQuery${i + 1}`] = query
+              return replacements
+            },
+            {} as Record<string, string>,
+          ),
         },
       ),
     )
@@ -280,4 +347,3 @@ export class TagsRepository {
     }
   }
 }
-
