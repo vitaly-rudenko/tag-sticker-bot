@@ -32,12 +32,12 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.13.10",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.11.11",
     "csv-parse": "^5.6.0",
     "nodemon": "^3.1.11",
     "tsc": "^2.0.4",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.3"
   },
   "nodemonConfig": {
     "watch": [
