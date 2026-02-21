@@ -142,24 +142,32 @@ export class TagsRepository {
 
     // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
 
+    // Search for the whole query
+    // \mhello world\M
     const wholeExactQuery =
       words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join(' ')}\\M` // \mhello world\M
+        ? `\\m${words.map(w => escapeRegex(w)).join(' ')}\\M`
         : ''
 
+    // Search for each whole word, they must be ordered correctly, in-between words are allowed
+    // \mhello\M.*\mworld\M
     const wholeOrderedQuery =
       words.length > 1 && words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join('\\M.*\\m')}\\M` // \mhello\M.*\mworld\M
+        ? `\\m${words.map(w => escapeRegex(w)).join('\\M.*\\m')}\\M`
         : ''
 
+    // Search for each prefixed word, they must be ordered correctly, in-between words are allowed
+    // \mhello.*\mworld
     const prefixOrderedQuery =
       words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join('.*\\m')}` // \mhello.*\mworld
+        ? `\\m${words.map(w => escapeRegex(w)).join('.*\\m')}`
         : ''
 
+    // Search for each prefixed word, in any order, in-between words are allowed
+    // \mhello, \mworld
     const prefixUnorderedQueries =
       words.length > 1 && words.filter(w => w.length >= 3).length > 0
-        ? words.filter(w => w.length >= 3).map(word => `\\m${escapeRegex(word)}`) // \mhello, \mworld
+        ? words.filter(w => w.length >= 3).map(word => `\\m${escapeRegex(word)}`)
         : []
 
     const wholeExactClause = wholeExactQuery.length > 0 ? 'value ~* :wholeExactQuery' : undefined
