@@ -429,6 +429,84 @@ describe('TagsRepository', () => {
         'cat says no', // exact partial
       ])
     })
+
+    it('returns random results (no query)', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      const values = ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta', 'eta', 'theta', 'iota', 'kappa']
+      for (const value of values) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
+
+      const subsets = new Set<string>()
+      for (let i = 0; i < 10; i++) {
+        const results = await tagsRepository.search({
+          query: '',
+          limit: 5,
+          ownedOnly: false,
+          authorUserId,
+          testAuthorUserIds: [authorUserId],
+          random: true,
+        })
+
+        assert.equal(results.length, 5)
+        subsets.add(results.map(tag => tag.value).join(','))
+      }
+
+      assert.ok(subsets.size > 1, 'expected multiple different subsets across 10 calls')
+    })
+
+    it('returns random results (with query)', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      const values = [
+        'dog one',
+        'cat three',
+        'fish one',
+        'cat one',
+        'bird two',
+        'cat five',
+        'dog two',
+        'cat two',
+        'bird one',
+        'cat four',
+      ]
+
+      for (const value of values) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
+
+      const orders = new Set<string>()
+      for (let i = 0; i < 10; i++) {
+        const results = await tagsRepository.search({
+          query: 'cat',
+          limit: 5,
+          ownedOnly: false,
+          authorUserId,
+          testAuthorUserIds: [authorUserId],
+          random: true,
+        })
+
+        assert.equal(results.length, 5)
+        orders.add(results.map(tag => tag.value).join(','))
+      }
+
+      assert.ok(orders.size > 1, 'expected multiple different orderings across 10 calls')
+    })
   })
 
   it('it returns prefix unordered matches even if some words are less than 3 characters long', async () => {

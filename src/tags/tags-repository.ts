@@ -135,9 +135,14 @@ export class TagsRepository {
     ownedOnly: boolean
     limit: number
     offset?: number
+    random?: boolean
     testAuthorUserIds?: number[]
   }): Promise<Tag[]> {
-    const { query, authorUserId, ownedOnly, limit, offset = 0, testAuthorUserIds } = input
+    const { query, authorUserId, ownedOnly, limit, offset = 0, random = false, testAuthorUserIds } = input
+
+    if (random && offset !== 0) {
+      throw new Error('Cannot use offset with random')
+    }
 
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
 
@@ -215,23 +220,23 @@ export class TagsRepository {
     const source =
       clauses.length > 0
         ? `(SELECT DISTINCT ON (file_unique_id) *
-           FROM (
-             ${clauses
-               .map(
-                 (clause, rank) =>
-                   `SELECT *, ${rank} AS rank
-                    FROM tags
-                    WHERE (${clause})
-                      AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
-                          ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`,
-               )
-               .join('\nUNION ALL\n')}
-           )
-           ORDER BY file_unique_id, rank DESC)`
-        : `(SELECT DISTINCT ON (file_unique_id) *, 0 AS rank
-           FROM tags
-           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
-                 ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''})`
+            FROM (
+              ${clauses
+                .map(
+                  (clause, rank) =>
+                    `SELECT *, ${rank} AS rank
+                     FROM tags
+                     WHERE (${clause})
+                       AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                           ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`,
+                )
+                .join('\nUNION ALL\n')}
+            )
+            ORDER BY file_unique_id, rank DESC)`
+        : `(SELECT *, 0 AS rank
+            FROM tags
+            WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                  ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''})`
 
     const { rows } = await this.#client.query<{
       author_user_id: string
@@ -263,9 +268,7 @@ export class TagsRepository {
               , is_animated
               , created_at
          FROM ${source}
-         ORDER BY rank DESC
-                , created_at DESC
-                , value DESC
+         ORDER BY ${random ? 'RANDOM()' : 'rank DESC, created_at DESC, value DESC'}
          LIMIT :limit
          OFFSET :offset;`,
         {

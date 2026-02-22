@@ -1,7 +1,7 @@
 import pg from 'pg'
 import fs from 'fs'
 import cors from 'cors'
-import express, { type ErrorRequestHandler } from 'express'
+import express, { type Request, type Response, type NextFunction, type ErrorRequestHandler } from 'express'
 import https from 'https'
 import jwt from 'jsonwebtoken'
 import { Context, Markup, Telegraf } from 'telegraf'
@@ -596,9 +596,12 @@ async function $handleSearchInlineQuery(context: Context) {
   if (context.inlineQuery?.query === undefined) return
 
   const requesterUserId = context.inlineQuery.from.id
-  const ownedOnly = context.inlineQuery.query.startsWith('!')
-  const effectiveQuery = ownedOnly ? context.inlineQuery.query.slice(1) : context.inlineQuery.query
-  const isFavoritesQuery = context.inlineQuery.query === ''
+  const rawQuery = context.inlineQuery.query
+
+  const isFavorites = rawQuery === ''
+  const isRandom = rawQuery.startsWith('?') || rawQuery.startsWith('!?')
+  const isOwnedOnly = rawQuery.startsWith('!') || rawQuery.startsWith('?!')
+  const query = rawQuery.slice(Number(isRandom) + Number(isOwnedOnly)).trim()
 
   const offset: number = Number.isSafeInteger(Number(context.inlineQuery.offset))
     ? Math.max(0, Number(context.inlineQuery.offset))
@@ -607,23 +610,25 @@ async function $handleSearchInlineQuery(context: Context) {
   let taggableFiles: TaggableFile[]
   let isPersonal = false
 
-  if (isFavoritesQuery) {
-    isPersonal = true
+  if (isFavorites) {
     taggableFiles = await favoritesRepository.list({
       userId: requesterUserId,
       limit: 50,
       offset,
     })
-  } else if (ownedOnly || (effectiveQuery.length >= 2 && effectiveQuery.length <= 100)) {
+
+    isPersonal = true
+  } else if (isOwnedOnly || isRandom || (query.length >= 2 && query.length <= 100)) {
     const tags = await tagsRepository.search({
-      query: effectiveQuery,
+      query,
       authorUserId: requesterUserId,
-      ownedOnly,
+      ownedOnly: isOwnedOnly,
       limit: 50,
-      offset,
+      offset: isRandom ? 0 : offset,
+      random: isRandom,
     })
 
-    isPersonal = tags.some(tag => tag.authorUserId === requesterUserId)
+    isPersonal = isOwnedOnly || tags.some(tag => tag.visibility === 'private')
     taggableFiles = tags.map(tag => tag.taggableFile)
   } else {
     return
@@ -675,11 +680,12 @@ async function $handleSearchInlineQuery(context: Context) {
         }
       }),
       {
-        cache_time: isLocal ? 1 : taggableFiles.length > 0 ? 5 * 60 : undefined, // 5 minutes in seconds, do not cache if no results
+        // 5 minutes in seconds, do not cache if no results, local or random
+        cache_time: !isLocal && !isRandom && taggableFiles.length > 0 ? 5 * 60 : 1,
         is_personal: isPersonal,
-        next_offset: String(offset + taggableFiles.length),
+        next_offset: isRandom ? '' : String(offset + taggableFiles.length),
         button: {
-          text: isFavoritesQuery
+          text: isFavorites
             ? taggableFiles.length === 0
               ? 'Add favorite stickers, GIFs and files'
               : 'Manage your favorite stickers, GIFs and files'
@@ -850,7 +856,7 @@ app.post('/exchange_token', async (req, res) => {
   res.json({ token })
 })
 
-const authMiddleware = (req, _res, next) => {
+const authMiddleware = (req: Request, _res: Response, next: NextFunction) => {
   const token = req.header('token')
   if (!token) {
     throw new Error('Token was not provided')
