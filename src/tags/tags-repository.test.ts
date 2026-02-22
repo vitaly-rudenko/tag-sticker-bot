@@ -457,6 +457,7 @@ describe('TagsRepository', () => {
         })
 
         assert.equal(results.length, 5)
+
         subsets.add(results.map(tag => tag.value).join(','))
       }
 
@@ -502,6 +503,11 @@ describe('TagsRepository', () => {
         })
 
         assert.equal(results.length, 5)
+        assert.ok(
+          results.every(tag => tag.value.includes('cat')),
+          'expected all results to match query',
+        )
+
         orders.add(results.map(tag => tag.value).join(','))
       }
 
@@ -509,7 +515,7 @@ describe('TagsRepository', () => {
     })
   })
 
-  it('it returns prefix unordered matches even if some words are less than 3 characters long', async () => {
+  it('returns prefix unordered matches even if some words are less than 3 characters long', async () => {
     const tagsRepository = new TagsRepository({ client })
 
     const authorUserId = await createTestUser()
