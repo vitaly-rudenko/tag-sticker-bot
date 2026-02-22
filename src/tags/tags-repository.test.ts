@@ -314,6 +314,45 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: 'tag', ownedOnly: true }), ['my tag'])
     })
 
+    it('escapes special posix regex characters in query', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      async function createTestTag(value: string) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
+
+      await createTestTag('hello (world)')
+      await createTestTag('price is $5.00')
+      await createTestTag('unrelated tag')
+
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            authorUserId,
+            testAuthorUserIds: [authorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
+
+      // Special chars should be treated as literals, not regex operators
+      assert.deepEqual(await search({ query: '(world)' }), ['hello (world)'])
+      assert.deepEqual(await search({ query: '$5.00' }), ['price is $5.00'])
+
+      // Should not throw or return unexpected results
+      assert.deepEqual(await search({ query: '.*' }), [])
+      assert.deepEqual(await search({ query: '[a-z]' }), [])
+    })
+
     it('returns exact partial matches for short queries', async () => {
       const tagsRepository = new TagsRepository({ client })
 

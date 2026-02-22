@@ -4,6 +4,7 @@ import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.t
 import { visibilitySchema, type Visibility } from './visibility.ts'
 import { prepareQuery } from '../utils/prepare-query.ts'
 import { escapePostgresPosixRegex } from '../utils/escape-postgres-posix-regex.ts'
+import { wrapPosixBoundary } from '../utils/wrap-posix-boundary.ts'
 
 export class TagsRepository {
   #client: Client
@@ -147,7 +148,7 @@ export class TagsRepository {
     // '\mno ', ' no\M'
     const exactPartialQueries =
       exactQuery && exactQuery.length === 2
-        ? [`\\m${escapePostgresPosixRegex(exactQuery)} `, ` ${escapePostgresPosixRegex(exactQuery)}\\M`]
+        ? [wrapPosixBoundary(exactQuery, 'prefix') + ' ', ' ' + wrapPosixBoundary(exactQuery, 'suffix')]
         : []
 
     // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
@@ -155,22 +156,18 @@ export class TagsRepository {
 
     // Search for the whole query
     // \mhello world\M
-    const wholeExactQuery = shouldUsePartialSearch
-      ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join(' ')}\\M`
-      : undefined
+    const wholeExactQuery = shouldUsePartialSearch ? wrapPosixBoundary(words.join(' '), 'whole') : undefined
 
     // Search for each whole word, they must be ordered correctly, in-between words are allowed
     // NOTE: If there's just one word, resulting query is identical to "wholeExactQuery", so we skip this clause
     // \mhello\M.*\mworld\M
     const wholeOrderedQuery =
-      words.length > 1 && shouldUsePartialSearch
-        ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('\\M.*\\m')}\\M`
-        : undefined
+      words.length > 1 && shouldUsePartialSearch ? words.map(w => wrapPosixBoundary(w, 'whole')).join('.*') : undefined
 
     // Search for each prefixed word, they must be ordered correctly, in-between words are allowed
     // \mhello.*\mworld
     const prefixOrderedQuery = shouldUsePartialSearch
-      ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('.*\\m')}`
+      ? words.map(w => wrapPosixBoundary(w, 'prefix')).join('.*')
       : undefined
 
     // Search for each prefixed word, in any order, in-between words are allowed
@@ -183,8 +180,8 @@ export class TagsRepository {
             .filter(w => w.length >= 2)
             .flatMap(word =>
               word.length >= 3
-                ? `\\m${escapePostgresPosixRegex(word)}`
-                : [`\\m${escapePostgresPosixRegex(word)} `, ` ${escapePostgresPosixRegex(word)}`],
+                ? wrapPosixBoundary(word, 'prefix')
+                : [wrapPosixBoundary(word, 'prefix') + ' ', ' ' + escapePostgresPosixRegex(word)],
             )
         : []
 
