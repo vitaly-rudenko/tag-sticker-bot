@@ -4,13 +4,13 @@
   "main": "src/app.ts",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env --experimental-strip-types src/app.ts | pino-pretty",
+    "start": "node --env-file-if-exists=.env src/app.ts | pino-pretty",
     "dev": "nodemon --exec 'npm start'",
-    "test": "node --env-file=.env.test --experimental-strip-types --test",
+    "test": "node --env-file-if-exists=.env.test --test",
     "lint": "tsc",
-    "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts",
-    "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts",
-    "script:populate": "node --experimental-strip-types --env-file=.env scripts/populate.mjs"
+    "umzug": "node --env-file-if-exists=.env ./src/umzug/cli.ts",
+    "umzug:test": "node --env-file-if-exists=.env.test ./src/umzug/cli.ts",
+    "script:populate": "node --env-file-if-exists=.env scripts/populate.mjs"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
