@@ -1,4 +1,5 @@
 import pg from 'pg'
+import * as uuid from 'uuid'
 import { after, before, describe, it } from 'node:test'
 import { TagsRepository } from './tags-repository.ts'
 import { type TaggableFile } from '../common/taggable-file.ts'
@@ -16,164 +17,181 @@ describe('TagsRepository', () => {
     await client.end()
   })
 
-  describe('search()', () => {
-    it('searches tags', async () => {
-      await client.query('TRUNCATE tags')
+  async function createTestUser(): Promise<number> {
+    const result = await client.query<{ id: number }>(
+      `INSERT INTO test_users
+       DEFAULT VALUES
+       RETURNING id;`,
+    )
 
+    return result.rows[0].id
+  }
+
+  function createTestTaggableFile(): TaggableFile {
+    return {
+      fileId: uuid.v4(),
+      fileType: 'animation',
+      fileUniqueId: uuid.v4(),
+      mimeType: 'video/mp4',
+    }
+  }
+
+  describe('search()', () => {
+    it('searches tags (latin)', async () => {
       const tagsRepository = new TagsRepository({ client })
 
-      let snapshot = Date.now()
-      function nextId() { return snapshot++ }
+      const authorUserId = await createTestUser()
 
-      const authorUserId1 = nextId()
-      const authorUserId2 = nextId()
-      const authorUserId3 = nextId()
+      const taggableFile1 = createTestTaggableFile()
+      const taggableFile2 = createTestTaggableFile()
+      const taggableFile3 = createTestTaggableFile()
+      const taggableFile4 = createTestTaggableFile()
+      const taggableFile5 = createTestTaggableFile()
 
-      const taggableFile1: TaggableFile = {
-        fileId: 'fake-file-1',
-        fileType: 'animation',
-        fileUniqueId: `fake-file-unique-id-${nextId()}-1`,
-        mimeType: 'video/mp4',
+      async function createTestTag(partial: { taggableFile: TaggableFile; value: string }) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          ...partial,
+        })
       }
 
-      const taggableFile2: TaggableFile = {
-        fileId: 'fake-file-2',
-        fileType: 'animation',
-        fileUniqueId: `fake-file-unique-id-${nextId()}-2`,
-        mimeType: 'video/mp4',
+      await createTestTag({ taggableFile: taggableFile1, value: 'well' })
+      await createTestTag({ taggableFile: taggableFile2, value: 'swell' })
+      await createTestTag({ taggableFile: taggableFile3, value: 'well well well, you are here, and i am not' })
+      await createTestTag({ taggableFile: taggableFile4, value: 'i care about your wellness' })
+      await createTestTag({ taggableFile: taggableFile5, value: 'i know you well' })
+
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            requesterUserId: authorUserId,
+            testAuthorUserIds: [authorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
       }
 
-      const taggableFile3: TaggableFile = {
-        fileId: 'fake-file-3',
-        fileType: 'sticker',
-        fileUniqueId: `fake-file-unique-id-${nextId()}-3`,
-        setName: 'fake-set-name',
-        isVideo: false,
-        isAnimated: true,
+      assert.deepEqual(await search({ query: 'well' }), [
+        //
+        'well', // exact
+        'i know you well', // whole exact
+        'well well well, you are here, and i am not', // whole exact
+        'i care about your wellness', // prefix ordered
+      ])
+
+      assert.deepEqual(await search({ query: 'swe' }), [
+        //
+        'swell', // prefix ordered
+      ])
+
+      assert.deepEqual(await search({ query: 'you well' }), [
+        //
+        'i know you well', // whole exact
+        'i care about your wellness', // prefix ordered
+        'well well well, you are here, and i am not', // prefix unordered
+      ])
+
+      assert.deepEqual(await search({ query: 'well you' }), [
+        //
+        'well well well, you are here, and i am not', // prefix ordered
+        'i know you well', // prefix unordered
+        'i care about your wellness', // prefix unordered
+      ])
+
+      // Edge case: "i" is too short and ignored in "prefix unordered" clause
+      assert.deepEqual(await search({ query: 'i well' }), [
+        //
+        'i know you well', // prefix ordered
+        'i care about your wellness', // prefix ordered
+      ])
+
+      // Edge case: both "i" and "am" are too short for "prefix unordered" clause
+      assert.deepEqual(await search({ query: 'i am' }), [
+        //
+        'well well well, you are here, and i am not', // whole exact
+      ])
+
+      // Should not match suffixes
+      assert.deepEqual(await search({ query: 'ness' }), [])
+    })
+
+    it('searches tags (cyrillic)', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      const taggableFile1 = createTestTaggableFile()
+      const taggableFile2 = createTestTaggableFile()
+      const taggableFile3 = createTestTaggableFile()
+      const taggableFile4 = createTestTaggableFile()
+      const taggableFile5 = createTestTaggableFile()
+
+      async function createTestTag(partial: { taggableFile: TaggableFile; value: string }) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          ...partial,
+        })
       }
 
-      // Sticker 1
-      await tagsRepository.upsert({
-        authorUserId: authorUserId1,
-        taggableFile: taggableFile1,
-        value: 'hello my beautiful world',
-        visibility: 'public',
-      })
+      await createTestTag({ taggableFile: taggableFile1, value: 'кіт' })
+      await createTestTag({ taggableFile: taggableFile2, value: 'скіт' })
+      await createTestTag({ taggableFile: taggableFile3, value: 'кіт кіт кіт, твій ніс бачив, я не ховався' })
+      await createTestTag({ taggableFile: taggableFile4, value: 'я та твій кітунь' })
+      await createTestTag({ taggableFile: taggableFile5, value: 'я добре знаю, що твій кіт робить' })
 
-      await tagsRepository.upsert({
-        authorUserId: authorUserId2,
-        taggableFile: taggableFile2,
-        value: 'hello world!',
-        visibility: 'public',
-      })
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            requesterUserId: authorUserId,
+            testAuthorUserIds: [authorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
 
-      await tagsRepository.upsert({
-        authorUserId: authorUserId3,
-        taggableFile: taggableFile3,
-        value: 'hello world',
-        visibility: 'private',
-      })
+      assert.deepEqual(await search({ query: 'кіт' }), [
+        //
+        'кіт', // exact
+        'я добре знаю, що твій кіт робить', // whole exact
+        'кіт кіт кіт, твій ніс бачив, я не ховався', // whole exact
+        'я та твій кітунь', // prefix ordered
+      ])
 
-      // duplicate
-      await tagsRepository.upsert({
-        authorUserId: authorUserId1,
-        taggableFile: taggableFile1,
-        value: 'Hello, world.',
-        visibility: 'public',
-      })
+      assert.deepEqual(await search({ query: 'твій кіт' }), [
+        //
+        'я добре знаю, що твій кіт робить', // whole exact
+        'я та твій кітунь', // prefix ordered
+        'кіт кіт кіт, твій ніс бачив, я не ховався', // prefix unordered
+      ])
 
-      // alternative tag
-      await tagsRepository.upsert({
-        authorUserId: authorUserId2,
-        taggableFile: taggableFile1,
-        value: 'Goodbye, world.',
-        visibility: 'public',
-      })
+      assert.deepEqual(await search({ query: 'кіт твій' }), [
+        //
+        'кіт кіт кіт, твій ніс бачив, я не ховався', // prefix ordered
+        'я добре знаю, що твій кіт робить', // prefix unordered
+        'я та твій кітунь', // prefix unordered
+      ])
 
-      await tagsRepository.upsert({
-        authorUserId: authorUserId2,
-        taggableFile: taggableFile3,
-        value: 'Something else',
-        visibility: 'private',
-      })
+      // Edge case: "я" is too short and ignored in "prefix unordered" clause
+      assert.deepEqual(await search({ query: 'я кіт' }), [
+        //
+        'я добре знаю, що твій кіт робить', // prefix ordered
+        'я та твій кітунь', // prefix ordered
+      ])
 
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: false,
-          query: 'hello world',
-          requesterUserId: authorUserId1,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile1.fileUniqueId,
-          taggableFile2.fileUniqueId,
-        ]
-      )
+      // Edge case: both "я" and "не" are too short for "prefix unordered" clause
+      assert.deepEqual(await search({ query: 'я не' }), [
+        //
+        'кіт кіт кіт, твій ніс бачив, я не ховався', // whole exact
+      ])
 
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: true,
-          query: 'hello world',
-          requesterUserId: authorUserId1,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile1.fileUniqueId,
-        ]
-      )
-
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: true,
-          query: '',
-          requesterUserId: authorUserId2,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile3.fileUniqueId,
-          taggableFile1.fileUniqueId,
-          taggableFile2.fileUniqueId,
-        ]
-      )
-
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: false,
-          query: 'hello world',
-          requesterUserId: authorUserId2,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile2.fileUniqueId,
-          taggableFile1.fileUniqueId,
-        ]
-      )
-
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: false,
-          query: 'hello world',
-          requesterUserId: authorUserId3,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile3.fileUniqueId,
-          taggableFile2.fileUniqueId,
-          taggableFile1.fileUniqueId,
-        ]
-      )
-
-      assert.deepEqual(
-        (await tagsRepository.search({
-          limit: 10,
-          ownedOnly: false,
-          query: 'Goodbye',
-          requesterUserId: authorUserId1,
-        })).map(tag => tag.taggableFile.fileUniqueId),
-        [
-          taggableFile1.fileUniqueId,
-        ]
-      )
+      // Should not match suffixes
+      assert.deepEqual(await search({ query: 'унь' }), [])
     })
   })
 })
