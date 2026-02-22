@@ -358,6 +358,38 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: '[а-я]' }), [])
     })
 
+    it('does not match tags without special characters when query contains them', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      async function createTestTag(value: string) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
+
+      await createTestTag('і шо')
+      await createTestTag('шо?')
+
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            authorUserId,
+            testAuthorUserIds: [authorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
+
+      assert.deepEqual(await search({ query: 'шо?' }), ['шо?'])
+    })
+
     it('returns exact partial matches for short queries', async () => {
       const tagsRepository = new TagsRepository({ client })
 
