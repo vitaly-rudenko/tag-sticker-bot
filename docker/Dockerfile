@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:24-alpine
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US.UTF-8
