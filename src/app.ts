@@ -44,6 +44,23 @@ const stickerSetsRepository = new StickerSetsRepository({ client: postgresClient
 
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
+async function shutdown(signal?: string) {
+  console.log(`Received ${signal || 'NOSIGNAL'}, shutting down gracefully`)
+
+  try {
+    bot.stop()
+  } catch {}
+
+  try {
+    await postgresClient.end()
+  } catch {}
+
+  process.exit(0)
+}
+
+process.on('SIGINT', () => shutdown('SIGINT'))
+process.on('SIGTERM', () => shutdown('SIGTERM'))
+
 await bot.telegram.setMyCommands([
   { command: 'start', description: 'Get help' },
   { command: 'export', description: 'Export your tags and favorites in a ZIP format' },
