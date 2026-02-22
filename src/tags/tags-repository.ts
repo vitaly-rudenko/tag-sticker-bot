@@ -3,8 +3,7 @@ import { type Tag, tagSchema } from './tag.ts'
 import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.ts'
 import { visibilitySchema, type Visibility } from './visibility.ts'
 import { prepareQuery } from '../utils/prepare-query.ts'
-import { escapeRegex } from '../utils/escape-regex.ts'
-import { escapeLikeQuery } from '../utils/escape-like-query.ts'
+import { escapePostgresPosixRegex } from '../utils/escape-postgres-posix-regex.ts'
 
 export class TagsRepository {
   #client: Client
@@ -135,59 +134,68 @@ export class TagsRepository {
     ownedOnly: boolean
     limit: number
     offset?: number
+    testAuthorUserIds?: number[]
   }): Promise<Tag[]> {
-    const { query, requesterUserId, ownedOnly, limit, offset = 0 } = input
+    const { query, requesterUserId, ownedOnly, limit, offset = 0, testAuthorUserIds } = input
 
-    const words = query.trim().split(/\s+/).filter(Boolean)
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+    const exactQuery = words.join(' ').length > 0 ? words.join(' ') : undefined
 
     // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
 
     // Search for the whole query
     // \mhello world\M
     const wholeExactQuery =
-      words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join(' ')}\\M`
-        : ''
+      words.join(' ').length >= 3 ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join(' ')}\\M` : undefined
 
     // Search for each whole word, they must be ordered correctly, in-between words are allowed
+    // NOTE: If there's just one word, resulting query is identical to "wholeExactQuery"
     // \mhello\M.*\mworld\M
     const wholeOrderedQuery =
       words.length > 1 && words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join('\\M.*\\m')}\\M`
-        : ''
+        ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('\\M.*\\m')}\\M`
+        : undefined
 
     // Search for each prefixed word, they must be ordered correctly, in-between words are allowed
     // \mhello.*\mworld
     const prefixOrderedQuery =
-      words.join(' ').length >= 3
-        ? `\\m${words.map(w => escapeRegex(w)).join('.*\\m')}`
-        : ''
+      words.join(' ').length >= 3 ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('.*\\m')}` : undefined
 
     // Search for each prefixed word, in any order, in-between words are allowed
+    // NOTE: If there's just one word, resulting query is identical to "prefixOrderedQuery"
+    // NOTE: If at least one word is less than 3 characters, we can't include this clause
     // \mhello, \mworld
     const prefixUnorderedQueries =
-      words.length > 1 && words.filter(w => w.length >= 3).length > 0
-        ? words.filter(w => w.length >= 3).map(word => `\\m${escapeRegex(word)}`)
+      words.length > 1 && words.every(w => w.length >= 3)
+        ? words.map(word => `\\m${escapePostgresPosixRegex(word)}`)
         : []
 
-    const wholeExactClause = wholeExactQuery.length > 0 ? 'value ~* :wholeExactQuery' : undefined
-    const wholeOrderedClause = wholeOrderedQuery.length > 0 ? 'value ~* :wholeOrderedQuery' : undefined
-    const prefixOrderedClause = prefixOrderedQuery.length > 0 ? 'value ~* :prefixOrderedQuery' : undefined
+    const exactClause = exactQuery ? 'value = :exactQuery' : undefined
+    const wholeExactClause = wholeExactQuery ? 'value ~* :wholeExactQuery' : undefined
+    const wholeOrderedClause = wholeOrderedQuery ? 'value ~* :wholeOrderedQuery' : undefined
+    const prefixOrderedClause = prefixOrderedQuery ? 'value ~* :prefixOrderedQuery' : undefined
     const prefixUnorderedClause =
       prefixUnorderedQueries.length > 0
         ? prefixUnorderedQueries.map((_, i) => `value ~* :prefixUnorderedQuery${i + 1}`).join(' AND ')
         : undefined
 
-    const clauses = [prefixUnorderedClause, prefixOrderedClause, wholeOrderedClause, wholeExactClause].filter(Boolean)
+    const clauses = [
+      prefixUnorderedClause,
+      prefixOrderedClause,
+      wholeOrderedClause,
+      wholeExactClause,
+      exactClause,
+    ].filter(Boolean)
 
-    // User provided a query, but we can't fulfill the request
+    // User provided a query, but we can't fulfill the request (e.g. all words are shorter than 3 characters)
     if (words.length > 0 && clauses.length === 0) {
       return []
     }
 
     const source =
       clauses.length > 0
-        ? `SELECT DISTINCT ON (file_unique_id) *
+        ? `(SELECT DISTINCT ON (file_unique_id) *
            FROM (
              ${clauses
                .map(
@@ -195,14 +203,16 @@ export class TagsRepository {
                    `SELECT *, ${rank} AS rank
                     FROM tags
                     WHERE ${clause}
-                      AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}`,
+                      AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                          ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`,
                )
-               .join(' UNION ALL ')}
+               .join('\nUNION ALL\n')}
            )
-           ORDER BY file_unique_id, rank DESC`
-        : `SELECT DISTINCT ON (file_unique_id) *, 0 AS rank
+           ORDER BY file_unique_id, rank DESC)`
+        : `(SELECT DISTINCT ON (file_unique_id) *, 0 AS rank
            FROM tags
-           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}`
+           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"})
+                 ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`
 
     const { rows } = await this.#client.query<{
       author_user_id: string
@@ -236,12 +246,15 @@ export class TagsRepository {
          FROM ${source}
          ORDER BY rank DESC
                 , created_at DESC
+                , value DESC
          LIMIT :limit
          OFFSET :offset;`,
         {
           limit,
           offset,
           authorUserId: requesterUserId,
+          testAuthorUserIds,
+          exactQuery,
           wholeExactQuery,
           wholeOrderedQuery,
           prefixOrderedQuery,
