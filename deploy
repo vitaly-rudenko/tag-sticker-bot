@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+source .env
+
+docker compose stop -t 60
+
+git pull --ff-only
+echo "Pulled latest changes"
+
+docker compose build --force-rm
+echo "Built"
+
+docker compose up -d
