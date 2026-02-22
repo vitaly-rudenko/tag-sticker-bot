@@ -3,8 +3,8 @@ export function prepareQuery(sql: string, replacements: Record<string, unknown>)
   let params: unknown[] = []
 
   for (const [key, value] of Object.entries(replacements)) {
-    if (updatedSql.includes(`:${key}`)) {
-      updatedSql = updatedSql.replaceAll(`:${key}`, `$${params.length + 1}`)
+    if (new RegExp(`:${key}\\b`).test(updatedSql)) {
+      updatedSql = updatedSql.replaceAll(new RegExp(`:${key}\\b`, 'g'), `$${params.length + 1}`)
       params.push(value)
     }
   }
