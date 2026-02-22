@@ -1,5 +1,5 @@
 import pg from 'pg'
-import * as uuid from 'uuid'
+import { randomUUID } from 'crypto'
 import { after, before, describe, it } from 'node:test'
 import { TagsRepository } from './tags-repository.ts'
 import { type TaggableFile } from '../common/taggable-file.ts'
@@ -29,9 +29,9 @@ describe('TagsRepository', () => {
 
   function createTestTaggableFile(): TaggableFile {
     return {
-      fileId: uuid.v4(),
+      fileId: randomUUID(),
       fileType: 'animation',
-      fileUniqueId: uuid.v4(),
+      fileUniqueId: randomUUID(),
       mimeType: 'video/mp4',
     }
   }
@@ -212,8 +212,19 @@ describe('TagsRepository', () => {
       const publicFile = createTestTaggableFile()
       const privateFile = createTestTaggableFile()
 
-      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'public', taggableFile: publicFile, value: 'visible tag' })
-      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'private', taggableFile: privateFile, value: 'hidden tag' })
+      await tagsRepository.upsert({
+        authorUserId: otherAuthorUserId,
+        visibility: 'public',
+        taggableFile: publicFile,
+        value: 'visible tag',
+      })
+
+      await tagsRepository.upsert({
+        authorUserId: otherAuthorUserId,
+        visibility: 'private',
+        taggableFile: privateFile,
+        value: 'hidden tag',
+      })
 
       async function search(partial: { query: string }) {
         return (
@@ -231,6 +242,64 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: 'hidden tag' }), [])
     })
 
+    it('returns empty array when query has no exact match and all words are shorter than 3 characters', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      const taggableFile = createTestTaggableFile()
+
+      await tagsRepository.upsert({
+        authorUserId,
+        visibility: 'public',
+        taggableFile,
+        value: 'hello world',
+      })
+
+      const results = await tagsRepository.search({
+        query: 'he',
+        limit: 10,
+        ownedOnly: false,
+        authorUserId,
+        testAuthorUserIds: [authorUserId],
+      })
+
+      assert.deepEqual(results, [])
+    })
+
+    it('returns all results if query is empty', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      const taggableFile1 = createTestTaggableFile()
+      const taggableFile2 = createTestTaggableFile()
+
+      await tagsRepository.upsert({
+        authorUserId,
+        visibility: 'public',
+        taggableFile: taggableFile1,
+        value: 'first',
+      })
+
+      await tagsRepository.upsert({
+        authorUserId,
+        visibility: 'public',
+        taggableFile: taggableFile2,
+        value: 'second',
+      })
+
+      const results = await tagsRepository.search({
+        query: '',
+        limit: 10,
+        ownedOnly: false,
+        authorUserId,
+        testAuthorUserIds: [authorUserId],
+      })
+
+      assert.deepEqual(results.map(tag => tag.value).sort(), ['first', 'second'])
+    })
+
     it('ownedOnly returns only tags owned by authorUserId', async () => {
       const tagsRepository = new TagsRepository({ client })
 
@@ -240,8 +309,19 @@ describe('TagsRepository', () => {
       const ownFile = createTestTaggableFile()
       const otherPublicFile = createTestTaggableFile()
 
-      await tagsRepository.upsert({ authorUserId, visibility: 'public', taggableFile: ownFile, value: 'my tag' })
-      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'public', taggableFile: otherPublicFile, value: 'other tag' })
+      await tagsRepository.upsert({
+        authorUserId,
+        visibility: 'public',
+        taggableFile: ownFile,
+        value: 'my tag',
+      })
+
+      await tagsRepository.upsert({
+        authorUserId: otherAuthorUserId,
+        visibility: 'public',
+        taggableFile: otherPublicFile,
+        value: 'other tag',
+      })
 
       async function search(partial: { query: string; ownedOnly: boolean }) {
         return (

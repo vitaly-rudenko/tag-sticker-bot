@@ -230,15 +230,15 @@ async function $handleTaggingFileMessage(context: Context) {
 
   const message_: string[] = []
   const fileType_ = formatFileType(taggableFile)
-  if (stats.publicTags.total === 0 && !stats.requesterTag) {
+  if (stats.publicTags.total === 0 && !stats.authorTag) {
     // Don't add this message if it's a set-less sticker
     if (taggableFile.fileType !== 'sticker' || taggableFile.setName) {
       message_.push(`No one has tagged this ${fileType_} yet\\.`)
     }
   } else {
-    if (stats.requesterTag) {
-      const visibility_ = stats.requesterTag.visibility === 'public' ? 'publicly' : 'privately'
-      const value_ = formatValue(stats.requesterTag.value)
+    if (stats.authorTag) {
+      const visibility_ = stats.authorTag.visibility === 'public' ? 'publicly' : 'privately'
+      const value_ = formatValue(stats.authorTag.value)
       message_.push(`You have *${visibility_}* tagged this ${fileType_}: ${value_}\\.`)
     } else {
       message_.push(`You have not tagged this ${fileType_}\\.`)
@@ -266,7 +266,7 @@ async function $handleTaggingFileMessage(context: Context) {
     reply_markup: Markup.inlineKeyboard(
       [
         Markup.button.callback(
-          stats.requesterTag ? `📎 Edit my tag` : `📎 Tag ${formatFileType(taggableFile)}`,
+          stats.authorTag ? `📎 Edit my tag` : `📎 Tag ${formatFileType(taggableFile)}`,
           'tagging:tag-single',
         ),
         isFavorite

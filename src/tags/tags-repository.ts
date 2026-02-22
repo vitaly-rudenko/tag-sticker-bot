@@ -214,8 +214,8 @@ export class TagsRepository {
            ORDER BY file_unique_id, rank DESC)`
         : `(SELECT DISTINCT ON (file_unique_id) *, 0 AS rank
            FROM tags
-           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"})
-                 ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`
+           WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                 ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''})`
 
     const { rows } = await this.#client.query<{
       author_user_id: string
@@ -315,7 +315,7 @@ export class TagsRepository {
   }
 
   async stats(input: { authorUserId: number; fileUniqueId: string }): Promise<{
-    requesterTag:
+    authorTag:
       | {
           visibility: Visibility
           value: string
@@ -353,11 +353,11 @@ export class TagsRepository {
        )
        SELECT (SELECT COUNT(*) FROM public_tag_values)::int AS total,
               (SELECT array_agg(value) FROM (SELECT value FROM public_tag_values LIMIT 3)) AS values;`,
-      [fileUniqueId, requesterUserId, 'public' satisfies Visibility],
+      [fileUniqueId, authorUserId, 'public' satisfies Visibility],
     )
 
     return {
-      requesterTag:
+      authorTag:
         requesterRows.length > 0
           ? {
               visibility: visibilitySchema.parse(requesterRows[0].visibility),
