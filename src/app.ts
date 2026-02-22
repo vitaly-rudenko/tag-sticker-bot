@@ -827,9 +827,6 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-app.get('/icon.svg', (_req, res) => {
-  res.sendStatus(404)
-})
 app.get('/', async (_req, res) => {
   res.sendFile(path.join(import.meta.dirname, '../web/index.html'))
 })
@@ -853,7 +850,7 @@ app.post('/exchange_token', async (req, res) => {
   res.json({ token })
 })
 
-app.use((req, _res, next) => {
+const authMiddleware = (req, _res, next) => {
   const token = req.header('token')
   if (!token) {
     throw new Error('Token was not provided')
@@ -870,9 +867,9 @@ app.use((req, _res, next) => {
   req.requesterUserId = userId
 
   next()
-})
+}
 
-app.get('/files/:fileId/download', async (req, res) => {
+app.get('/files/:fileId/download', authMiddleware, async (req, res) => {
   const fileId = req.params.fileId
   if (typeof fileId !== 'string') {
     throw new Error('File ID not provided')
@@ -882,7 +879,7 @@ app.get('/files/:fileId/download', async (req, res) => {
   https.get(fileUrl, proxyRes => proxyRes.pipe(res))
 })
 
-app.get('/tags', async (req, res) => {
+app.get('/tags', authMiddleware, async (req, res) => {
   // TODO: pagination
 
   const tags = await tagsRepository.list({
@@ -914,7 +911,7 @@ app.get('/tags', async (req, res) => {
   })
 })
 
-app.get('/favorites', async (req, res) => {
+app.get('/favorites', authMiddleware, async (req, res) => {
   // TODO: pagination
 
   const favorites = await favoritesRepository.list({
