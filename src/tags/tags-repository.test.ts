@@ -47,6 +47,7 @@ describe('TagsRepository', () => {
       const taggableFile3 = createTestTaggableFile()
       const taggableFile4 = createTestTaggableFile()
       const taggableFile5 = createTestTaggableFile()
+      const taggableFile6 = createTestTaggableFile()
 
       async function createTestTag(partial: { taggableFile: TaggableFile; value: string }) {
         await tagsRepository.upsert({
@@ -61,6 +62,7 @@ describe('TagsRepository', () => {
       await createTestTag({ taggableFile: taggableFile3, value: 'well well well, you are here, and i am not' })
       await createTestTag({ taggableFile: taggableFile4, value: 'i care about your wellness' })
       await createTestTag({ taggableFile: taggableFile5, value: 'i know you well' })
+      await createTestTag({ taggableFile: taggableFile6, value: 'i am crazy, am i not?' })
 
       async function search(partial: { query: string }) {
         return (
@@ -101,6 +103,12 @@ describe('TagsRepository', () => {
         'i care about your wellness', // prefix unordered
       ])
 
+      assert.deepEqual(await search({ query: 'am not' }), [
+        //
+        'well well well, you are here, and i am not', // whole exact
+        'i am crazy, am i not?', // whole ordered
+      ])
+
       // Edge case: "i" is too short and ignored in "prefix unordered" clause
       assert.deepEqual(await search({ query: 'i well' }), [
         //
@@ -111,6 +119,7 @@ describe('TagsRepository', () => {
       // Edge case: both "i" and "am" are too short for "prefix unordered" clause
       assert.deepEqual(await search({ query: 'i am' }), [
         //
+        'i am crazy, am i not?', // whole exact
         'well well well, you are here, and i am not', // whole exact
       ])
 
