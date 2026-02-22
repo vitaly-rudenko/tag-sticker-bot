@@ -1,7 +1,7 @@
 #!/bin/sh
 set -ex
 
-cd /app
+cd /server
 
 DATABASE_HOST=$(echo $DATABASE_URL | cut -d'/' -f3 | cut -d'@' -f2 | cut -d':' -f1)
 DATABASE_PORT=$(echo $DATABASE_URL | cut -d'/' -f3 | cut -d'@' -f2 | cut -d':' -f2)
