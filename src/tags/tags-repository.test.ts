@@ -330,6 +330,8 @@ describe('TagsRepository', () => {
 
       await createTestTag('hello (world)')
       await createTestTag('price is $5.00')
+      await createTestTag('тег (важный)')
+      await createTestTag('цена $5.00')
       await createTestTag('unrelated tag')
 
       async function search(partial: { query: string }) {
@@ -346,11 +348,14 @@ describe('TagsRepository', () => {
 
       // Special chars should be treated as literals, not regex operators
       assert.deepEqual(await search({ query: '(world)' }), ['hello (world)'])
-      assert.deepEqual(await search({ query: '$5.00' }), ['price is $5.00'])
+      assert.deepEqual(await search({ query: '$5.00' }), ['цена $5.00', 'price is $5.00'])
+      assert.deepEqual(await search({ query: '(важный)' }), ['тег (важный)'])
+      assert.deepEqual(await search({ query: 'тег' }), ['тег (важный)'])
 
       // Should not throw or return unexpected results
       assert.deepEqual(await search({ query: '.*' }), [])
       assert.deepEqual(await search({ query: '[a-z]' }), [])
+      assert.deepEqual(await search({ query: '[а-я]' }), [])
     })
 
     it('returns exact partial matches for short queries', async () => {
