@@ -202,5 +202,60 @@ describe('TagsRepository', () => {
       // Should not match suffixes
       assert.deepEqual(await search({ query: 'унь' }), [])
     })
+
+    it('hides other authors private tags, but shows their public tags', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+      const otherAuthorUserId = await createTestUser()
+
+      const publicFile = createTestTaggableFile()
+      const privateFile = createTestTaggableFile()
+
+      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'public', taggableFile: publicFile, value: 'visible tag' })
+      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'private', taggableFile: privateFile, value: 'hidden tag' })
+
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            requesterUserId: authorUserId,
+            testAuthorUserIds: [authorUserId, otherAuthorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
+
+      assert.deepEqual(await search({ query: 'visible tag' }), ['visible tag'])
+      assert.deepEqual(await search({ query: 'hidden tag' }), [])
+    })
+
+    it('ownedOnly returns only tags owned by requesterUserId', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const requesterUserId = await createTestUser()
+      const otherAuthorUserId = await createTestUser()
+
+      const ownFile = createTestTaggableFile()
+      const otherPublicFile = createTestTaggableFile()
+
+      await tagsRepository.upsert({ authorUserId: requesterUserId, visibility: 'public', taggableFile: ownFile, value: 'my tag' })
+      await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'public', taggableFile: otherPublicFile, value: 'other tag' })
+
+      async function search(partial: { query: string; ownedOnly: boolean }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            requesterUserId,
+            testAuthorUserIds: [requesterUserId, otherAuthorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
+
+      assert.deepEqual(await search({ query: 'tag', ownedOnly: false }), ['other tag', 'my tag'])
+      assert.deepEqual(await search({ query: 'tag', ownedOnly: true }), ['my tag'])
+    })
   })
 })
