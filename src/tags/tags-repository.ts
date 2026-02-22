@@ -140,7 +140,15 @@ export class TagsRepository {
 
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
 
-    const exactQuery = words.join(' ').length > 0 ? words.join(' ') : undefined
+    const exactQuery = words.join(' ') || undefined
+
+    // Search for whole query with a padding to utilize trgm index (for queries of 2 characters)
+    // NOTE: This doesn't work if tag value uses comma, exclamation mark or other symbols other than whitespace
+    // '\mno ', ' no\M'
+    const exactPartialQueries =
+      exactQuery && exactQuery.length === 2
+        ? [`\\m${escapePostgresPosixRegex(exactQuery)} `, ` ${escapePostgresPosixRegex(exactQuery)}\\M`]
+        : []
 
     // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
     const shouldUsePartialSearch = words.join(' ').length >= 3
@@ -175,6 +183,10 @@ export class TagsRepository {
         : []
 
     const exactClause = exactQuery ? 'value = :exactQuery' : undefined
+    const exactPartialClause =
+      exactPartialQueries.length > 0
+        ? exactPartialQueries.map((_, i) => `value ~* :exactPartialQuery${i + 1}`).join(' OR ')
+        : undefined
     const wholeExactClause = wholeExactQuery ? 'value ~* :wholeExactQuery' : undefined
     const wholeOrderedClause = wholeOrderedQuery ? 'value ~* :wholeOrderedQuery' : undefined
     const prefixOrderedClause = prefixOrderedQuery ? 'value ~* :prefixOrderedQuery' : undefined
@@ -188,6 +200,7 @@ export class TagsRepository {
       prefixOrderedClause,
       wholeOrderedClause,
       wholeExactClause,
+      exactPartialClause,
       exactClause,
     ].filter(Boolean)
 
@@ -205,7 +218,7 @@ export class TagsRepository {
                  (clause, rank) =>
                    `SELECT *, ${rank} AS rank
                     FROM tags
-                    WHERE ${clause}
+                    WHERE (${clause})
                       AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
                           ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`,
                )
@@ -264,6 +277,13 @@ export class TagsRepository {
           ...prefixUnorderedQueries.reduce(
             (replacements, query, i) => {
               replacements[`prefixUnorderedQuery${i + 1}`] = query
+              return replacements
+            },
+            {} as Record<string, string>,
+          ),
+          ...exactPartialQueries.reduce(
+            (replacements, query, i) => {
+              replacements[`exactPartialQuery${i + 1}`] = query
               return replacements
             },
             {} as Record<string, string>,

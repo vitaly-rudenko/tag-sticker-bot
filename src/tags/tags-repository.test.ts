@@ -42,27 +42,21 @@ describe('TagsRepository', () => {
 
       const authorUserId = await createTestUser()
 
-      const taggableFile1 = createTestTaggableFile()
-      const taggableFile2 = createTestTaggableFile()
-      const taggableFile3 = createTestTaggableFile()
-      const taggableFile4 = createTestTaggableFile()
-      const taggableFile5 = createTestTaggableFile()
-      const taggableFile6 = createTestTaggableFile()
-
-      async function createTestTag(partial: { taggableFile: TaggableFile; value: string }) {
+      async function createTestTag(value: string) {
         await tagsRepository.upsert({
           authorUserId,
           visibility: 'public',
-          ...partial,
+          taggableFile: createTestTaggableFile(),
+          value,
         })
       }
 
-      await createTestTag({ taggableFile: taggableFile1, value: 'well' })
-      await createTestTag({ taggableFile: taggableFile2, value: 'swell' })
-      await createTestTag({ taggableFile: taggableFile3, value: 'well well well, you are here, and i am not' })
-      await createTestTag({ taggableFile: taggableFile4, value: 'i care about your wellness' })
-      await createTestTag({ taggableFile: taggableFile5, value: 'i know you well' })
-      await createTestTag({ taggableFile: taggableFile6, value: 'i am crazy, am i not?' })
+      await createTestTag('well')
+      await createTestTag('swell')
+      await createTestTag('well well well, you are here, and i am not')
+      await createTestTag('i care about your wellness')
+      await createTestTag('i know you well')
+      await createTestTag('i am crazy, am i not?')
 
       async function search(partial: { query: string }) {
         return (
@@ -132,25 +126,20 @@ describe('TagsRepository', () => {
 
       const authorUserId = await createTestUser()
 
-      const taggableFile1 = createTestTaggableFile()
-      const taggableFile2 = createTestTaggableFile()
-      const taggableFile3 = createTestTaggableFile()
-      const taggableFile4 = createTestTaggableFile()
-      const taggableFile5 = createTestTaggableFile()
-
-      async function createTestTag(partial: { taggableFile: TaggableFile; value: string }) {
+      async function createTestTag(value: string) {
         await tagsRepository.upsert({
           authorUserId,
           visibility: 'public',
-          ...partial,
+          taggableFile: createTestTaggableFile(),
+          value,
         })
       }
 
-      await createTestTag({ taggableFile: taggableFile1, value: 'кіт' })
-      await createTestTag({ taggableFile: taggableFile2, value: 'скіт' })
-      await createTestTag({ taggableFile: taggableFile3, value: 'кіт кіт кіт, твій ніс бачив, я не ховався' })
-      await createTestTag({ taggableFile: taggableFile4, value: 'я та твій кітунь' })
-      await createTestTag({ taggableFile: taggableFile5, value: 'я добре знаю, що твій кіт робить' })
+      await createTestTag('кіт')
+      await createTestTag('скіт')
+      await createTestTag('кіт кіт кіт, твій ніс бачив, я не ховався')
+      await createTestTag('я та твій кітунь')
+      await createTestTag('я добре знаю, що твій кіт робить')
 
       async function search(partial: { query: string }) {
         return (
@@ -203,28 +192,23 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: 'унь' }), [])
     })
 
-    it('hides other authors private tags, but shows their public tags', async () => {
+    it('hides private tags of other authors', async () => {
       const tagsRepository = new TagsRepository({ client })
 
       const authorUserId = await createTestUser()
       const otherAuthorUserId = await createTestUser()
 
-      const publicFile = createTestTaggableFile()
-      const privateFile = createTestTaggableFile()
+      async function createTestTag(authorId: number, visibility: 'public' | 'private', value: string) {
+        await tagsRepository.upsert({
+          authorUserId: authorId,
+          visibility,
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
 
-      await tagsRepository.upsert({
-        authorUserId: otherAuthorUserId,
-        visibility: 'public',
-        taggableFile: publicFile,
-        value: 'visible tag',
-      })
-
-      await tagsRepository.upsert({
-        authorUserId: otherAuthorUserId,
-        visibility: 'private',
-        taggableFile: privateFile,
-        value: 'hidden tag',
-      })
+      await createTestTag(otherAuthorUserId, 'public', 'visible tag')
+      await createTestTag(otherAuthorUserId, 'private', 'hidden tag')
 
       async function search(partial: { query: string }) {
         return (
@@ -242,19 +226,21 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: 'hidden tag' }), [])
     })
 
-    it('returns empty array when query has no exact match and all words are shorter than 3 characters', async () => {
+    it('returns empty results when no matches or query is too short', async () => {
       const tagsRepository = new TagsRepository({ client })
 
       const authorUserId = await createTestUser()
 
-      const taggableFile = createTestTaggableFile()
+      async function createTestTag(value: string) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
 
-      await tagsRepository.upsert({
-        authorUserId,
-        visibility: 'public',
-        taggableFile,
-        value: 'hello world',
-      })
+      await createTestTag('hello world')
 
       const results = await tagsRepository.search({
         query: 'he',
@@ -272,22 +258,17 @@ describe('TagsRepository', () => {
 
       const authorUserId = await createTestUser()
 
-      const taggableFile1 = createTestTaggableFile()
-      const taggableFile2 = createTestTaggableFile()
+      async function createTestTag(value: string) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
 
-      await tagsRepository.upsert({
-        authorUserId,
-        visibility: 'public',
-        taggableFile: taggableFile1,
-        value: 'first',
-      })
-
-      await tagsRepository.upsert({
-        authorUserId,
-        visibility: 'public',
-        taggableFile: taggableFile2,
-        value: 'second',
-      })
+      await createTestTag('first')
+      await createTestTag('second')
 
       const results = await tagsRepository.search({
         query: '',
@@ -300,28 +281,23 @@ describe('TagsRepository', () => {
       assert.deepEqual(results.map(tag => tag.value).sort(), ['first', 'second'])
     })
 
-    it('ownedOnly returns only tags owned by authorUserId', async () => {
+    it('returns tags owned by specific author', async () => {
       const tagsRepository = new TagsRepository({ client })
 
       const authorUserId = await createTestUser()
       const otherAuthorUserId = await createTestUser()
 
-      const ownFile = createTestTaggableFile()
-      const otherPublicFile = createTestTaggableFile()
+      async function createTestTag(authorId: number, value: string) {
+        await tagsRepository.upsert({
+          authorUserId: authorId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
 
-      await tagsRepository.upsert({
-        authorUserId,
-        visibility: 'public',
-        taggableFile: ownFile,
-        value: 'my tag',
-      })
-
-      await tagsRepository.upsert({
-        authorUserId: otherAuthorUserId,
-        visibility: 'public',
-        taggableFile: otherPublicFile,
-        value: 'other tag',
-      })
+      await createTestTag(authorUserId, 'my tag')
+      await createTestTag(otherAuthorUserId, 'other tag')
 
       async function search(partial: { query: string; ownedOnly: boolean }) {
         return (
@@ -336,6 +312,46 @@ describe('TagsRepository', () => {
 
       assert.deepEqual(await search({ query: 'tag', ownedOnly: false }), ['other tag', 'my tag'])
       assert.deepEqual(await search({ query: 'tag', ownedOnly: true }), ['my tag'])
+    })
+
+    it('returns exact partial matches for short queries', async () => {
+      const tagsRepository = new TagsRepository({ client })
+
+      const authorUserId = await createTestUser()
+
+      async function createTestTag(value: string) {
+        await tagsRepository.upsert({
+          authorUserId,
+          visibility: 'public',
+          taggableFile: createTestTaggableFile(),
+          value,
+        })
+      }
+
+      await createTestTag('cat says no')
+      await createTestTag('no way')
+      await createTestTag('no')
+      await createTestTag('no!')
+      await createTestTag('volcano is hot')
+      await createTestTag('my nostril')
+
+      async function search(partial: { query: string }) {
+        return (
+          await tagsRepository.search({
+            limit: 10,
+            ownedOnly: false,
+            authorUserId,
+            testAuthorUserIds: [authorUserId],
+            ...partial,
+          })
+        ).map(tag => tag.value)
+      }
+
+      assert.deepEqual(await search({ query: 'no' }), [
+        'no', // exact
+        'no way', // exact partial
+        'cat says no', // exact partial
+      ])
     })
   })
 })
