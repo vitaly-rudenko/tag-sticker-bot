@@ -16,6 +16,7 @@ WORKDIR /server
 COPY --from=npm_dependencies /server/node_modules ./node_modules
 COPY package*.json ./
 COPY src src
+COPY web web
 
 COPY docker/docker-entrypoint.sh /usr/local/bin/
 COPY docker/wait-for /usr/local/bin
