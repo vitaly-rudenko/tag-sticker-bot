@@ -405,7 +405,7 @@ async function $handleTaggingTextMessage(context: Context, next: Function) {
   const text = context.message.text
   if (text.startsWith('/')) return next()
 
-  const value = context.message.text.trim()
+  const value = context.message.text.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ')
   if (value.length < 2) {
     await context.sendMessage('❌ Tag must not be shorter than 2 characters.')
     return
