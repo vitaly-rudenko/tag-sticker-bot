@@ -1,21 +1,22 @@
-FROM node:24-alpine
+# Stage: Install NPM packages
+FROM node:24-bookworm-slim AS npm_dependencies
 
-ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US.UTF-8
+WORKDIR /server
+COPY package*.json ./
+RUN npm ci --omit=dev
 
-WORKDIR /app
+# Stage: Runtime
+FROM node:24-bookworm-slim
 
-RUN apk add --no-cache npm
+WORKDIR /server
+COPY --from=npm_dependencies /server/node_modules ./node_modules
+COPY package*.json ./
+COPY src src
 
-COPY package*.json .
-RUN npm ci
+COPY docker/docker-entrypoint.sh /usr/local/bin/
 
-COPY . .
+USER node
 
-RUN touch .env
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["node", "src/app.ts"]
 
-RUN set -ex; \
-  chmod +x ./docker/wait-for; \
-  chmod +x ./docker/entrypoint
-
-ENTRYPOINT ["./docker/entrypoint"]
