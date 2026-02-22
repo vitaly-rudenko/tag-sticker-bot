@@ -130,13 +130,13 @@ export class TagsRepository {
 
   async search(input: {
     query: string
-    requesterUserId: number
+    authorUserId: number
     ownedOnly: boolean
     limit: number
     offset?: number
     testAuthorUserIds?: number[]
   }): Promise<Tag[]> {
-    const { query, requesterUserId, ownedOnly, limit, offset = 0, testAuthorUserIds } = input
+    const { query, authorUserId, ownedOnly, limit, offset = 0, testAuthorUserIds } = input
 
     const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
 
@@ -255,7 +255,7 @@ export class TagsRepository {
         {
           limit,
           offset,
-          authorUserId: requesterUserId,
+          authorUserId,
           testAuthorUserIds,
           exactQuery,
           wholeExactQuery,
@@ -314,7 +314,7 @@ export class TagsRepository {
     return rows.length > 0
   }
 
-  async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{
+  async stats(input: { authorUserId: number; fileUniqueId: string }): Promise<{
     requesterTag:
       | {
           visibility: Visibility
@@ -326,7 +326,7 @@ export class TagsRepository {
       values: string[]
     }
   }> {
-    const { requesterUserId, fileUniqueId } = input
+    const { authorUserId, fileUniqueId } = input
 
     const { rows: requesterRows } = await this.#client.query<{
       value: string
@@ -337,7 +337,7 @@ export class TagsRepository {
        WHERE file_unique_id = $1
          AND author_user_id = $2
        LIMIT 1;`,
-      [fileUniqueId, requesterUserId],
+      [fileUniqueId, authorUserId],
     )
 
     const { rows: publicRows } = await this.#client.query<{

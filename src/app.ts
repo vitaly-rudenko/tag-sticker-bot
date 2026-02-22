@@ -18,7 +18,6 @@ import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
 import { type PhotoSize } from 'telegraf/types'
-import { stringify } from 'csv-stringify/sync'
 import path from 'path'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
 
@@ -47,8 +46,7 @@ const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN!)
 
 await bot.telegram.setMyCommands([
   { command: 'start', description: 'Get help' },
-  { command: 'export_csv', description: 'Export your tags and favorites in a CSV format' },
-  { command: 'export_zip', description: 'Export your tags and favorites in a ZIP format' },
+  { command: 'export', description: 'Export your tags and favorites in a ZIP format' },
 ])
 
 process.once('SIGINT', () => bot.stop('SIGINT'))
@@ -228,7 +226,7 @@ async function $handleTaggingFileMessage(context: Context) {
     userId: requesterUserId,
     fileUniqueId: taggableFile.fileUniqueId,
   })
-  const stats = await tagsRepository.stats({ requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
+  const stats = await tagsRepository.stats({ authorUserId: requesterUserId, fileUniqueId: taggableFile.fileUniqueId })
 
   const message_: string[] = []
   const fileType_ = formatFileType(taggableFile)
@@ -602,7 +600,7 @@ async function $handleSearchInlineQuery(context: Context) {
   } else if (ownedOnly || (effectiveQuery.length >= 2 && effectiveQuery.length <= 100)) {
     const tags = await tagsRepository.search({
       query: effectiveQuery,
-      requesterUserId,
+      authorUserId: requesterUserId,
       ownedOnly,
       limit: 50,
       offset,
@@ -683,127 +681,6 @@ async function $handleSearchInlineQuery(context: Context) {
   }
 }
 
-function formatDate(date: Date) {
-  return date.toISOString().replace('T', ' ').split('.')[0].split(':').slice(0, -1).join(':')
-}
-
-async function $handleExportCsvCommand(context: Context) {
-  if (!context.message) return
-
-  const requesterUserId = context.message.from.id
-
-  const message = await context.reply('⏳ Export in progress...')
-
-  const tags = await tagsRepository.list({ authorUserId: requesterUserId, limit: 10_000 })
-  const favorites = await favoritesRepository.list({ userId: requesterUserId, limit: 10_000 })
-
-  if (tags.length === 0 && favorites.length === 0) {
-    await bot.telegram.editMessageText(message.chat.id, message.message_id, undefined, '❌ Nothing to export.')
-    return
-  }
-
-  const rows: string[][] = [
-    [
-      'Row Type',
-      'Date',
-      'Author User ID',
-      'File Type',
-      'Visibility',
-      'Tag',
-      'Sticker Set Name',
-      'Sticker Emoji',
-      'File MIME Type',
-      'Filename',
-      'File URL',
-      'File Unique ID',
-      'File ID',
-    ],
-  ]
-
-  const fileIdFileUrlMap: Record<string, string | undefined> = {}
-  async function getFileUrl(fileId: string) {
-    if (fileIdFileUrlMap[fileId]) {
-      return fileIdFileUrlMap[fileId]
-    }
-
-    try {
-      const fileUrl = (await bot.telegram.getFileLink(fileId)).toString()
-      fileIdFileUrlMap[fileId] = fileUrl
-      return fileUrl
-    } catch (error) {
-      logger.warn({ error }, 'Failed to get file link')
-      return undefined
-    }
-  }
-
-  let progress = 0
-  const total = tags.length + favorites.length
-  async function trackProgress() {
-    await bot.telegram
-      .editMessageText(
-        message.chat.id,
-        message.message_id,
-        undefined,
-        `⏳ Export in progress... (${++progress}/${total})`,
-      )
-      .catch(() => {})
-  }
-
-  for (const tag of tags) {
-    trackProgress()
-
-    const fileUrl = await getFileUrl(tag.taggableFile.fileId)
-
-    rows.push([
-      'Tag',
-      formatDate(tag.createdAt),
-      String(tag.authorUserId),
-      tag.taggableFile.fileType,
-      tag.visibility,
-      tag.value,
-      ('setName' in tag.taggableFile ? tag.taggableFile.setName : undefined) ?? '',
-      ('emoji' in tag.taggableFile ? tag.taggableFile.emoji : undefined) ?? '',
-      ('mimeType' in tag.taggableFile ? tag.taggableFile.mimeType : undefined) ?? '',
-      ('fileName' in tag.taggableFile ? tag.taggableFile.fileName : undefined) ?? '',
-      fileUrl ?? 'N/A',
-      tag.taggableFile.fileUniqueId,
-      tag.taggableFile.fileId,
-    ])
-  }
-
-  for (const favorite of favorites) {
-    trackProgress()
-
-    const fileUrl = await getFileUrl(favorite.fileId)
-
-    rows.push([
-      'Favorite',
-      '',
-      '',
-      favorite.fileType,
-      '',
-      '',
-      ('setName' in favorite ? favorite.setName : undefined) ?? '',
-      ('emoji' in favorite ? favorite.emoji : undefined) ?? '',
-      ('mimeType' in favorite ? favorite.mimeType : undefined) ?? '',
-      ('fileName' in favorite ? favorite.fileName : undefined) ?? '',
-      fileUrl ?? 'N/A',
-      favorite.fileUniqueId,
-      favorite.fileId,
-    ])
-  }
-
-  const csv = stringify(rows)
-  const filename = `sttagbot_${new Date()
-    .toISOString()
-    .split('.')[0]
-    .replaceAll(/[^\d]+/g, '_')}.csv`
-
-  bot.telegram.deleteMessage(message.chat.id, message.message_id).catch(() => {})
-
-  await context.replyWithDocument({ source: Buffer.from(csv), filename }, { caption: '✅ Your export is ready.' })
-}
-
 const appUrl = process.env.APP_URL!
 if (!appUrl) {
   throw new Error('APP_URL is not defined')
@@ -819,7 +696,7 @@ type TokenPayload = {
   type: 'refresh' | 'access'
 }
 
-async function $handleExportZipCommand(context: Context) {
+async function $handleExportCommand(context: Context) {
   if (!context.message) return
 
   const requesterUserId = context.message.from.id
@@ -886,8 +763,7 @@ bot.use(async (context, next) => {
 
 bot.start($handleStartCommand)
 bot.command('version', $handleVersionCommand)
-bot.command('export_csv', $handleExportCsvCommand)
-bot.command('export_zip', $handleExportZipCommand)
+bot.command('export', $handleExportCommand)
 
 bot.action('tagging:add-to-favorites', $handleTaggingAddToFavoritesAction)
 bot.action('tagging:delete-from-favorites', $handleTaggingDeleteFromFavoritesAction)

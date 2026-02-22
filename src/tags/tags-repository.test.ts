@@ -69,7 +69,7 @@ describe('TagsRepository', () => {
           await tagsRepository.search({
             limit: 10,
             ownedOnly: false,
-            requesterUserId: authorUserId,
+            authorUserId,
             testAuthorUserIds: [authorUserId],
             ...partial,
           })
@@ -157,7 +157,7 @@ describe('TagsRepository', () => {
           await tagsRepository.search({
             limit: 10,
             ownedOnly: false,
-            requesterUserId: authorUserId,
+            authorUserId,
             testAuthorUserIds: [authorUserId],
             ...partial,
           })
@@ -220,7 +220,7 @@ describe('TagsRepository', () => {
           await tagsRepository.search({
             limit: 10,
             ownedOnly: false,
-            requesterUserId: authorUserId,
+            authorUserId,
             testAuthorUserIds: [authorUserId, otherAuthorUserId],
             ...partial,
           })
@@ -231,24 +231,24 @@ describe('TagsRepository', () => {
       assert.deepEqual(await search({ query: 'hidden tag' }), [])
     })
 
-    it('ownedOnly returns only tags owned by requesterUserId', async () => {
+    it('ownedOnly returns only tags owned by authorUserId', async () => {
       const tagsRepository = new TagsRepository({ client })
 
-      const requesterUserId = await createTestUser()
+      const authorUserId = await createTestUser()
       const otherAuthorUserId = await createTestUser()
 
       const ownFile = createTestTaggableFile()
       const otherPublicFile = createTestTaggableFile()
 
-      await tagsRepository.upsert({ authorUserId: requesterUserId, visibility: 'public', taggableFile: ownFile, value: 'my tag' })
+      await tagsRepository.upsert({ authorUserId, visibility: 'public', taggableFile: ownFile, value: 'my tag' })
       await tagsRepository.upsert({ authorUserId: otherAuthorUserId, visibility: 'public', taggableFile: otherPublicFile, value: 'other tag' })
 
       async function search(partial: { query: string; ownedOnly: boolean }) {
         return (
           await tagsRepository.search({
             limit: 10,
-            requesterUserId,
-            testAuthorUserIds: [requesterUserId, otherAuthorUserId],
+            authorUserId,
+            testAuthorUserIds: [authorUserId, otherAuthorUserId],
             ...partial,
           })
         ).map(tag => tag.value)
