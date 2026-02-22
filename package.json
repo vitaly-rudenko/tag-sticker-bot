@@ -26,6 +26,7 @@
     "pino-pretty": "^13.0.0",
     "telegraf": "^4.16.3",
     "umzug": "^3.8.2",
+    "uuid": "^13.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
