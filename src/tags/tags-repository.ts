@@ -143,28 +143,31 @@ export class TagsRepository {
     const exactQuery = words.join(' ').length > 0 ? words.join(' ') : undefined
 
     // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
+    const shouldUsePartialSearch = words.join(' ').length >= 3
 
     // Search for the whole query
     // \mhello world\M
-    const wholeExactQuery =
-      words.join(' ').length >= 3 ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join(' ')}\\M` : undefined
+    const wholeExactQuery = shouldUsePartialSearch
+      ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join(' ')}\\M`
+      : undefined
 
     // Search for each whole word, they must be ordered correctly, in-between words are allowed
-    // NOTE: If there's just one word, resulting query is identical to "wholeExactQuery"
+    // NOTE: If there's just one word, resulting query is identical to "wholeExactQuery", so we skip this clause
     // \mhello\M.*\mworld\M
     const wholeOrderedQuery =
-      words.length > 1 && words.join(' ').length >= 3
+      words.length > 1 && shouldUsePartialSearch
         ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('\\M.*\\m')}\\M`
         : undefined
 
     // Search for each prefixed word, they must be ordered correctly, in-between words are allowed
     // \mhello.*\mworld
-    const prefixOrderedQuery =
-      words.join(' ').length >= 3 ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('.*\\m')}` : undefined
+    const prefixOrderedQuery = shouldUsePartialSearch
+      ? `\\m${words.map(w => escapePostgresPosixRegex(w)).join('.*\\m')}`
+      : undefined
 
     // Search for each prefixed word, in any order, in-between words are allowed
-    // NOTE: If there's just one word, resulting query is identical to "prefixOrderedQuery"
-    // NOTE: If at least one word is less than 3 characters, we can't include this clause
+    // NOTE: If there's just one word, resulting query is identical to "prefixOrderedQuery", so we skip this clause
+    // NOTE: All words must be at least 3 characters long, otherwise this clause will be unused (because it will produce incorrect results)
     // \mhello, \mworld
     const prefixUnorderedQueries =
       words.length > 1 && words.every(w => w.length >= 3)
