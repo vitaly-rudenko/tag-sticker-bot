@@ -354,4 +354,30 @@ describe('TagsRepository', () => {
       ])
     })
   })
+
+  it('it returns prefix unordered matches even if some words are less than 3 characters long', async () => {
+    const tagsRepository = new TagsRepository({ client })
+
+    const authorUserId = await createTestUser()
+
+    await tagsRepository.upsert({
+      authorUserId,
+      visibility: 'public',
+      taggableFile: createTestTaggableFile(),
+      value: 'тобто ти не віриш у мене?',
+    })
+
+    const results = await tagsRepository.search({
+      query: 'ти тобто',
+      limit: 10,
+      ownedOnly: false,
+      authorUserId,
+      testAuthorUserIds: [authorUserId],
+    })
+
+    assert.deepEqual(
+      results.map(tag => tag.value),
+      ['тобто ти не віриш у мене?'],
+    )
+  })
 })

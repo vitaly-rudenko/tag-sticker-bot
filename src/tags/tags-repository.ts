@@ -175,11 +175,17 @@ export class TagsRepository {
 
     // Search for each prefixed word, in any order, in-between words are allowed
     // NOTE: If there's just one word, resulting query is identical to "prefixOrderedQuery", so we skip this clause
-    // NOTE: All words must be at least 3 characters long, otherwise this clause will be unused (because it will produce incorrect results)
+    // NOTE: We pad 2-character words to use trgm index properly, 1-character words will skip this clause completely
     // \mhello, \mworld
     const prefixUnorderedQueries =
-      words.length > 1 && words.every(w => w.length >= 3)
-        ? words.map(word => `\\m${escapePostgresPosixRegex(word)}`)
+      words.length > 1 && words.every(w => w.length >= 2)
+        ? words
+            .filter(w => w.length >= 2)
+            .flatMap(word =>
+              word.length >= 3
+                ? `\\m${escapePostgresPosixRegex(word)}`
+                : [`\\m${escapePostgresPosixRegex(word)} `, ` ${escapePostgresPosixRegex(word)}`],
+            )
         : []
 
     const exactClause = exactQuery ? 'value = :exactQuery' : undefined
