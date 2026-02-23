@@ -17,7 +17,7 @@ import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
-import { type PhotoSize, type Message } from 'telegraf/types'
+import { type PhotoSize, type Message, type ReplyParameters } from 'telegraf/types'
 import path from 'path'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
 
@@ -63,6 +63,7 @@ process.on('SIGTERM', () => shutdown('SIGTERM'))
 
 await bot.telegram.setMyCommands([
   { command: 'start', description: 'Get help' },
+  { command: 'tag', description: 'Reply with /tag to a media file to tag it' },
   { command: 'export', description: 'Export your tags and favorites in a ZIP format' },
 ])
 
@@ -775,6 +776,79 @@ async function $handleExportCommand(context: Context) {
   )
 }
 
+async function $handleTagCommand(context: Context) {
+  if (!context.message || !('text' in context.message)) return
+
+  const reply_parameters: ReplyParameters = {
+    chat_id: context.message.chat.id,
+    message_id: context.message.message_id,
+    allow_sending_without_reply: true,
+  }
+
+  const replyToMessage = context.message.reply_to_message
+  if (!replyToMessage) {
+    await context.sendMessage('❌ Reply to a media file with /tag <tag> to tag it.', { reply_parameters })
+    return
+  }
+
+  const requesterUserId = context.message.from.id
+
+  let taggableFile: TaggableFile | undefined
+  try {
+    taggableFile = extractTaggableFile(replyToMessage)
+  } catch (error) {
+    if (error instanceof UnsupportedFileFormatError) {
+      await context.sendMessage('❌ Only MP4 videos and GIF animations are supported.', { reply_parameters })
+      return
+    }
+
+    throw error
+  }
+
+  if (!taggableFile) {
+    await context.sendMessage('❌ Reply to a media file with /tag <tag> to tag it.', { reply_parameters })
+    return
+  }
+
+  await storeTaggableFile(taggableFile, replyToMessage, requesterUserId)
+
+  const value = context.message.text
+    .split(' ')
+    .slice(1)
+    .join(' ')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .join(' ')
+  if (value.length === 0) {
+    await context.sendMessage('❌ Reply to a media file with /tag <tag> to tag it.', { reply_parameters })
+    return
+  }
+  if (value.length < 2) {
+    await context.sendMessage('❌ Tag must not be shorter than 2 characters.', { reply_parameters })
+    return
+  }
+  if (value.length > 200) {
+    await context.sendMessage('❌ Tag must not be longer than 200 characters.', { reply_parameters })
+    return
+  }
+
+  await tagsRepository.upsert({ authorUserId: requesterUserId, taggableFile, visibility: 'public', value })
+
+  // TODO: Add "Make private", "Delete buttons" and "OK" buttons
+  // TODO: Add "Tagged by @username"
+  const value_ = formatValue(value)
+  await context.reply(
+    [
+      `✅ ${capitalize(formatFileType(taggableFile))} is now searchable by: ${value_}\\.`,
+      '🔓 Visibility: *public*\\.',
+      '🕒 It may take up to 5 minutes to see the changes\\.',
+    ].join('\n'),
+    { parse_mode: 'MarkdownV2', reply_parameters },
+  )
+}
+
 async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles: TaggableFile[]) {
   try {
     for (const taggableFile of taggableFiles) {
@@ -803,6 +877,9 @@ async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles:
 }
 
 bot.on('inline_query', $handleSearchInlineQuery)
+
+// Must be public to be accessible in group chats
+bot.command('tag', $handleTagCommand)
 
 // Only allow to manage favorites and tags in the private chat with bot
 bot.use(async (context, next) => {
