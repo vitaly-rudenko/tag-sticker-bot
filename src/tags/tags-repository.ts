@@ -3,6 +3,8 @@ import { type Tag, tagSchema } from './tag.ts'
 import { taggableFileSchema, type TaggableFile } from '../common/taggable-file.ts'
 import { visibilitySchema, type Visibility } from './visibility.ts'
 import { prepareQuery } from '../utils/prepare-query.ts'
+import { escapePostgresPosixRegex } from '../utils/escape-postgres-posix-regex.ts'
+import { wrapPosixBoundary } from '../utils/wrap-posix-boundary.ts'
 
 export class TagsRepository {
   #client: Client
@@ -129,16 +131,112 @@ export class TagsRepository {
 
   async search(input: {
     query: string
-    requesterUserId: number
+    authorUserId: number
     ownedOnly: boolean
     limit: number
     offset?: number
+    random?: boolean
+    testAuthorUserIds?: number[]
   }): Promise<Tag[]> {
-    const { query, requesterUserId, ownedOnly, limit, offset = 0 } = input
+    const { query, authorUserId, ownedOnly, limit, offset = 0, random = false, testAuthorUserIds } = input
 
-    const escapedQuery = query.replaceAll('_', '\\_').replaceAll('%', '\\%')
-    const exactQuery = `%${escapedQuery}%` // "%hello world%"
-    const fuzzyQuery = `%${escapedQuery.replaceAll(' ', '%')}%` // "%hello%world%"
+    if (random && offset !== 0) {
+      throw new Error('Cannot use offset with random')
+    }
+
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+
+    const exactQuery = words.join(' ') || undefined
+
+    // Search for whole query with a padding to utilize trgm index (for queries of 2 characters)
+    // NOTE: This doesn't work if tag value uses comma, exclamation mark or other symbols other than whitespace
+    // '\mno ', ' no\M'
+    const exactPartialQueries =
+      exactQuery && exactQuery.length === 2
+        ? [wrapPosixBoundary(exactQuery, 'prefix') + ' ', ' ' + wrapPosixBoundary(exactQuery, 'suffix')]
+        : []
+
+    // We do length checks (>= 3) because trgm index only words for words of 3 characters and longer
+    const shouldUsePartialSearch = words.join(' ').length >= 3
+
+    // Search for the whole query
+    // \mhello world\M
+    const wholeExactQuery = shouldUsePartialSearch ? wrapPosixBoundary(words.join(' '), 'whole') : undefined
+
+    // Search for each whole word, they must be ordered correctly, in-between words are allowed
+    // NOTE: If there's just one word, resulting query is identical to "wholeExactQuery", so we skip this clause
+    // \mhello\M.*\mworld\M
+    const wholeOrderedQuery =
+      words.length > 1 && shouldUsePartialSearch ? words.map(w => wrapPosixBoundary(w, 'whole')).join('.*') : undefined
+
+    // Search for each prefixed word, they must be ordered correctly, in-between words are allowed
+    // \mhello.*\mworld
+    const prefixOrderedQuery = shouldUsePartialSearch
+      ? words.map(w => wrapPosixBoundary(w, 'prefix')).join('.*')
+      : undefined
+
+    // Search for each prefixed word, in any order, in-between words are allowed
+    // NOTE: If there's just one word, resulting query is identical to "prefixOrderedQuery", so we skip this clause
+    // NOTE: We pad 2-character words to use trgm index properly, 1-character words will skip this clause completely
+    // \mhello, \mworld
+    const prefixUnorderedQueries =
+      words.length > 1 && words.every(w => w.length >= 2)
+        ? words
+            .filter(w => w.length >= 2)
+            .flatMap(word =>
+              word.length >= 3
+                ? wrapPosixBoundary(word, 'prefix')
+                : [wrapPosixBoundary(word, 'prefix') + ' ', ' ' + escapePostgresPosixRegex(word)],
+            )
+        : []
+
+    const exactClause = exactQuery ? 'value = :exactQuery' : undefined
+    const exactPartialClause =
+      exactPartialQueries.length > 0
+        ? exactPartialQueries.map((_, i) => `value ~* :exactPartialQuery${i + 1}`).join(' OR ')
+        : undefined
+    const wholeExactClause = wholeExactQuery ? 'value ~* :wholeExactQuery' : undefined
+    const wholeOrderedClause = wholeOrderedQuery ? 'value ~* :wholeOrderedQuery' : undefined
+    const prefixOrderedClause = prefixOrderedQuery ? 'value ~* :prefixOrderedQuery' : undefined
+    const prefixUnorderedClause =
+      prefixUnorderedQueries.length > 0
+        ? prefixUnorderedQueries.map((_, i) => `value ~* :prefixUnorderedQuery${i + 1}`).join(' AND ')
+        : undefined
+
+    const clauses = [
+      prefixUnorderedClause,
+      prefixOrderedClause,
+      wholeOrderedClause,
+      wholeExactClause,
+      exactPartialClause,
+      exactClause,
+    ].filter(Boolean)
+
+    // User provided a query, but we can't fulfill the request (e.g. all words are shorter than 3 characters)
+    if (words.length > 0 && clauses.length === 0) {
+      return []
+    }
+
+    const source =
+      clauses.length > 0
+        ? `(SELECT DISTINCT ON (file_unique_id) *
+            FROM (
+              ${clauses
+                .map(
+                  (clause, rank) =>
+                    `SELECT *, ${rank} AS rank
+                     FROM tags
+                     WHERE (${clause})
+                       AND ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                           ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''}`,
+                )
+                .join('\nUNION ALL\n')}
+            )
+            ORDER BY file_unique_id, rank DESC)`
+        : `(SELECT *, 0 AS rank
+            FROM tags
+            WHERE ${ownedOnly ? 'author_user_id = :authorUserId' : "(author_user_id = :authorUserId OR visibility = 'public')"}
+                  ${testAuthorUserIds ? 'AND author_user_id = ANY(:testAuthorUserIds)' : ''})`
 
     const { rows } = await this.#client.query<{
       author_user_id: string
@@ -156,27 +254,46 @@ export class TagsRepository {
       created_at: string
     }>(
       ...prepareQuery(
-        `SELECT author_user_id, visibility, value, file_unique_id, file_id, file_type, set_name, emoji, mime_type, file_name, is_video, is_animated, created_at
-              , (author_user_id = :authorUserId) AS is_owner
-              , (:exactQuery = '' OR value ILIKE :exactQuery) AS is_exact_match
-         FROM (
-           SELECT DISTINCT ON (file_unique_id) *
-           FROM tags
-           WHERE (:fuzzyQuery = '' OR value ILIKE :fuzzyQuery)
-           ${ownedOnly ? `AND author_user_id = :authorUserId` : `AND (author_user_id = :authorUserId OR visibility = :publicVisibility)`}
-         ) AS filtered_tags
-         ORDER BY (author_user_id = :authorUserId) DESC
-                , (:exactQuery = '' OR value ILIKE :exactQuery) DESC
-                , created_at DESC
+        `SELECT author_user_id
+              , visibility
+              , value
+              , file_unique_id
+              , file_id
+              , file_type
+              , set_name
+              , emoji
+              , mime_type
+              , file_name
+              , is_video
+              , is_animated
+              , created_at
+         FROM ${source}
+         ORDER BY ${random ? 'RANDOM()' : 'rank DESC, created_at DESC, value DESC'}
          LIMIT :limit
          OFFSET :offset;`,
         {
           limit,
           offset,
-          authorUserId: requesterUserId,
-          fuzzyQuery,
+          authorUserId,
+          testAuthorUserIds,
           exactQuery,
-          publicVisibility: 'public' satisfies Visibility,
+          wholeExactQuery,
+          wholeOrderedQuery,
+          prefixOrderedQuery,
+          ...prefixUnorderedQueries.reduce(
+            (replacements, query, i) => {
+              replacements[`prefixUnorderedQuery${i + 1}`] = query
+              return replacements
+            },
+            {} as Record<string, string>,
+          ),
+          ...exactPartialQueries.reduce(
+            (replacements, query, i) => {
+              replacements[`exactPartialQuery${i + 1}`] = query
+              return replacements
+            },
+            {} as Record<string, string>,
+          ),
         },
       ),
     )
@@ -223,8 +340,8 @@ export class TagsRepository {
     return rows.length > 0
   }
 
-  async stats(input: { requesterUserId: number; fileUniqueId: string }): Promise<{
-    requesterTag:
+  async stats(input: { authorUserId: number; fileUniqueId: string }): Promise<{
+    authorTag:
       | {
           visibility: Visibility
           value: string
@@ -235,7 +352,7 @@ export class TagsRepository {
       values: string[]
     }
   }> {
-    const { requesterUserId, fileUniqueId } = input
+    const { authorUserId, fileUniqueId } = input
 
     const { rows: requesterRows } = await this.#client.query<{
       value: string
@@ -246,7 +363,7 @@ export class TagsRepository {
        WHERE file_unique_id = $1
          AND author_user_id = $2
        LIMIT 1;`,
-      [fileUniqueId, requesterUserId],
+      [fileUniqueId, authorUserId],
     )
 
     const { rows: publicRows } = await this.#client.query<{
@@ -262,11 +379,11 @@ export class TagsRepository {
        )
        SELECT (SELECT COUNT(*) FROM public_tag_values)::int AS total,
               (SELECT array_agg(value) FROM (SELECT value FROM public_tag_values LIMIT 3)) AS values;`,
-      [fileUniqueId, requesterUserId, 'public' satisfies Visibility],
+      [fileUniqueId, authorUserId, 'public' satisfies Visibility],
     )
 
     return {
-      requesterTag:
+      authorTag:
         requesterRows.length > 0
           ? {
               visibility: visibilitySchema.parse(requesterRows[0].visibility),
@@ -280,4 +397,3 @@ export class TagsRepository {
     }
   }
 }
-

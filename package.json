@@ -4,19 +4,18 @@
   "main": "src/app.ts",
   "type": "module",
   "scripts": {
-    "start": "node --env-file=.env --experimental-strip-types src/app.ts | pino-pretty",
+    "start": "node --env-file-if-exists=.env src/app.ts | pino-pretty",
     "dev": "nodemon --exec 'npm start'",
-    "test": "node --env-file=.env.test --experimental-strip-types --test",
+    "test": "node --env-file-if-exists=.env.test --test",
     "lint": "tsc",
-    "umzug": "node --env-file=.env --experimental-strip-types ./src/umzug/cli.ts",
-    "umzug:test": "node --env-file=.env.test --experimental-strip-types ./src/umzug/cli.ts",
-    "script:populate": "node --experimental-strip-types --env-file=.env scripts/populate.mjs"
+    "umzug": "node --env-file-if-exists=.env ./src/umzug/cli.ts",
+    "umzug:test": "node --env-file-if-exists=.env.test ./src/umzug/cli.ts",
+    "script:populate": "node --env-file-if-exists=.env scripts/populate.mjs"
   },
   "author": "Vitaly Rudenko",
   "license": "ISC",
   "dependencies": {
     "cors": "^2.8.5",
-    "csv-stringify": "^6.5.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "markdown-escapes": "^2.0.1",
@@ -32,12 +31,12 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^22.13.10",
+    "@types/node": "^24.0.0",
     "@types/pg": "^8.11.11",
     "csv-parse": "^5.6.0",
     "nodemon": "^3.1.11",
     "tsc": "^2.0.4",
-    "typescript": "^5.8.2"
+    "typescript": "^5.9.3"
   },
   "nodemonConfig": {
     "watch": [
