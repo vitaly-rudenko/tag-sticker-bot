@@ -17,7 +17,7 @@ import { FilesRepository } from './files/files-repository.ts'
 import { exhaust } from './utils/exhaust.ts'
 import { isDefined } from './utils/is-defined.ts'
 import { StickerSetsRepository } from './sticker-sets/sticker-sets-repository.ts'
-import { type PhotoSize } from 'telegraf/types'
+import { type PhotoSize, type Message } from 'telegraf/types'
 import path from 'path'
 import { requireNonNullable } from './utils/require-non-nullable.ts'
 
@@ -93,6 +93,77 @@ function pickLargestPhoto(photos: PhotoSize[]) {
   return [...photos].sort((a, b) => b.width * b.height - a.width * a.height)[0]
 }
 
+class UnsupportedFileFormatError extends Error {}
+function extractTaggableFile(message: Message): TaggableFile | undefined {
+  if ('video' in message && message.video.mime_type !== 'video/mp4') {
+    throw new UnsupportedFileFormatError()
+  }
+
+  if (
+    'animation' in message &&
+    message.animation.mime_type !== 'video/mp4' &&
+    message.animation.mime_type !== 'image/gif'
+  ) {
+    throw new UnsupportedFileFormatError()
+  }
+
+  if ('sticker' in message) {
+    return {
+      fileId: message.sticker.file_id,
+      fileUniqueId: message.sticker.file_unique_id,
+      fileType: 'sticker',
+      setName: message.sticker.set_name,
+      emoji: message.sticker.emoji,
+      isVideo: message.sticker.is_video,
+      isAnimated: message.sticker.is_animated,
+    }
+  }
+
+  if ('animation' in message) {
+    return {
+      fileId: message.animation.file_id,
+      fileUniqueId: message.animation.file_unique_id,
+      fileType: 'animation',
+      mimeType:
+        message.animation.mime_type === 'image/gif'
+          ? 'image/gif'
+          : message.animation.mime_type === 'video/mp4'
+            ? 'video/mp4'
+            : exhaust(),
+    }
+  }
+
+  if ('photo' in message) {
+    const photo = pickLargestPhoto(message.photo)
+
+    return {
+      fileId: photo.file_id,
+      fileUniqueId: photo.file_unique_id,
+      fileType: 'photo',
+    }
+  }
+
+  if ('video' in message) {
+    return {
+      fileId: message.video.file_id,
+      fileUniqueId: message.video.file_unique_id,
+      fileType: 'video',
+      mimeType: message.video.mime_type === 'video/mp4' ? 'video/mp4' : exhaust(),
+      fileName: message.video.file_name ?? 'video.mp4',
+    }
+  }
+
+  if ('video_note' in message) {
+    return {
+      fileId: message.video_note.file_id,
+      fileUniqueId: message.video_note.file_unique_id,
+      fileType: 'video_note',
+    }
+  }
+
+  return undefined
+}
+
 /* /start */
 async function $handleStartCommand(context: Context) {
   bot.botInfo ??= await bot.telegram.getMe()
@@ -122,70 +193,63 @@ async function $handleVersionCommand(context: Context) {
   await context.reply(`🤖 Version: ${version}`)
 }
 
+async function storeTaggableFile(taggableFile: TaggableFile, message: Message, requesterUserId: number) {
+  await filesRepository.upsert({
+    fileUniqueId: taggableFile.fileUniqueId,
+    fileId: taggableFile.fileId,
+    fileType: taggableFile.fileType,
+    setName: 'setName' in taggableFile ? taggableFile.setName : undefined,
+    mimeType: 'mimeType' in taggableFile ? taggableFile.mimeType : undefined,
+    fileName: 'fileName' in taggableFile ? taggableFile.fileName : undefined,
+    emoji: 'emoji' in taggableFile ? taggableFile.emoji : undefined,
+    isVideo: 'isVideo' in taggableFile ? taggableFile.isVideo : false,
+    isAnimated: 'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
+    data:
+      'sticker' in message
+        ? message.sticker
+        : 'animation' in message
+          ? message.animation
+          : 'photo' in message
+            ? pickLargestPhoto(message.photo)
+            : 'video' in message
+              ? message.video
+              : 'video_note' in message
+                ? message.video_note
+                : exhaust(),
+  })
+
+  if ('sticker' in message && message.sticker.set_name) {
+    try {
+      const stickerSet = await bot.telegram.getStickerSet(message.sticker.set_name)
+
+      await stickerSetsRepository.upsert({
+        setName: stickerSet.name,
+        title: stickerSet.title,
+        data: stickerSet,
+      })
+    } catch (error) {
+      logger.warn({ error, message, requesterUserId }, 'Failed to get sticker set')
+    }
+  }
+}
+
 /* Tagging */
 async function $handleTaggingFileMessage(context: Context) {
   if (!context.message) return
 
   const requesterUserId = context.message.from.id
 
-  if ('video' in context.message && context.message.video.mime_type !== 'video/mp4') {
-    await context.reply(`❌ Sorry, only MP4 videos are supported.`)
-    return
-  }
+  let taggableFile: TaggableFile | undefined
+  try {
+    taggableFile = extractTaggableFile(context.message)
+  } catch (error) {
+    if (error instanceof UnsupportedFileFormatError) {
+      await context.reply(`❌ Only MP4 videos and GIF animations are supported.`)
+      return
+    }
 
-  if (
-    'animation' in context.message &&
-    context.message.animation.mime_type !== 'video/mp4' &&
-    context.message.animation.mime_type !== 'image/gif'
-  ) {
-    await context.reply(`❌ Sorry, only MP4 and GIF animations are supported.`)
-    return
+    throw error
   }
-
-  const taggableFile: TaggableFile | undefined =
-    'sticker' in context.message
-      ? {
-          fileId: context.message.sticker.file_id,
-          fileUniqueId: context.message.sticker.file_unique_id,
-          fileType: 'sticker',
-          setName: context.message.sticker.set_name,
-          emoji: context.message.sticker.emoji,
-          isVideo: context.message.sticker.is_video,
-          isAnimated: context.message.sticker.is_animated,
-        }
-      : 'animation' in context.message
-        ? {
-            fileId: context.message.animation.file_id,
-            fileUniqueId: context.message.animation.file_unique_id,
-            fileType: 'animation',
-            mimeType:
-              context.message.animation.mime_type === 'image/gif'
-                ? 'image/gif'
-                : context.message.animation.mime_type === 'video/mp4'
-                  ? 'video/mp4'
-                  : exhaust(),
-          }
-        : 'photo' in context.message
-          ? {
-              fileId: pickLargestPhoto(context.message.photo).file_id,
-              fileUniqueId: pickLargestPhoto(context.message.photo).file_unique_id,
-              fileType: 'photo',
-            }
-          : 'video' in context.message
-            ? {
-                fileId: context.message.video.file_id,
-                fileUniqueId: context.message.video.file_unique_id,
-                fileType: 'video',
-                mimeType: context.message.video.mime_type === 'video/mp4' ? 'video/mp4' : exhaust(),
-                fileName: context.message.video.file_name ?? 'video.mp4',
-              }
-            : 'video_note' in context.message
-              ? {
-                  fileId: context.message.video_note.file_id,
-                  fileUniqueId: context.message.video_note.file_unique_id,
-                  fileType: 'video_note',
-                }
-              : undefined
 
   if (!taggableFile) return
 
@@ -199,45 +263,7 @@ async function $handleTaggingFileMessage(context: Context) {
     }
   }
 
-  await filesRepository.upsert({
-    fileUniqueId: taggableFile.fileUniqueId,
-    fileId: taggableFile.fileId,
-    fileType: taggableFile.fileType,
-    setName: 'setName' in taggableFile ? taggableFile.setName : undefined,
-    mimeType: 'mimeType' in taggableFile ? taggableFile.mimeType : undefined,
-    fileName: 'fileName' in taggableFile ? taggableFile.fileName : undefined,
-    emoji: 'emoji' in taggableFile ? taggableFile.emoji : undefined,
-    isVideo: 'isVideo' in taggableFile ? taggableFile.isVideo : false,
-    isAnimated: 'isAnimated' in taggableFile ? taggableFile.isAnimated : false,
-    data:
-      'sticker' in context.message
-        ? context.message.sticker
-        : 'animation' in context.message
-          ? context.message.animation
-          : 'photo' in context.message
-            ? pickLargestPhoto(context.message.photo)
-            : 'video' in context.message
-              ? context.message.video
-              : 'video_note' in context.message
-                ? context.message.video_note
-                : exhaust(),
-  })
-
-  if ('sticker' in context.message) {
-    if (context.message.sticker.set_name) {
-      try {
-        const stickerSet = await bot.telegram.getStickerSet(context.message.sticker.set_name)
-
-        await stickerSetsRepository.upsert({
-          setName: stickerSet.name,
-          title: stickerSet.title,
-          data: stickerSet,
-        })
-      } catch (error) {
-        logger.warn({ error, message: context.message, requesterUserId }, 'Failed to get sticker set')
-      }
-    }
-  }
+  await storeTaggableFile(taggableFile, context.message, requesterUserId)
 
   const isFavorite = await favoritesRepository.exists({
     userId: requesterUserId,
