@@ -878,6 +878,12 @@ async function processPotentiallyInvalidTaggableFilesInBackground(taggableFiles:
 
 bot.on('inline_query', $handleSearchInlineQuery)
 
+// Do not allow this bot to be used in channels
+bot.use(async (context, next) => {
+  if (context.chat?.type === 'channel') return
+  return next()
+})
+
 // Must be public to be accessible in group chats
 bot.command('tag', $handleTagCommand)
 
